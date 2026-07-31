@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TypeCraft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- APP-SHELL THEME TOKENS (dashboard / header / results) ---------- */
+:root[data-theme="dark"]{
+  --bg:#0f172a; --surface:#1e293b; --surface-alt:#16213a; --border:#334155;
+  --text-primary:#e2e8f0; --text-muted:#94a3b8; --caret:#3b82f6;
+}
+:root[data-theme="light"]{
+  --bg:#f8fafc; --surface:#ffffff; --surface-alt:#f1f5f9; --border:#e2e8f0;
+  --text-primary:#0f172a; --text-muted:#64748b; --caret:#3b82f6;
+}
+/* ---------- FIXED "PHYSICAL OBJECT" TOKENS for the lesson page (Carriage look) ---------- */
+:root{
+  --lv-paper:#e9e2cf; --lv-paper-dark:#d9d0b4; --lv-paper-edge:#c7bd9e;
+  --lv-hands-bg:#f4f1e8;
+  --lv-ribbon:#a23b3b; --lv-ribbon-dark:#7e2d2d;
+  --lv-ink-text:#3a3528; --lv-success:#3f5f3f; --lv-error:#c1523d; --lv-gold:#c9a227;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg); color:var(--text-primary); font-family:'Inter',sans-serif; min-height:100vh; transition:background .2s ease,color .2s ease;}
+.app-wrapper{max-width:960px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; gap:24px; padding:30px 20px 60px;}
+
+/* ---------- HEADER ---------- */
+.dashboard-header{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.brand{font-family:'Special Elite',monospace; font-size:22px; letter-spacing:0.5px;}
+.streak-display{display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; background:var(--surface); border:1px solid var(--border); padding:8px 14px; border-radius:999px;}
+.streak-label{color:var(--text-muted); font-weight:500;}
+.theme-toggle{background:var(--surface); border:1px solid var(--border); color:var(--text-primary); width:38px; height:38px; border-radius:50%; font-size:16px; cursor:pointer;}
+
+/* ---------- REVIEW PANEL ---------- */
+.review-panel{background:var(--surface); border:1px solid var(--border); border-left:5px solid var(--lv-error); border-radius:14px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.review-info{display:flex; flex-direction:column; gap:8px;}
+.review-title{font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);}
+.review-keys{display:flex; gap:6px; flex-wrap:wrap;}
+.review-key-chip{font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; padding:5px 10px; border-radius:8px; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.35);}
+.review-empty{font-size:13px; color:var(--text-muted);}
+.btn{font-size:13.5px; font-weight:700; padding:11px 18px; border-radius:10px; cursor:pointer; border:none;}
+.btn.primary{background:var(--caret); color:#fff;}
+.btn.secondary{background:var(--surface-alt); color:var(--text-primary); border:1px solid var(--border);}
+.btn.danger{background:#ef4444; color:#fff;}
+
+/* ---------- COACH PANEL ---------- */
+.coach-panel{background:var(--surface); border:1px solid var(--border); border-left:5px solid var(--caret); border-radius:14px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.coach-message{font-size:13.5px; color:var(--text-primary); font-style:italic; max-width:520px; line-height:1.5;}
+
+/* ---------- METRONOME ---------- */
+#metronomeView{display:none; flex-direction:column; gap:14px;}
+.beat-dot{width:22px; height:22px; border-radius:50%; background:var(--caret); margin-left:auto; transition:transform .08s ease, background .08s ease;}
+.beat-dot.pulse{transform:scale(1.6); background:#facc15;}
+#metroPaper .letter.default{color:#1e3a5f;}
+
+/* ---------- TUG OF WAR ---------- */
+#tugOfWarView{display:none; flex-direction:column; gap:14px;}
+.tow-track{display:flex; align-items:center; gap:10px;}
+.tow-label{font-size:12px; font-weight:800; letter-spacing:1px; color:var(--text-muted);}
+.tow-label-left{color:#22c55e;}
+.tow-label-right{color:#ef4444;}
+.tow-bar{flex:1; height:14px; border-radius:999px; background:linear-gradient(90deg, rgba(34,197,94,0.25), rgba(239,68,68,0.25)); position:relative; border:1px solid var(--border);}
+.tow-flag{position:absolute; top:50%; left:50%; width:22px; height:22px; border-radius:50%; background:#facc15; transform:translate(-50%,-50%); transition:left .1s linear; box-shadow:0 0 0 4px rgba(250,204,21,0.25);}
+#towPaper .letter.default{color:#1e3a5f;}
+
+/* ---------- FEEDBACK MODAL ---------- */
+.feedback-stars{display:flex; gap:6px; font-size:30px; color:var(--border); cursor:pointer; margin-bottom:14px;}
+.feedback-stars span.active{color:var(--lv-gold, #f5a524);}
+.feedback-textarea{width:100%; min-height:90px; resize:vertical; background:var(--surface-alt); border:1px solid var(--border); border-radius:10px; padding:12px; color:var(--text-primary); font-family:'Inter',sans-serif; font-size:13.5px; margin-bottom:14px;}
+.feedback-thanks{margin-top:14px; font-size:13px; color:#22c55e; font-weight:600;}
+.feedback-history{margin-top:18px; max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;}
+.feedback-entry{background:var(--surface-alt); border:1px solid var(--border); border-radius:10px; padding:8px 12px; font-size:12.5px;}
+.feedback-entry .fe-stars{color:var(--lv-gold, #f5a524); font-size:12px;}
+.feedback-entry .fe-date{color:var(--text-muted); font-size:11px; float:right;}
+
+/* ---------- HEADER ACTIONS ---------- */
+.header-actions{display:flex; align-items:center; gap:10px;}
+.fun-btn{background:linear-gradient(120deg,#a855f7,#3b82f6); color:#fff; border:none; font-size:13px; font-weight:700; padding:9px 16px; border-radius:999px; cursor:pointer;}
+
+/* ---------- FUN MODE HUB ---------- */
+#funSelectView{display:none; flex-direction:column; gap:18px;}
+.fun-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:16px;}
+.fun-card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:8px; align-items:flex-start;}
+.fun-card.disabled{opacity:0.5;}
+.fun-icon{font-size:28px;}
+.fun-title{font-size:15px; font-weight:700;}
+.fun-desc{font-size:12.5px; color:var(--text-muted); line-height:1.4;}
+
+/* ---------- SPACE INVADERS ---------- */
+#spaceInvadersView{display:none; flex-direction:column; gap:14px;}
+.si-hud{display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 18px;}
+.si-hud-item{font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:700;}
+.si-canvas-wrap{position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--border);}
+#siCanvas{display:block; width:100%; background:#0f172a;}
+.si-hint{text-align:center; font-size:12.5px; color:var(--text-muted);}
+.si-gameover{position:absolute; inset:0; background:rgba(15,23,42,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#fff;}
+.si-gameover.hidden{display:none;}
+.si-gameover h3{font-size:22px; margin:0;}
+.si-gameover .si-score-big{font-family:'IBM Plex Mono',monospace; font-size:38px; font-weight:800; color:#facc15;}
+
+/* ---------- CARD DASHBOARD ---------- */
+.card-dashboard{display:flex; flex-direction:column; gap:24px;}
+.tier-block{display:flex; flex-direction:column; gap:12px;}
+.tier-head{display:flex; align-items:center; gap:10px;}
+.tier-dot{width:10px; height:10px; border-radius:50%;}
+.tier-title{font-size:15.5px; font-weight:700;}
+.card-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:12px;}
+.lesson-card{
+  background:var(--surface); border-radius:12px; border-left:5px solid var(--tier-accent, var(--caret));
+  box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:13px 14px 12px; cursor:pointer;
+  transition:transform .14s ease, box-shadow .14s ease; display:flex; flex-direction:column; gap:6px; min-height:92px;
+}
+.lesson-card:hover{transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,0.18);}
+.lesson-card .lnum{font-size:10.5px; color:var(--text-muted); font-weight:600;}
+.lesson-card .ltitle{font-size:13.5px; font-weight:700; line-height:1.3;}
+.lesson-card .lstars{margin-top:auto; font-size:15px; letter-spacing:2px; color:var(--lv-gold);}
+.lesson-card .lstars .empty{color:var(--border);}
+
+/* ==========================================================================
+   LESSON PAGE — Carriage layout (paper + rail + animated hands, no virtual keys)
+   ========================================================================== */
+#lessonView{display:none; flex-direction:column; gap:18px; animation:fadeSlideIn .25s ease;}
+@keyframes fadeSlideIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+
+.lesson-shell{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px 22px; display:flex; flex-direction:column; gap:14px;}
+.lesson-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+.back-btn{background:var(--surface-alt); border:1px solid var(--border); color:var(--text-primary); font-size:12.5px; font-weight:600; padding:8px 13px; border-radius:9px; cursor:pointer;}
+.lesson-tier-tag{font-size:11px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-muted); font-weight:600;}
+.lesson-title{font-family:'Special Elite',monospace; font-size:20px; margin-top:2px;}
+.key-chips{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+.chip{background:var(--lv-ribbon); color:#fff; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600; padding:4px 10px; border-radius:7px;}
+.chip-label{font-size:11px; color:var(--text-muted); font-weight:600;}
+
+.stage-row{display:flex; gap:10px; align-items:center;}
+.stage-pill{font-size:11.5px; font-weight:700; padding:5px 11px; border-radius:999px; background:var(--surface-alt); color:var(--text-muted); border:1px solid var(--border);}
+.stage-pill.current{background:var(--lv-ribbon); color:#fff; border-color:var(--lv-ribbon-dark);}
+.stage-pill.done{background:rgba(34,197,94,0.18); color:#22c55e; border-color:rgba(34,197,94,0.4);}
+
+.rail-wrap{padding:0 2px;}
+.rail{position:relative; height:30px; display:flex; align-items:center;}
+.rail-track{position:absolute; left:0; right:0; top:50%; height:3px; background:var(--border); border-radius:3px; transform:translateY(-50%);}
+.carriage{position:absolute; left:0; top:50%; transform:translate(0,-50%); width:26px; height:26px; border-radius:7px; background:var(--lv-ribbon); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(162,59,59,0.4); transition:left .08s linear;}
+.carriage svg{width:14px; height:14px; fill:#fff;}
+.carriage.ding{animation:ding .32s ease;}
+@keyframes ding{0%{transform:translate(0,-50%) scale(1) rotate(0deg);}35%{transform:translate(0,-50%) scale(1.3) rotate(-10deg);}70%{transform:translate(0,-50%) scale(0.95) rotate(5deg);}100%{transform:translate(0,-50%) scale(1) rotate(0deg);}}
+
+.paper-wrap{position:relative;}
+.paper{
+  position:relative; background:repeating-linear-gradient(180deg, rgba(0,0,0,0.02) 0 2px, transparent 2px 26px), linear-gradient(180deg, var(--lv-paper) 0%, var(--lv-paper-dark) 100%);
+  border:1px solid var(--lv-paper-edge); border-radius:10px; padding:26px 28px; min-height:130px; transition:box-shadow .15s;
+}
+.text-display{font-family:'IBM Plex Mono', monospace; font-size:20px; line-height:1.75; color:var(--lv-ink-text); letter-spacing:0.2px; white-space:pre-wrap; word-wrap:break-word;}
+.letter{display:inline-block; transition:color .08s ease, background-color .08s ease;}
+.letter.default{color:#1e3a5f;}
+.letter.correct{color:var(--lv-success);}
+.letter.incorrect{color:var(--lv-error); background:rgba(193,82,61,0.18); border-radius:3px;}
+.letter.current{color:var(--lv-paper); background:var(--lv-ribbon); border-radius:2px; animation:caretPulse 1s ease-in-out infinite;}
+@keyframes caretPulse{0%,100%{opacity:1;} 50%{opacity:0.4;}}
+@media (prefers-reduced-motion: reduce){ .letter.current{animation:none;} }
+#typer{position:absolute; inset:0; width:100%; height:100%; opacity:0; resize:none; border:none; outline:none; padding:26px 28px; font-family:'IBM Plex Mono', monospace; font-size:20px; line-height:1.75; background:transparent; color:transparent; caret-color:transparent;}
+.paper.focused{box-shadow:0 0 0 3px var(--lv-ribbon);}
+.start-hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(233,226,207,0.9); color:var(--lv-ribbon-dark); font-size:13.5px; font-weight:600; border-radius:10px; cursor:text;}
+
+.stats-row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+.keycap{border-radius:10px; padding:10px 12px; background:var(--surface-alt); border:1px solid var(--border);}
+.keycap .label{font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); font-weight:700;}
+.keycap .value{font-family:'IBM Plex Mono', monospace; font-size:21px; font-weight:700;}
+.keycap.accent{border-color:var(--lv-ribbon);}
+.keycap.accent .value{color:var(--lv-ribbon);}
+
+.controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.hint{font-size:12px; color:var(--text-muted);}
+.hint kbd{background:var(--surface-alt); border:1px solid var(--border); border-radius:5px; padding:2px 7px; font-family:monospace; font-size:11px;}
+
+/* ---------- animated hands (finger guide) — NO virtual keyboard grid ---------- */
+.hands-card{background:var(--lv-hands-bg); border:1px solid var(--lv-paper-edge); border-radius:16px; padding:16px 18px 18px; display:flex; flex-direction:column; gap:8px;}
+.finger-caption{text-align:center; font-size:12.5px; color:var(--lv-ink-text); font-weight:600;}
+.finger-caption b{color:var(--lv-ribbon);}
+.hands-stage{display:flex; justify-content:center; align-items:flex-end; gap:64px; padding:6px 0 2px;}
+.hand{display:flex; flex-direction:column; align-items:center;}
+.fingers{display:flex; gap:5px; align-items:flex-end;}
+.finger{width:16px; border-radius:8px 8px 4px 4px; opacity:0.5; transition:transform .18s cubic-bezier(.34,1.56,.64,1), filter .18s, opacity .18s;}
+.finger.h-index{height:34px;} .finger.h-middle{height:42px;} .finger.h-ring{height:36px;} .finger.h-pinky{height:26px;}
+.palm-row{display:flex; align-items:center; gap:5px; margin-top:3px;}
+.palm{width:58px; height:28px; border-radius:14px 14px 20px 20px; background:#e2ddc9;}
+.thumb{width:22px; height:14px; border-radius:8px; opacity:0.5; transition:transform .18s cubic-bezier(.34,1.56,.64,1), filter .18s, opacity .18s;}
+.finger.active, .thumb.active{transform:translateY(-8px) scale(1.12); filter:brightness(1.12); opacity:1; box-shadow:0 5px 12px rgba(0,0,0,0.22), 0 0 0 3px rgba(255,255,255,0.7) inset; animation:fingerPulse .9s ease-in-out infinite; z-index:2;}
+@keyframes fingerPulse{0%,100%{box-shadow:0 5px 12px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,255,255,0.7) inset;} 50%{box-shadow:0 8px 16px rgba(0,0,0,0.28), 0 0 0 5px rgba(255,255,255,0.45) inset;}}
+
+/* ---------- RESULTS VIEW ---------- */
+.results-view{position:fixed; inset:0; background:rgba(15,23,42,0.72); display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .3s ease; z-index:20;}
+.results-view.hidden{opacity:0; pointer-events:none;}
+.results-card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:32px 36px; width:100%; max-width:600px; text-align:center; box-shadow:0 30px 70px rgba(0,0,0,0.45);}
+.results-card h2{margin:0 0 12px; font-size:20px;}
+.results-stars{font-size:26px; letter-spacing:5px; color:var(--lv-gold); margin-bottom:14px;}
+.results-stars .empty{color:var(--border);}
+#wpmChart{width:100%; height:200px; background:var(--surface-alt); border-radius:12px; border:1px solid var(--border);}
+.chart-legend{display:flex; justify-content:center; gap:20px; margin:10px 0 20px; font-size:12px; color:var(--text-muted);}
+.legend-item{display:flex; align-items:center; gap:6px;}
+.dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+.dot-wpm{background:var(--caret);}
+.dot-acc{background:#22c55e;}
+.results-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:22px;}
+.rstat{background:var(--surface-alt); border-radius:10px; padding:10px 6px;}
+.rlabel{font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);}
+.rvalue{font-size:20px; font-weight:800;}
+.results-actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+@media (max-width:640px){ .text-display{font-size:18px;} .results-grid{grid-template-columns:repeat(2,1fr);} .hands-stage{gap:36px;} }
+</style>
+</head>
+<body>
+
+  <div class="app-wrapper">
+
+    <header class="dashboard-header">
+      <div class="brand">TypeCraft</div>
+      <div class="header-actions">
+        <div class="streak-display" title="Consecutive days practiced">🔥 <span id="streakCount">0</span><span class="streak-label">day streak</span></div>
+        <button id="funModeBtn" class="fun-btn">🎮 Fun Mode</button>
+        <button id="feedbackBtn" class="fun-btn" style="background:linear-gradient(120deg,#f59e0b,#ef4444);">💬 Feedback</button>
+        <button id="themeToggle" class="theme-toggle" title="Toggle light / dark mode">🌙</button>
+      </div>
+    </header>
+
+    <div id="reviewPanel" class="review-panel"></div>
+    <div id="coachPanel" class="coach-panel"></div>
+
+    <div id="cardDashboard" class="card-dashboard"></div>
+
+    <!-- ============ LESSON PAGE — Carriage layout ============ -->
+    <div id="lessonView">
+      <div class="lesson-shell">
+        <div class="lesson-head">
+          <button class="back-btn" id="backBtn">&larr; Back to dashboard</button>
+        </div>
+        <div>
+          <div class="lesson-tier-tag" id="lessonTier"></div>
+          <div class="lesson-title" id="lessonTitle"></div>
+        </div>
+        <div class="key-chips"><span class="chip-label">Focus:</span><div id="keyChips" style="display:flex; gap:6px; flex-wrap:wrap;"></div></div>
+        <div class="stage-row" id="stageRow"></div>
+
+        <div class="rail-wrap">
+          <div class="rail">
+            <div class="rail-track"></div>
+            <div class="carriage" id="carriage">
+              <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v2H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2V7a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v2H9V7a3 3 0 0 1 3-3zm-1 9a1 1 0 1 1 2 0 1 1 0 0 1-2 0z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="paper-wrap">
+          <div class="paper" id="paper">
+            <div class="text-display" id="textDisplay"></div>
+            <textarea id="typer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+          </div>
+          <div class="start-hint" id="startHint">click here, then just start typing</div>
+        </div>
+
+        <div class="stats-row">
+          <div class="keycap"><div class="label">Time</div><div class="value" id="statTime">0.0s</div></div>
+          <div class="keycap accent"><div class="label">WPM</div><div class="value" id="statWpm">0</div></div>
+          <div class="keycap"><div class="label">Accuracy</div><div class="value" id="statAcc">100%</div></div>
+          <div class="keycap"><div class="label">Errors</div><div class="value" id="statErr">0</div></div>
+        </div>
+
+        <div class="controls">
+          <button class="btn secondary" id="restartBtn">Restart lesson</button>
+          <span class="hint">press <kbd>Tab</kbd> to restart instantly</span>
+        </div>
+      </div>
+
+      <div class="hands-card">
+        <div class="finger-caption" id="fingerCaption">&nbsp;</div>
+        <div class="hands-stage">
+          <div class="hand left">
+            <div class="fingers">
+              <div class="finger h-pinky" data-finger="lp"></div>
+              <div class="finger h-ring" data-finger="lr"></div>
+              <div class="finger h-middle" data-finger="lm"></div>
+              <div class="finger h-index" data-finger="li"></div>
+            </div>
+            <div class="palm-row"><div class="palm"></div><div class="thumb" data-finger="thumb-l"></div></div>
+          </div>
+          <div class="hand right">
+            <div class="fingers">
+              <div class="finger h-index" data-finger="ri"></div>
+              <div class="finger h-middle" data-finger="rm"></div>
+              <div class="finger h-ring" data-finger="rr"></div>
+              <div class="finger h-pinky" data-finger="rp"></div>
+            </div>
+            <div class="palm-row"><div class="thumb" data-finger="thumb-r"></div><div class="palm"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FUN MODE HUB ============ -->
+    <div id="funSelectView">
+      <div class="lesson-head">
+        <button class="back-btn" id="funBackBtn">&larr; Back to dashboard</button>
+      </div>
+      <div class="fun-grid">
+        <div class="fun-card">
+          <div class="fun-icon">👾</div>
+          <div class="fun-title">Space Invaders</div>
+          <div class="fun-desc">Words fall like ships. Type them before they land. Long words are boss fights.</div>
+          <button class="btn primary" id="playSiBtn">Play</button>
+        </div>
+        <div class="fun-card">
+          <div class="fun-icon">🎵</div>
+          <div class="fun-title">Metronome Rhythm</div>
+          <div class="fun-desc">A steady click sets the beat. Type exactly on time to build combo and perfect rhythm.</div>
+          <select id="metroBpmSelect" class="btn secondary" style="width:100%; text-align:center;">
+            <option value="60">60 BPM — Relaxed</option>
+            <option value="80" selected>80 BPM — Steady</option>
+            <option value="100">100 BPM — Brisk</option>
+            <option value="120">120 BPM — Fast</option>
+          </select>
+          <button class="btn primary" id="playMetroBtn">Play</button>
+        </div>
+        <div class="fun-card">
+          <div class="fun-icon">🚩</div>
+          <div class="fun-title">Tug-of-War</div>
+          <div class="fun-desc">Race a bot typist. Outpace it to pull the flag to your side before the paragraph ends.</div>
+          <select id="towBotSpeedSelect" class="btn secondary" style="width:100%; text-align:center;">
+            <option value="30">Bot speed: 30 WPM — Easy</option>
+            <option value="45" selected>Bot speed: 45 WPM — Medium</option>
+            <option value="60">Bot speed: 60 WPM — Hard</option>
+            <option value="80">Bot speed: 80 WPM — Brutal</option>
+          </select>
+          <button class="btn primary" id="playTowBtn">Play</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SPACE INVADERS ============ -->
+    <div id="spaceInvadersView">
+      <div class="lesson-head">
+        <button class="back-btn" id="siBackBtn">&larr; Back to fun mode</button>
+      </div>
+      <div class="si-hud">
+        <div class="si-hud-item">Score: <span id="siScore">0</span></div>
+        <div class="si-hud-item" id="siLives">❤️❤️❤️</div>
+      </div>
+      <div class="si-canvas-wrap">
+        <canvas id="siCanvas" width="880" height="440"></canvas>
+        <div class="si-gameover hidden" id="siGameOver">
+          <h3>Game Over</h3>
+          <div class="si-score-big" id="siFinalScore">0</div>
+          <div class="results-actions">
+            <button class="btn primary" id="siReplayBtn">Play Again</button>
+            <button class="btn secondary" id="siExitBtn">Back to Fun Mode</button>
+          </div>
+        </div>
+      </div>
+      <p class="si-hint">Just start typing any falling word — no need to click first.</p>
+    </div>
+
+    <!-- ============ RESULTS VIEW ============ -->
+    <section id="resultsView" class="results-view hidden">
+      <div class="results-card">
+        <h2>Lesson Complete</h2>
+        <div class="results-stars" id="resultsStars"></div>
+        <canvas id="wpmChart" width="600" height="200"></canvas>
+        <div class="chart-legend">
+          <span class="legend-item"><i class="dot dot-wpm"></i> WPM over time</span>
+          <span class="legend-item"><i class="dot dot-acc"></i> Average accuracy</span>
+        </div>
+        <div class="results-grid">
+          <div class="rstat"><div class="rlabel">WPM</div><div class="rvalue" id="finalWpm">0</div></div>
+          <div class="rstat"><div class="rlabel">Accuracy</div><div class="rvalue" id="finalAcc">0%</div></div>
+          <div class="rstat"><div class="rlabel">Errors</div><div class="rvalue" id="finalErr">0</div></div>
+          <div class="rstat"><div class="rlabel">Time</div><div class="rvalue" id="finalTime">0s</div></div>
+        </div>
+        <div class="results-actions">
+          <button id="retryBtn" class="btn primary">Retry (Tab)</button>
+          <button id="dashboardBtn" class="btn secondary">Back to dashboard</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ METRONOME RHYTHM CHALLENGE ============ -->
+    <div id="metronomeView">
+      <div class="lesson-head"><button class="back-btn" id="metroBackBtn">&larr; Back to fun mode</button></div>
+      <div class="si-hud">
+        <div class="si-hud-item">Score: <span id="metroScore">0</span></div>
+        <div class="si-hud-item">Combo: <span id="metroCombo">0</span>x</div>
+        <div class="si-hud-item">On-Beat: <span id="metroOnBeat">100</span>%</div>
+        <div class="beat-dot" id="beatDot"></div>
+      </div>
+      <div class="paper-wrap">
+        <div class="paper" id="metroPaper">
+          <div class="text-display" id="metroTextDisplay"></div>
+          <textarea id="metroTyper" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+        </div>
+        <div class="start-hint" id="metroStartHint">click here, then type in time with the beat</div>
+      </div>
+      <p class="si-hint">Type each letter as close to the click as you can — early or late breaks your combo.</p>
+    </div>
+    <div class="overlay hidden" id="metroResultsOverlay">
+      <div class="results-card">
+        <h2>Rhythm Session Complete</h2>
+        <div class="results-grid">
+          <div class="rstat"><div class="rlabel">Final Score</div><div class="rvalue" id="metroFinalScore">0</div></div>
+          <div class="rstat"><div class="rlabel">Best Combo</div><div class="rvalue" id="metroBestCombo">0</div></div>
+          <div class="rstat"><div class="rlabel">On-Beat</div><div class="rvalue" id="metroFinalOnBeat">0%</div></div>
+          <div class="rstat"><div class="rlabel">BPM</div><div class="rvalue" id="metroFinalBpm">0</div></div>
+        </div>
+        <div class="results-actions">
+          <button class="btn primary" id="metroReplayBtn">Play Again</button>
+          <button class="btn secondary" id="metroExitBtn">Back to Fun Mode</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TUG-OF-WAR ============ -->
+    <div id="tugOfWarView">
+      <div class="lesson-head"><button class="back-btn" id="towBackBtn">&larr; Back to fun mode</button></div>
+      <div class="si-hud">
+        <div class="si-hud-item">You: <span id="towUserWpm">0</span> WPM</div>
+        <div class="si-hud-item">Bot: <span id="towBotWpmLabel">0</span> WPM</div>
+      </div>
+      <div class="tow-track">
+        <div class="tow-label tow-label-left">YOU</div>
+        <div class="tow-bar"><div class="tow-flag" id="towFlag"></div></div>
+        <div class="tow-label tow-label-right">BOT</div>
+      </div>
+      <div class="paper-wrap">
+        <div class="paper" id="towPaper">
+          <div class="text-display" id="towTextDisplay"></div>
+          <textarea id="towTyper" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+        </div>
+        <div class="start-hint" id="towStartHint">click here, then start typing to pull the flag</div>
+      </div>
+      <p class="si-hint">Every correct letter pulls the flag your way — outpace the bot before it finishes.</p>
+    </div>
+    <div class="overlay hidden" id="towResultsOverlay">
+      <div class="results-card">
+        <h2 id="towResultTitle">Round Complete</h2>
+        <div class="results-grid">
+          <div class="rstat"><div class="rlabel">Your WPM</div><div class="rvalue" id="towFinalUserWpm">0</div></div>
+          <div class="rstat"><div class="rlabel">Bot WPM</div><div class="rvalue" id="towFinalBotWpm">0</div></div>
+        </div>
+        <div class="results-actions">
+          <button class="btn primary" id="towReplayBtn">Play Again</button>
+          <button class="btn secondary" id="towExitBtn">Back to Fun Mode</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FEEDBACK ============ -->
+    <div class="overlay hidden" id="feedbackModal">
+      <div class="results-card" style="max-width:480px; text-align:left;">
+        <h2>Send Feedback</h2>
+        <div class="feedback-stars" id="feedbackStars">
+          <span data-star="1">★</span><span data-star="2">★</span><span data-star="3">★</span><span data-star="4">★</span><span data-star="5">★</span>
+        </div>
+        <textarea id="feedbackText" class="feedback-textarea" placeholder="What's working, what's not, what would you like to see next?"></textarea>
+        <div class="results-actions" style="justify-content:flex-start;">
+          <button class="btn primary" id="feedbackSubmitBtn">Submit</button>
+          <button class="btn secondary" id="feedbackCloseBtn">Close</button>
+        </div>
+        <div id="feedbackThanks" class="feedback-thanks hidden">Thanks — your feedback is saved locally in this browser.</div>
+        <div id="feedbackHistory" class="feedback-history"></div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* ==========================================================================
+   1. LESSON PLAN — copied from the Carriage curriculum (24 lessons, 4 tiers),
+      now extended with word + paragraph drills on every lesson.
+   ========================================================================== */
+const lessons = [
+  { id:'l1', tier:'Beginner — Home Row', keys:['F','J'], title:'Home Base',
+    charDrill:"fff jjj fj fj jf jf fjf jfj ff jj fjfj jfjf",
+    wordDrill:["fjf","jfj","ffj","jff","fjfj","jfjf","ffjj","jjff","fjj"],
+    paragraphDrill:"fjf jfj ffj jff. fjfj jfjf ffjj jjff. fjj jff fjf jfj. ff jj fj jf." },
+  { id:'l2', tier:'Beginner — Home Row', keys:['D','K'], title:'Adding D & K',
+    charDrill:"ddd kkk dk dk kd kd dkd kdk fjdk kdjf",
+    wordDrill:["dkd","kdk","fdk","kfj","djk","kjd","fkd","dkf"],
+    paragraphDrill:"dkd kdk fdk kfj. djk kjd fkd dkf. fj dk kd fj. dd kk fj jd." },
+  { id:'l3', tier:'Beginner — Home Row', keys:['S','L'], title:'Adding S & L',
+    charDrill:"sss lll sl sl ls ls sls lsl fjdksl lskdjf",
+    wordDrill:["sld","lsd","fsl","klsd","dsl","lfk","skl","lsk"],
+    paragraphDrill:"sld lsd fsl klsd. dsl lfk skl lsk. sl ls fj dk. ss ll fj jd." },
+  { id:'l4', tier:'Beginner — Home Row', keys:['A',';'], title:'Adding A & ;',
+    charDrill:"aaa ;;; a; a; ;a ;a a;a ;a; fjdksla ;alskdjf",
+    wordDrill:["dad","sad","lad","ask","add","fads","flask","salad","salsa","alfalfa"],
+    paragraphDrill:"a lad asks a dad; a sad lad adds a flask. salad falls; salsa falls; a lass asks a lad. alfalfa falls; add a flask; ask a lass." },
+  { id:'l5', tier:'Beginner — Home Row', keys:['G','H'], title:'Filling In G & H',
+    charDrill:"ggg hhh gh gh hg hg ghg hgh half glass flash",
+    wordDrill:["half","glass","flash","gala","gash","hall","lag","gas","ask","flask"],
+    paragraphDrill:"a lad has a flask; a gala had a glass. glass falls; a flash; a gash; ask a lass. half a salad falls; add a dash salsa." },
+  { id:'l6', tier:'Beginner — Home Row', keys:['fluency'], title:'Home Row Fluency',
+    charDrill:"asdfghjkl; ;lkjhgfdsa asdf jkl; fdsa lkj;",
+    wordDrill:["flask","glass","salad","salsa","alfalfa","half","flash","gala","ask","lass"],
+    paragraphDrill:"dad had a flask; a lad asks a lass; glass falls; salsa gala; ask dad; a sad lad had a glass flask; all glass falls; add salsa; ask a lass." },
+
+  { id:'l7', tier:'Intermediate — Top Row', keys:['E','I'], title:'Reaching for E & I',
+    charDrill:"eee iii ei ei ie ie eie iei fjdksl eifj iehg",
+    wordDrill:["side","hide","life","aide","die","lid","kid","field","shield","dial"],
+    paragraphDrill:"a kid hides a die; a shield aids a lad. life is a gas; a field lies; a lass hides a lid; a die falls; a kid slides." },
+  { id:'l8', tier:'Intermediate — Top Row', keys:['R','T'], title:'Reaching for R & T',
+    charDrill:"rtrt trtr rt tr rat tar art trade dirt",
+    wordDrill:["rat","tar","art","dirt","trail","start","stare","tire","tired","state"],
+    paragraphDrill:"the star has light; dirt hides the tale. a trail leads a kid; a rat starts a fire; a lid falls; her sister stares. she stirs the salad; a tired girl rests." },
+  { id:'l9', tier:'Intermediate — Top Row', keys:['W','O'], title:'Reaching for W & O',
+    charDrill:"wo ow wow low tow flow slow throw shadow",
+    wordDrill:["low","tow","flow","slow","throw","shadow","word","grow","glow","wood"],
+    paragraphDrill:"the old fowl was slow to grow. a low tide throws a shadow; a word of gold falls. she rows to shore; a girl trades a dirt trail for a low road." },
+  { id:'l10', tier:'Intermediate — Top Row', keys:['Q','P'], title:'Reaching for Q & P',
+    charDrill:"qp pq quip pat quiet pot pet pit",
+    wordDrill:["pat","pet","pit","pot","quip","quiet","pale","plot","spot","past"],
+    paragraphDrill:"the pilot quit; a quiet pet ate a pie. she kept a pet goat; a plot was set apart. a pilot ate a pear at rest; the spot was pale." },
+  { id:'l11', tier:'Intermediate — Top Row', keys:['Y','U'], title:'Reaching for Y & U',
+    charDrill:"yu uy your true study dirty truth",
+    wordDrill:["your","true","study","dirty","truth","quiet","story","juicy","sturdy","tour"],
+    paragraphDrill:"your dirty truth stays quiet at dusk. a study of trust guides you truly; a story tours the world. she tries to write it slowly." },
+  { id:'l12', tier:'Intermediate — Numbers', keys:['1','2','3','4','5'], title:'Number Row: 1–5',
+    charDrill:"1 2 3 4 5 11 22 33 a1 s2 d3 f4 g5",
+    wordDrill:["12","34","51","23","45","102","215","304","521","413"],
+    paragraphDrill:"flight 415 departs at gate 23; the code is 512. she has 21 keys; 34 pages hold a total of 125." },
+  { id:'l13', tier:'Intermediate — Numbers', keys:['6','7','8','9','0'], title:'Number Row: 6–0',
+    charDrill:"6 7 8 9 0 67 89 90 606 707",
+    wordDrill:["67","89","90","1990","2024","60","78","906","1000","250"],
+    paragraphDrill:"the year 1990 had 60 degree days; 78 people saw 90 stars. she kept a diary of 250 pages; a total of 1000 words." },
+
+  { id:'l14', tier:'Advanced — Bottom Row', keys:['V','M'], title:'Reaching for V & M',
+    charDrill:"vm mv move have make time game visit",
+    wordDrill:["move","have","make","time","game","mile","visit","voice","value","smile"],
+    paragraphDrill:"we move a mile every visit; make more time. a voice of value stays; she gives a warm smile. a movie starts the same day." },
+  { id:'l15', tier:'Advanced — Bottom Row', keys:['C',','], title:'Reaching for C & ,',
+    charDrill:"c, ,c cat, cot, cut, come, care,",
+    wordDrill:["cat","cot","cut","come","care","voice","place","close","office","race"],
+    paragraphDrill:"come here, watch closely, then act, please. a cat sat, a cot moved, a voice spoke clearly, calm, slow, quiet." },
+  { id:'l16', tier:'Advanced — Bottom Row', keys:['X','.'], title:'Reaching for X & .',
+    charDrill:"x. .x fox. box. mix. fix. next. exit.",
+    wordDrill:["fox","box","mix","fix","exit","next","text","sixty","taxi","relax"],
+    paragraphDrill:"the fox sat next to a box. it was fixed. a text was mailed. sixty taxis exit at rest." },
+  { id:'l17', tier:'Advanced — Bottom Row', keys:['Z','/'], title:'Reaching for Z & /',
+    charDrill:"z/ /z size zone maze/ lazy hazy dozer",
+    wordDrill:["size","zone","maze","lazy","hazy","zero","amaze","gaze","haze","doze"],
+    paragraphDrill:"a lazy fox grazed near the size of a maze. a hazy haze filled the zone at dusk. a dozer moves slowly, a gaze holds steady." },
+  { id:'l18', tier:'Advanced — Bottom Row', keys:['B','N'], title:'Reaching for B & N',
+    charDrill:"bn nb ban bun born barn bank bright",
+    wordDrill:["ban","bun","born","barn","bank","bright","bunny","between","brand","begin"],
+    paragraphDrill:"a bright bunny ran between the barn and the bank. a new brand began. she can begin any plan now." },
+  { id:'l19', tier:'Advanced — Shift & Symbols', keys:['Shift'], title:'Shift & Capitals',
+    charDrill:"The Cat The Dog A Big Apple New York",
+    wordDrill:["The","Cat","Monday","New York","London","Tokyo","Begins","Now","Capital","Title"],
+    paragraphDrill:"The Cat Sat. Monday Begins Now. New York, London, and Tokyo are big cities. Every Title deserves a Capital Letter." },
+  { id:'l20', tier:'Advanced — Shift & Symbols', keys:['" ! $ % @'], title:'Punctuation & Symbols',
+    charDrill:'! @ # $ % & * ( ) - _ = +',
+    wordDrill:["$12.50","8%","(about)","name@example.com","555-123-4567","\"Wait!\"","he said,","costs $5","call now:","email me"],
+    paragraphDrill:'He said, "Wait!" then left; it costs $12.50 about 8%. Email me at name@example.com or call 555-123-4567.' },
+
+  { id:'l21', tier:'Mastery — Fluency', keys:['speed'], title:'Common Words Sprint',
+    charDrill:"th he in er an re nd at on nt ha es",
+    wordDrill:["the","and","for","you","are","with","this","that","from","have","they","will","one","all","can"],
+    paragraphDrill:"The most common words in English carry most of everyday writing. Once they are automatic, your hands barely pause between them, and your speed climbs on its own." },
+  { id:'l22', tier:'Mastery — Fluency', keys:['sentences'], title:'Sentence Fluency',
+    charDrill:"th he in er an re nd at on",
+    wordDrill:["market","customers","coffee","brewed","quiet","street","busy","minutes","early","arrive"],
+    paragraphDrill:"The market opens early, and the first customers arrive before the coffee is even brewed. A quiet street turns busy within minutes." },
+  { id:'l23', tier:'Mastery — Fluency', keys:['paragraph'], title:'Paragraph Practice',
+    charDrill:"th he in er an re nd at on nt",
+    wordDrill:["rhythm","fingers","keyboard","mechanics","disappear","practice","fluency","goal","mind","free"],
+    paragraphDrill:"Learning to type well is less about speed and more about rhythm. Once your fingers know the keyboard, your mind is free to think about the words instead of where your hands need to go. That is the real goal of practice: to make the mechanics disappear." },
+  { id:'l24', tier:'Mastery — Fluency', keys:['certification'], title:'Timed Challenge',
+    charDrill:"th he in er an re nd at on nt ha",
+    wordDrill:["wrists","relaxed","reach","accurate","automatic","favor","clean","messy","daily","lasting"],
+    paragraphDrill:"Keep both wrists low and relaxed, let your fingers return to the home row after every reach, and resist the urge to look down at the keys. Speed follows naturally once accuracy becomes automatic, so favor a slow, clean pass over a fast, messy one. Small daily sessions build more lasting skill than one long, exhausting sprint." }
+];
+
+const TIER_ORDER = [];
+lessons.forEach(l => { if(!TIER_ORDER.includes(l.tier)) TIER_ORDER.push(l.tier); });
+const TIER_ACCENT = {
+  'Beginner — Home Row':'#22c55e', 'Intermediate — Top Row':'#3b82f6', 'Intermediate — Numbers':'#06b6d4',
+  'Advanced — Bottom Row':'#f97316', 'Advanced — Shift & Symbols':'#a855f7', 'Mastery — Fluency':'#ec4899'
+};
+
+let reviewLesson = null; // synthetic lesson built from the person's weak keys
+function getLessonById(id){ return id === 'review' ? reviewLesson : lessons.find(l => l.id === id); }
+
+/* ==========================================================================
+   2. PROCEDURAL TEXT GENERATORS (per stage)
+   ========================================================================== */
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+function generateFromTokens(tokenString){
+  const tokens = tokenString.split(' ').filter(Boolean);
+  const itemCount = randInt(20,30);
+  const items = [];
+  for(let i=0;i<itemCount;i++){ items.push(tokens[randInt(0,tokens.length-1)]); }
+  return items.join(' ');
+}
+function generateFromPool(pool){
+  const itemCount = randInt(16,24);
+  const items = [];
+  for(let i=0;i<itemCount;i++){ items.push(pool[randInt(0,pool.length-1)]); }
+  return items.join(' ');
+}
+function getStagesForLesson(lesson){
+  if(lesson.isReview) return (lesson.wordDrill && lesson.wordDrill.length) ? ['character','word'] : ['character'];
+  return ['character','word','paragraph'];
+}
+function getStageText(lesson, stageType){
+  if(stageType === 'character') return generateFromTokens(lesson.charDrill);
+  if(stageType === 'word') return generateFromPool(lesson.wordDrill);
+  return lesson.paragraphDrill; // paragraph: load cleanly, no shuffling
+}
+
+/* ==========================================================================
+   3. DOM RENDERING
+   ========================================================================== */
+const textDisplay = document.getElementById('textDisplay');
+let exerciseText = ''; let letters = [];
+function renderText(text){
+  textDisplay.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for(const ch of text){
+    const span = document.createElement('span');
+    span.className = 'letter default';
+    if(ch === '\n'){ span.textContent=''; frag.appendChild(span); frag.appendChild(document.createElement('br')); continue; }
+    span.textContent = (ch === ' ') ? '\u00A0' : ch;
+    frag.appendChild(span);
+  }
+  textDisplay.appendChild(frag);
+  letters = Array.from(textDisplay.querySelectorAll('.letter'));
+  if(letters.length) letters[0].classList.add('current');
+}
+
+/* ==========================================================================
+   4. KEYBOARD ENGINE + LIVE METRICS + STAGE FLOW
+   ========================================================================== */
+const IGNORED_KEYS = new Set(['Shift','CapsLock','Control','Alt','Meta','Escape','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Insert','Delete','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12']);
+const shiftMap = {'!':'1','@':'2','#':'3','$':'4','%':'5','^':'6','&':'7','*':'8','(':'9',')':'0',':':';','"':"'",'<':',','>':'.','?':'/','_':'-','+':'='};
+const FINGER_MAP = {'1':'lp','q':'lp','a':'lp','z':'lp','2':'lr','w':'lr','s':'lr','x':'lr','3':'lm','e':'lm','d':'lm','c':'lm',
+  '4':'li','r':'li','f':'li','v':'li','5':'li','t':'li','g':'li','b':'li','6':'ri','y':'ri','h':'ri','n':'ri','7':'ri','u':'ri','j':'ri','m':'ri',
+  '8':'rm','i':'rm','k':'rm',',':'rm','9':'rr','o':'rr','l':'rr','.':'rr','0':'rp','p':'rp',';':'rp',"'":'rp','/':'rp','-':'rp','=':'rp',' ':'thumb'};
+const FINGER_LABEL = {lp:'Left pinky', lr:'Left ring', lm:'Left middle', li:'Left index', ri:'Right index', rm:'Right middle', rr:'Right ring', rp:'Right pinky', thumb:'Either thumb'};
+
+let currentLessonId = null;
+let currentStage = 0; let stages = [];
+let currentIndex=0, totalKeystrokes=0, correctKeystrokes=0, errorCount=0, startTime=null, sampleIntervalHandle=null, wpmSamples=[], lessonFinished=false;
+const wpmValueEl=document.getElementById('statWpm'), accValueEl=document.getElementById('statAcc'), errValueEl=document.getElementById('statErr');
+
+function currentWpm(){ if(!startTime) return 0; const m=(Date.now()-startTime)/60000; return m<=0?0:Math.round((correctKeystrokes/5)/m); }
+function currentAccuracy(){ if(totalKeystrokes===0) return 100; return Math.max(0, Math.round(((totalKeystrokes-errorCount)/totalKeystrokes)*100)); }
+function updateStatsDisplay(){ wpmValueEl.textContent=currentWpm(); accValueEl.textContent=currentAccuracy()+'%'; errValueEl.textContent=errorCount; }
+function updateCaretPosition(){ letters.forEach(l=>l.classList.remove('current')); if(currentIndex<letters.length) letters[currentIndex].classList.add('current'); }
+function startTimerIfNeeded(){
+  if(startTime) return;
+  startTime = Date.now(); wpmSamples = [];
+  sampleIntervalHandle = setInterval(()=>{ wpmSamples.push({t:(Date.now()-startTime)/1000, wpm: currentWpm()}); }, 5000);
+}
+
+/* ---- per-character weak-key tracking (in-memory during session, flushed to localStorage) ---- */
+let keyStats = {};
+function recordKeyResult(ch, isCorrect){
+  if(ch === ' ' || ch === '\n') return;
+  if(!keyStats[ch]) keyStats[ch] = {attempts:0, errors:0};
+  keyStats[ch].attempts++;
+  if(!isCorrect) keyStats[ch].errors++;
+}
+function saveKeyStats(){ try{ localStorage.setItem('typingMasterKeyStats', JSON.stringify(keyStats)); }catch(e){} saveAnalytics(); }
+function loadKeyStats(){ try{ keyStats = JSON.parse(localStorage.getItem('typingMasterKeyStats') || '{}'); }catch(e){ keyStats = {}; } }
+
+function updateHands(fingerKey){
+  document.querySelectorAll('.finger, .thumb').forEach(el => el.classList.remove('active'));
+  if(!fingerKey) return;
+  if(fingerKey === 'thumb'){ document.querySelectorAll('[data-finger="thumb-l"], [data-finger="thumb-r"]').forEach(el=>el.classList.add('active')); }
+  else{ const el = document.querySelector(`.hands-stage [data-finger="${fingerKey}"]`); if(el) el.classList.add('active'); }
+}
+function nextExpectedChar(){ if(currentIndex>=letters.length) return null; return exerciseText[currentIndex]; }
+function updateFingerGuide(){
+  const fingerCaption = document.getElementById('fingerCaption');
+  const ch = nextExpectedChar();
+  if(ch === null){ fingerCaption.innerHTML='&nbsp;'; updateHands(null); return; }
+  let target = ch.toLowerCase();
+  let needsShift = ch !== ch.toLowerCase() && ch.toLowerCase() !== ch.toUpperCase();
+  if(target === ' ') target = ' ';
+  if(shiftMap[ch]){ target = shiftMap[ch]; needsShift = true; }
+  const fingerKey = FINGER_MAP[target] || 'thumb';
+  fingerCaption.innerHTML = `Reach with: <b>${FINGER_LABEL[fingerKey]}${needsShift ? ' + Shift' : ''}</b>`;
+  updateHands(fingerKey);
+}
+
+function updateCarriage(){
+  const railEl = document.querySelector('.rail'); const carriageEl = document.getElementById('carriage');
+  const pct = letters.length ? Math.min(1, currentIndex/letters.length) : 0;
+  const railWidth = railEl.clientWidth - 26;
+  carriageEl.style.left = (pct*railWidth)+'px';
+}
+
+function renderStageRow(){
+  const row = document.getElementById('stageRow');
+  const labels = {character:'Characters', word:'Words', paragraph:'Paragraph'};
+  row.innerHTML = stages.map((s,i)=>{
+    const cls = i===currentStage ? 'current' : (i<currentStage ? 'done' : '');
+    return `<span class="stage-pill ${cls}" data-stage-index="${i}" style="cursor:pointer;">${i+1}. ${labels[s]}</span>`;
+  }).join('');
+  // all stages are freely selectable — click any pill to jump straight to Words or Paragraph
+  row.querySelectorAll('.stage-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      currentStage = parseInt(pill.dataset.stageIndex, 10);
+      resetLessonState();
+      loadStage();
+    });
+  });
+}
+
+function loadStage(){
+  const lesson = getLessonById(currentLessonId);
+  exerciseText = getStageText(lesson, stages[currentStage]);
+  renderText(exerciseText);
+  currentIndex = 0;
+  updateCaretPosition(); updateCarriage(); updateFingerGuide(); renderStageRow();
+}
+
+/* ---- keyboard adjacency map, for classifying "adjacent key" errors ---- */
+const KEY_ROWS = ["1234567890","qwertyuiop","asdfghjkl;","zxcvbnm,./"];
+function keyCoord(ch){
+  const c = (ch||'').toLowerCase();
+  for(let r=0;r<KEY_ROWS.length;r++){ const idx=KEY_ROWS[r].indexOf(c); if(idx!==-1) return {row:r, col:idx}; }
+  return null;
+}
+function isAdjacentKey(a,b){
+  const pa=keyCoord(a), pb=keyCoord(b);
+  if(!pa||!pb) return false;
+  return Math.abs(pa.row-pb.row)<=1 && Math.abs(pa.col-pb.col)<=1 && !(pa.row===pb.row && pa.col===pb.col);
+}
+
+/* ---- error-pattern classification + key-transition latency (feeds the Typing Coach) ---- */
+let bigramLatency = {};   // "a>b" -> {count, totalMs}
+let errorClasses = {adjacent:0, transposition:0, omission:0, other:0};
+let lastKeyTime = null, lastExpectedChar = null, lastKeystrokeWasCorrect = true, pendingTransposition = null;
+
+function recordBigramLatency(pairKey, ms){
+  if(ms <= 0 || ms > 3000) return; // ignore pauses (not meaningful "rhythm" data)
+  if(!bigramLatency[pairKey]) bigramLatency[pairKey] = {count:0, totalMs:0};
+  bigramLatency[pairKey].count++; bigramLatency[pairKey].totalMs += ms;
+}
+function isOmissionPattern(position, typedChar){
+  for(let look=2; look<=3; look++){
+    if(exerciseText[position+look] && typedChar.toLowerCase()===exerciseText[position+look].toLowerCase()) return true;
+  }
+  return false;
+}
+function classifyError(expectedChar, typedChar, position){
+  let category = 'other';
+  if(pendingTransposition && pendingTransposition.expectPos===position && typedChar.toLowerCase()===pendingTransposition.skippedChar.toLowerCase()){
+    category = 'transposition'; pendingTransposition = null;
+  } else if(exerciseText[position+1] && typedChar.toLowerCase()===exerciseText[position+1].toLowerCase()){
+    pendingTransposition = { expectPos: position+1, skippedChar: expectedChar };
+    category = 'transposition';
+  } else if(isOmissionPattern(position, typedChar)){
+    category = 'omission';
+  } else if(isAdjacentKey(expectedChar, typedChar)){
+    category = 'adjacent';
+  }
+  errorClasses[category] = (errorClasses[category]||0) + 1;
+}
+function saveAnalytics(){
+  try{ localStorage.setItem('typingMasterBigramLatency', JSON.stringify(bigramLatency)); }catch(e){}
+  try{ localStorage.setItem('typingMasterErrorClasses', JSON.stringify(errorClasses)); }catch(e){}
+}
+function loadAnalytics(){
+  try{ bigramLatency = JSON.parse(localStorage.getItem('typingMasterBigramLatency')||'{}'); }catch(e){ bigramLatency={}; }
+  try{ errorClasses = JSON.parse(localStorage.getItem('typingMasterErrorClasses')||'{"adjacent":0,"transposition":0,"omission":0,"other":0}'); }catch(e){ errorClasses={adjacent:0,transposition:0,omission:0,other:0}; }
+}
+
+function handleKeydown(e){
+  if(e.key === 'Tab'){
+    if(lessonView.style.display !== 'none'){ e.preventDefault(); resetLesson(); }
+    return;
+  }
+  const lessonOpen = lessonView.style.display !== 'none';
+  if(!lessonOpen) return;
+
+  // press Space (or any key) while unfocused to jump straight in — "start lesson by pressing space"
+  if(document.activeElement !== typer){
+    e.preventDefault();
+    typer.focus();
+    return;
+  }
+  if(lessonFinished) return;
+  if(e.key === ' '){ e.preventDefault(); }
+  if(e.key === 'Backspace'){
+    e.preventDefault();
+    if(currentIndex>0){ currentIndex--; letters[currentIndex].className='letter default'; updateCaretPosition(); updateCarriage(); updateFingerGuide(); }
+    return;
+  }
+  if(IGNORED_KEYS.has(e.key)) return;
+  if(e.key.length>1 && e.key!=='Enter') return;
+  if(currentIndex>=letters.length) return;
+
+  const inputChar = (e.key==='Enter') ? '\n' : e.key;
+  const expectedChar = exerciseText[currentIndex];
+  startTimerIfNeeded(); totalKeystrokes++;
+
+  const isCorrect = (inputChar === expectedChar);
+  recordKeyResult(expectedChar, isCorrect);
+
+  // rhythm/latency tracking between consecutive CLEAN keystrokes
+  const now = Date.now();
+  if(lastKeyTime !== null && lastExpectedChar !== null && isCorrect && lastKeystrokeWasCorrect){
+    recordBigramLatency(lastExpectedChar.toLowerCase()+'>'+expectedChar.toLowerCase(), now - lastKeyTime);
+  }
+  lastKeyTime = now; lastExpectedChar = expectedChar; lastKeystrokeWasCorrect = isCorrect;
+
+  if(isCorrect){ letters[currentIndex].className='letter correct'; correctKeystrokes++; playSound('correct'); }
+  else{ letters[currentIndex].className='letter incorrect'; errorCount++; playSound('incorrect'); classifyError(expectedChar, inputChar, currentIndex); }
+
+  currentIndex++; updateCaretPosition(); updateStatsDisplay(); updateCarriage(); updateFingerGuide();
+
+  if(currentIndex === letters.length){
+    if(currentStage < stages.length - 1){ currentStage++; loadStage(); }
+    else{ finishLesson(); }
+  }
+}
+document.addEventListener('keydown', handleKeydown);
+
+/* ==========================================================================
+   5. AUDIO FEEDBACK
+   ========================================================================== */
+let audioCtx=null;
+function initAudioContext(){ if(audioCtx) return; const Ctx=window.AudioContext||window.webkitAudioContext; if(Ctx) audioCtx=new Ctx(); }
+document.addEventListener('keydown', initAudioContext, {once:true});
+function playSound(type){
+  if(!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  if(type==='correct'){
+    osc.type='square'; osc.frequency.setValueAtTime(1250, now);
+    gain.gain.setValueAtTime(0.06, now); gain.gain.exponentialRampToValueAtTime(0.0001, now+0.05);
+    osc.start(now); osc.stop(now+0.06);
+  } else {
+    osc.type='sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(70, now+0.15);
+    gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
+    osc.start(now); osc.stop(now+0.2);
+  }
+}
+
+/* ==========================================================================
+   6. STREAK + LESSON PROGRESS + PROBLEM-KEY REVIEW (all localStorage)
+   ========================================================================== */
+const STREAK_KEY='typingMasterStreak', PROGRESS_KEY='typingMasterProgress';
+let progress = {};
+function todayString(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function loadStreak(){ try{ const data=JSON.parse(localStorage.getItem(STREAK_KEY)||'null'); document.getElementById('streakCount').textContent = data?data.count:0; }catch(e){} }
+function recordStreak(){
+  const today = todayString(); let data;
+  try{ data = JSON.parse(localStorage.getItem(STREAK_KEY) || 'null'); }catch(e){ data=null; }
+  if(!data){ data={lastDate:today, count:1}; }
+  else if(data.lastDate===today){ /* already counted */ }
+  else{ const diff=Math.round((new Date(today)-new Date(data.lastDate))/86400000); data.count=(diff===1)?data.count+1:1; data.lastDate=today; }
+  try{ localStorage.setItem(STREAK_KEY, JSON.stringify(data)); }catch(e){}
+  document.getElementById('streakCount').textContent = data.count;
+}
+function loadProgress(){ try{ progress = JSON.parse(localStorage.getItem(PROGRESS_KEY)||'{}'); }catch(e){ progress={}; } }
+function saveProgress(){ try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); }catch(e){} }
+function starGlyphs(n){ let s=''; for(let i=0;i<3;i++) s += i<n ? '★' : '<span class="empty">★</span>'; return s; }
+
+function computeProblemKeys(){
+  return Object.entries(keyStats)
+    .map(([ch, s]) => ({ char: ch, attempts: s.attempts, errors: s.errors, rate: s.errors/s.attempts }))
+    .filter(k => k.attempts >= 5 && k.errors > 0)
+    .sort((a,b) => b.rate - a.rate || b.errors - a.errors)
+    .slice(0, 6);
+}
+function buildReviewLesson(problemKeys){
+  const chars = problemKeys.map(p => p.char);
+  const fragTokens = [];
+  for(let i=0;i<14;i++){
+    const len = randInt(2,3); let frag='';
+    for(let j=0;j<len;j++) frag += chars[randInt(0,chars.length-1)];
+    fragTokens.push(frag);
+  }
+  const allWords = new Set();
+  lessons.forEach(l => { if(Array.isArray(l.wordDrill)) l.wordDrill.forEach(w => allWords.add(w)); });
+  const matched = Array.from(allWords).filter(w => chars.some(c => w.toLowerCase().includes(c.toLowerCase())));
+  return {
+    id:'review', tier:'Review — Problem Keys', isReview:true,
+    keys: chars.map(c => c===' ' ? 'space' : c),
+    title:'Problem Key Practice',
+    charDrill: fragTokens.join(' '),
+    wordDrill: matched.slice(0,12),
+    paragraphDrill: ''
+  };
+}
+function renderReviewPanel(){
+  const panel = document.getElementById('reviewPanel');
+  const problemKeys = computeProblemKeys();
+  if(problemKeys.length === 0){
+    panel.innerHTML = `<div class="review-info"><div class="review-title">Problem Key Review</div><div class="review-empty">Complete a few lessons and your weakest keys will show up here.</div></div>`;
+    return;
+  }
+  panel.innerHTML = `
+    <div class="review-info">
+      <div class="review-title">Your Problem Keys</div>
+      <div class="review-keys">${problemKeys.map(k => `<span class="review-key-chip">${k.char==='  '?'space':k.char} · ${Math.round((1-k.rate)*100)}%</span>`).join('')}</div>
+    </div>
+    <button class="btn danger" id="practiceProblemBtn">Practice These Keys</button>
+  `;
+  document.getElementById('practiceProblemBtn').addEventListener('click', () => {
+    reviewLesson = buildReviewLesson(problemKeys);
+    openLesson('review');
+  });
+}
+
+/* ==========================================================================
+   6b. TYPING COACH — the analytics bot
+   Reads bigramLatency (rhythm) + errorClasses (error pattern) and produces
+   plain-language, targeted feedback, plus a generator for a custom drill.
+   ========================================================================== */
+function getExtremeBigram(wantSlow){
+  let best = null;
+  Object.entries(bigramLatency).forEach(([pair, d]) => {
+    if(d.count < 3) return;
+    const avg = d.totalMs / d.count;
+    if(!best || (wantSlow ? avg > best.avg : avg < best.avg)) best = {pair, avg, count:d.count};
+  });
+  return best;
+}
+function dominantErrorCategory(){
+  const entries = Object.entries(errorClasses).filter(([k]) => k !== 'other');
+  entries.sort((a,b) => b[1]-a[1]);
+  return (entries.length && entries[0][1] > 0) ? entries[0] : null;
+}
+function totalAnalyticsSamples(){
+  const latencyTotal = Object.values(bigramLatency).reduce((sum,d) => sum+d.count, 0);
+  const errorTotal = Object.values(errorClasses).reduce((sum,v) => sum+v, 0);
+  return latencyTotal + errorTotal;
+}
+function generateBotMessage(){
+  const slow = getExtremeBigram(true);
+  const fast = getExtremeBigram(false);
+  const dom = dominantErrorCategory();
+  const parts = [];
+  if(slow && fast && slow.pair !== fast.pair){
+    const [sa,sb] = slow.pair.split('>'); const [fa,fb] = fast.pair.split('>');
+    parts.push(`You type '${fa}' to '${fb}' quickly, but your rhythm stumbles moving from '${sa}' to '${sb}'.`);
+  } else if(slow){
+    const [sa,sb] = slow.pair.split('>');
+    parts.push(`Your rhythm stumbles moving from '${sa}' to '${sb}'.`);
+  }
+  if(dom){
+    const [cat] = dom;
+    if(cat === 'adjacent') parts.push(`Most of your misses are adjacent-key slips — focus on accuracy over raw speed for a bit.`);
+    else if(cat === 'transposition') parts.push(`You're mostly swapping letter order — try typing in a steady, metronome-like flow instead of rushing ahead.`);
+    else if(cat === 'omission') parts.push(`You seem to be skipping ahead of yourself — slow down slightly so every letter actually lands.`);
+  }
+  return parts.length ? parts.join(' ') : null;
+}
+function buildSmartPracticeLesson(){
+  const slow = getExtremeBigram(true);
+  const problemKeys = computeProblemKeys();
+  const targetChars = problemKeys.length ? problemKeys.map(p=>p.char) : (slow ? slow.pair.split('>') : ['a','s']);
+  const targetPair = slow ? slow.pair.replace('>','') : targetChars.slice(0,2).join('');
+
+  const allWords = new Set();
+  lessons.forEach(l => { if(Array.isArray(l.wordDrill)) l.wordDrill.forEach(w=>allWords.add(w)); });
+  let matched = Array.from(allWords).filter(w => w.toLowerCase().includes(targetPair));
+  if(matched.length < 6){
+    const extra = Array.from(allWords).filter(w => targetChars.some(c => w.toLowerCase().includes(c.toLowerCase())));
+    matched = Array.from(new Set([...matched, ...extra]));
+  }
+
+  const fragTokens = [];
+  for(let i=0;i<14;i++){
+    const len = randInt(2,3); let frag='';
+    for(let j=0;j<len;j++) frag += targetChars[randInt(0,targetChars.length-1)];
+    fragTokens.push(frag);
+  }
+
+  const errCount = Object.values(errorClasses).reduce((a,b)=>a+b,0);
+  return {
+    id:'smart', tier:'Coach — Smart Practice', isReview:true,
+    keys: targetChars.map(c => c===' ' ? 'space' : c),
+    title:'Smart Practice Drill',
+    botIntro: `I noticed ${errCount} errors concentrated around '${targetPair}' clustering. Here's a custom precision drill to smooth it out.`,
+    charDrill: fragTokens.join(' '),
+    wordDrill: matched.slice(0,12),
+    paragraphDrill: ''
+  };
+}
+function renderCoachPanel(){
+  const panel = document.getElementById('coachPanel');
+  if(totalAnalyticsSamples() < 15){
+    panel.innerHTML = `<div class="review-info"><div class="review-title">Typing Coach</div><div class="review-empty">Keep practicing — your coach starts spotting patterns after a bit more data.</div></div>`;
+    return;
+  }
+  const msg = generateBotMessage() || "You're typing pretty evenly — no strong weak spots yet.";
+  panel.innerHTML = `
+    <div class="review-info">
+      <div class="review-title">Typing Coach</div>
+      <div class="coach-message">"${msg}"</div>
+    </div>
+    <button class="btn primary" id="smartPracticeBtn">Generate Smart Practice</button>
+  `;
+  document.getElementById('smartPracticeBtn').addEventListener('click', () => {
+    reviewLesson = buildSmartPracticeLesson();
+    openLesson('review');
+  });
+}
+
+/* ==========================================================================
+   7. WPM GRAPH (Canvas)
+   ========================================================================== */
+const wpmChart = document.getElementById('wpmChart');
+function drawWpmGraph(samples, avgAccuracy){
+  const ctx = wpmChart.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = wpmChart.clientWidth||600, cssH = wpmChart.clientHeight||200;
+  wpmChart.width=cssW*dpr; wpmChart.height=cssH*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const w=cssW,h=cssH,padding=20; ctx.clearRect(0,0,w,h);
+  if(samples.length===0){ ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('Not enough data for a curve — nice and fast!', w/2, h/2); return; }
+  const maxWpm = Math.max(...samples.map(s=>s.wpm), 10);
+  const stepX = (w-padding*2)/Math.max(samples.length-1,1);
+  ctx.strokeStyle='rgba(148,163,184,0.15)'; ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){ const y=padding+(h-padding*2)*(i/3); ctx.beginPath(); ctx.moveTo(padding,y); ctx.lineTo(w-padding,y); ctx.stroke(); }
+  ctx.strokeStyle='#3b82f6'; ctx.lineWidth=2.5; ctx.beginPath();
+  samples.forEach((s,i)=>{ const x=padding+i*stepX; const y=h-padding-(s.wpm/maxWpm)*(h-padding*2); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.lineTo(padding+(samples.length-1)*stepX, h-padding); ctx.lineTo(padding,h-padding); ctx.closePath();
+  ctx.fillStyle='rgba(59,130,246,0.12)'; ctx.fill();
+  const accY = h-padding-(avgAccuracy/100)*(h-padding*2);
+  ctx.strokeStyle='#22c55e'; ctx.setLineDash([5,4]); ctx.lineWidth=2; ctx.beginPath();
+  ctx.moveTo(padding,accY); ctx.lineTo(w-padding,accY); ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* ==========================================================================
+   8. VIEW SWITCHING / LESSON LIFECYCLE
+   ========================================================================== */
+const cardDashboard = document.getElementById('cardDashboard');
+const lessonView = document.getElementById('lessonView');
+const resultsView = document.getElementById('resultsView');
+const paper = document.getElementById('paper');
+const typer = document.getElementById('typer');
+const startHint = document.getElementById('startHint');
+
+function renderDashboard(){
+  cardDashboard.innerHTML = '';
+  TIER_ORDER.forEach(tier => {
+    const accent = TIER_ACCENT[tier] || '#3b82f6';
+    const block = document.createElement('div'); block.className='tier-block';
+    block.innerHTML = `<div class="tier-head"><div class="tier-dot" style="background:${accent}"></div><div class="tier-title">${tier}</div></div>`;
+    const grid = document.createElement('div'); grid.className='card-grid';
+    lessons.filter(l=>l.tier===tier).forEach(l=>{
+      const p = progress[l.id]; const stars = p?p.stars:0;
+      const card = document.createElement('div'); card.className='lesson-card';
+      card.style.setProperty('--tier-accent', accent);
+      card.innerHTML = `<div class="lnum">${l.id.toUpperCase()}</div><div class="ltitle">${l.title}</div><div class="lstars">${starGlyphs(stars)}</div>`;
+      card.addEventListener('click', () => openLesson(l.id));
+      grid.appendChild(card);
+    });
+    block.appendChild(grid); cardDashboard.appendChild(block);
+  });
+}
+
+function openLesson(lessonId){
+  currentLessonId = lessonId;
+  const l = getLessonById(lessonId);
+  document.getElementById('lessonTier').textContent = l.botIntro || l.tier;
+  document.getElementById('lessonTitle').textContent = l.title;
+  document.getElementById('keyChips').innerHTML = l.keys.map(k=>`<span class="chip">${k}</span>`).join('');
+  stages = getStagesForLesson(l);
+  currentStage = 0;
+  cardDashboard.style.display='none'; document.getElementById('reviewPanel').style.display='none';
+  lessonView.style.display='flex'; resultsView.classList.add('hidden');
+  resetLessonState();
+  loadStage();
+}
+function backToDashboard(){
+  lessonView.style.display='none'; resultsView.classList.add('hidden');
+  document.getElementById('funSelectView').style.display='none';
+  document.getElementById('spaceInvadersView').style.display='none';
+  document.getElementById('metronomeView').style.display='none';
+  document.getElementById('tugOfWarView').style.display='none';
+  siStop(); metStop(); towStop();
+  cardDashboard.style.display='flex';
+  document.getElementById('reviewPanel').style.display='flex';
+  document.getElementById('coachPanel').style.display='flex';
+  clearInterval(sampleIntervalHandle);
+  saveKeyStats();
+  renderDashboard(); renderReviewPanel(); renderCoachPanel();
+}
+function openFunMode(){
+  cardDashboard.style.display='none';
+  document.getElementById('reviewPanel').style.display='none';
+  document.getElementById('coachPanel').style.display='none';
+  lessonView.style.display='none'; resultsView.classList.add('hidden');
+  document.getElementById('spaceInvadersView').style.display='none';
+  document.getElementById('metronomeView').style.display='none';
+  document.getElementById('tugOfWarView').style.display='none';
+  document.getElementById('funSelectView').style.display='flex';
+}
+function resetLessonState(){
+  clearInterval(sampleIntervalHandle);
+  currentIndex=0; totalKeystrokes=0; correctKeystrokes=0; errorCount=0; startTime=null; wpmSamples=[]; lessonFinished=false;
+  updateStatsDisplay(); paper.style.opacity='1'; startHint.style.display='flex'; paper.classList.remove('focused');
+  typer.value='';
+}
+function resetLesson(){ currentStage=0; resetLessonState(); loadStage(); }
+
+function finishLesson(){
+  lessonFinished = true; clearInterval(sampleIntervalHandle);
+  const finalWpm = currentWpm(); const finalAcc = currentAccuracy();
+  const elapsedSec = startTime ? Math.round((Date.now()-startTime)/1000) : 0;
+  wpmSamples.push({t: elapsedSec, wpm: finalWpm});
+
+  let stars = 0;
+  if(finalAcc>=98) stars=3; else if(finalAcc>=92) stars=2; else if(finalAcc>=80) stars=1;
+  if(!getLessonById(currentLessonId).isReview){
+    const prev = progress[currentLessonId];
+    progress[currentLessonId] = { stars: Math.max(stars, prev?prev.stars:0), bestWpm: Math.max(finalWpm, prev?prev.bestWpm:0), bestAcc: Math.max(finalAcc, prev?prev.bestAcc:0) };
+    saveProgress();
+  }
+  saveKeyStats();
+
+  document.getElementById('finalWpm').textContent = finalWpm;
+  document.getElementById('finalAcc').textContent = finalAcc+'%';
+  document.getElementById('finalErr').textContent = errorCount;
+  document.getElementById('finalTime').textContent = elapsedSec+'s';
+  document.getElementById('resultsStars').innerHTML = starGlyphs(stars);
+  recordStreak();
+  paper.style.opacity='0'; resultsView.classList.remove('hidden');
+  drawWpmGraph(wpmSamples, finalAcc);
+}
+
+/* ==========================================================================
+   9. FUN MODE — Space Invaders
+   Words fall like ships; typing the full word destroys it. Long words spawn
+   as multi-hit "boss" ships. Short words are fast, low-health "scouts".
+   ========================================================================== */
+const SI = { canvas:null, ctx:null, running:false, ships:[], score:0, lives:3, buffer:'', spawnTimer:0, spawnInterval:1800, animHandle:null, lastTs:0 };
+let SI_SHORT_WORDS = [], SI_LONG_WORDS = [];
+
+function siGatherWords(){
+  const set = new Set();
+  lessons.forEach(l => { if(Array.isArray(l.wordDrill)) l.wordDrill.forEach(w => { if(/^[a-zA-Z]+$/.test(w)) set.add(w.toLowerCase()); }); });
+  const all = Array.from(set);
+  SI_SHORT_WORDS = all.filter(w => w.length <= 4);
+  SI_LONG_WORDS = all.filter(w => w.length >= 6);
+  if(SI_SHORT_WORDS.length === 0) SI_SHORT_WORDS = ['cat','dog','sun','run','fox','pit','ask'];
+  if(SI_LONG_WORDS.length === 0) SI_LONG_WORDS = ['keyboard','practice','accuracy','fluency'];
+}
+function siSpawnShip(){
+  const isBoss = Math.random() < 0.16;
+  const word = isBoss ? SI_LONG_WORDS[randInt(0,SI_LONG_WORDS.length-1)] : SI_SHORT_WORDS[randInt(0,SI_SHORT_WORDS.length-1)];
+  SI.ships.push({ word, x: randInt(60, SI.canvas.width-60), y:-30, speed: isBoss?16:38, isBoss, hp: isBoss?3:1, maxHp: isBoss?3:1, hitFlash:0 });
+}
+function siStart(){
+  siGatherWords();
+  SI.canvas = document.getElementById('siCanvas'); SI.ctx = SI.canvas.getContext('2d');
+  SI.ships=[]; SI.score=0; SI.lives=3; SI.buffer=''; SI.spawnTimer=0; SI.spawnInterval=1800; SI.running=true; SI.lastTs=performance.now();
+  siUpdateHud();
+  document.getElementById('siGameOver').classList.add('hidden');
+  cancelAnimationFrame(SI.animHandle);
+  SI.animHandle = requestAnimationFrame(siLoop);
+}
+function siStop(){ SI.running=false; cancelAnimationFrame(SI.animHandle); }
+function siLoop(ts){
+  if(!SI.running) return;
+  const dt = ts - SI.lastTs; SI.lastTs = ts;
+  SI.spawnTimer += dt;
+  if(SI.spawnTimer > SI.spawnInterval){ SI.spawnTimer = 0; siSpawnShip(); if(SI.spawnInterval > 700) SI.spawnInterval -= 25; }
+  SI.ships.forEach(s => { s.y += s.speed*(dt/1000); if(s.hitFlash>0) s.hitFlash -= dt; });
+  const bottom = SI.canvas.height - 24;
+  const survivors = [];
+  SI.ships.forEach(s => { if(s.y >= bottom){ SI.lives--; SI.buffer=''; } else survivors.push(s); });
+  SI.ships = survivors;
+  if(SI.lives <= 0){ siGameOver(); return; }
+  siRender(); siUpdateHud();
+  SI.animHandle = requestAnimationFrame(siLoop);
+}
+function siRender(){
+  const ctx = SI.ctx, c = SI.canvas;
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  for(let i=0;i<30;i++){ ctx.fillRect((i*53)%c.width, (i*97)%c.height, 2, 2); }
+  SI.ships.forEach(s => {
+    const w = s.isBoss?52:26, h = s.isBoss?32:18;
+    ctx.fillStyle = s.hitFlash>0 ? '#ffffff' : (s.isBoss ? '#a855f7' : '#3b82f6');
+    ctx.fillRect(s.x-w/2, s.y-h/2, w, h);
+    const matched = (SI.buffer && s.word.startsWith(SI.buffer)) ? SI.buffer.length : 0;
+    ctx.font='14px monospace'; ctx.textAlign='left';
+    const typedPart = s.word.slice(0,matched), restPart = s.word.slice(matched);
+    const totalWidth = ctx.measureText(s.word).width;
+    const startX = s.x - totalWidth/2;
+    ctx.fillStyle = '#22c55e'; ctx.fillText(typedPart, startX, s.y-h/2-8);
+    ctx.fillStyle = '#e2e8f0'; ctx.fillText(restPart, startX+ctx.measureText(typedPart).width, s.y-h/2-8);
+    if(s.isBoss){
+      ctx.fillStyle='#334155'; ctx.fillRect(s.x-26, s.y-h/2-22, 52, 5);
+      ctx.fillStyle='#ef4444'; ctx.fillRect(s.x-26, s.y-h/2-22, 52*(s.hp/s.maxHp), 5);
+    }
+  });
+}
+function siUpdateHud(){
+  document.getElementById('siScore').textContent = SI.score;
+  document.getElementById('siLives').textContent = '❤️'.repeat(Math.max(0,SI.lives)) || '💀';
+}
+function siGameOver(){
+  siStop();
+  document.getElementById('siFinalScore').textContent = SI.score;
+  document.getElementById('siGameOver').classList.remove('hidden');
+}
+function siHandleChar(ch){
+  if(!SI.running) return;
+  const candidate = SI.buffer + ch;
+  const target = SI.ships.find(s => s.word.startsWith(candidate));
+  if(target){
+    SI.buffer = candidate;
+    if(SI.buffer === target.word){
+      target.hp -= 1; target.hitFlash = 120;
+      playSound('correct');
+      if(target.hp <= 0){ SI.ships = SI.ships.filter(s => s !== target); SI.score += target.isBoss ? 50 : 10; }
+      SI.buffer = '';
+    }
+  } else {
+    SI.buffer = '';
+    playSound('incorrect');
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if(document.getElementById('spaceInvadersView').style.display === 'none') return;
+  if(e.key === ' ') e.preventDefault();
+  if(e.key.length === 1){ e.preventDefault(); siHandleChar(e.key.toLowerCase()); }
+});
+document.getElementById('funModeBtn').addEventListener('click', openFunMode);
+document.getElementById('funBackBtn').addEventListener('click', backToDashboard);
+document.getElementById('playSiBtn').addEventListener('click', () => {
+  document.getElementById('funSelectView').style.display='none';
+  document.getElementById('spaceInvadersView').style.display='flex';
+  siStart();
+});
+document.getElementById('siBackBtn').addEventListener('click', () => { siStop(); openFunMode(); });
+document.getElementById('siExitBtn').addEventListener('click', () => { siStop(); openFunMode(); });
+document.getElementById('siReplayBtn').addEventListener('click', siStart);
+
+/* ==========================================================================
+   10. FUN MODE — Metronome Rhythm Challenge
+   A steady click sets the beat; typing near a beat builds a combo multiplier.
+   ========================================================================== */
+const MET = { bpm:80, beatMs:750, running:false, beatTimes:[], score:0, combo:0, bestCombo:0, onBeatHits:0, totalHits:0, tickHandle:null, text:'', index:0, letters:[] };
+const TOLERANCE_MS = 160; // how close to a beat counts as "on time"
+
+function metPlayClick(){
+  if(!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type='sine'; osc.frequency.setValueAtTime(880, now);
+  gain.gain.setValueAtTime(0.08, now); gain.gain.exponentialRampToValueAtTime(0.0001, now+0.08);
+  osc.start(now); osc.stop(now+0.08);
+}
+function metBeatPulse(){
+  const dot = document.getElementById('beatDot');
+  dot.classList.add('pulse'); setTimeout(() => dot.classList.remove('pulse'), 120);
+}
+function metTick(){
+  if(!MET.running) return;
+  MET.beatTimes.push(Date.now());
+  if(MET.beatTimes.length > 8) MET.beatTimes.shift();
+  metPlayClick(); metBeatPulse();
+}
+function metText(){
+  const pool = []; lessons.forEach(l => { if(Array.isArray(l.wordDrill)) l.wordDrill.forEach(w => { if(/^[a-zA-Z]+$/.test(w)) pool.push(w.toLowerCase()); }); });
+  const items = []; for(let i=0;i<28;i++) items.push(pool[randInt(0,pool.length-1)]);
+  return items.join(' ');
+}
+function metRender(){
+  const disp = document.getElementById('metroTextDisplay');
+  disp.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for(const ch of MET.text){
+    const span = document.createElement('span'); span.className='letter default';
+    span.textContent = (ch===' ') ? '\u00A0' : ch;
+    frag.appendChild(span);
+  }
+  disp.appendChild(frag);
+  MET.letters = Array.from(disp.querySelectorAll('.letter'));
+  if(MET.letters.length) MET.letters[0].classList.add('current');
+}
+function metStart(){
+  MET.bpm = parseInt(document.getElementById('metroBpmSelect').value, 10) || 80;
+  MET.beatMs = 60000 / MET.bpm;
+  MET.running = true; MET.beatTimes=[]; MET.score=0; MET.combo=0; MET.bestCombo=0; MET.onBeatHits=0; MET.totalHits=0;
+  MET.text = metText(); MET.index = 0;
+  metRender(); metUpdateHud();
+  document.getElementById('metroResultsOverlay').classList.add('hidden');
+  clearInterval(MET.tickHandle);
+  metTick(); // immediate first beat so the user isn't waiting
+  MET.tickHandle = setInterval(metTick, MET.beatMs);
+  document.getElementById('metroTyper').value='';
+  document.getElementById('metroStartHint').style.display='flex';
+}
+function metStop(){ MET.running=false; clearInterval(MET.tickHandle); }
+function metUpdateHud(){
+  document.getElementById('metroScore').textContent = MET.score;
+  document.getElementById('metroCombo').textContent = MET.combo;
+  const pct = MET.totalHits ? Math.round((MET.onBeatHits/MET.totalHits)*100) : 100;
+  document.getElementById('metroOnBeat').textContent = pct;
+}
+function metClosestBeatDelta(now){
+  if(MET.beatTimes.length===0) return 99999;
+  let best = 99999;
+  MET.beatTimes.forEach(t => { const d = Math.abs(now-t); if(d<best) best=d; });
+  return best;
+}
+function metHandleKey(e){
+  if(!MET.running) return;
+  if(e.key===' ') e.preventDefault();
+  if(e.key.length!==1) return;
+  if(MET.index>=MET.letters.length) return;
+  e.preventDefault();
+  const expected = MET.text[MET.index];
+  const isCorrect = e.key===expected;
+  const delta = metClosestBeatDelta(Date.now());
+  const onBeat = isCorrect && delta<=TOLERANCE_MS;
+  MET.totalHits++;
+  if(onBeat) MET.onBeatHits++;
+
+  if(isCorrect){
+    MET.letters[MET.index].className='letter correct';
+    if(onBeat){ MET.combo++; MET.score += 10*Math.min(MET.combo,10); playSound('correct'); }
+    else{ MET.combo=0; MET.score += 2; playSound('correct'); }
+    MET.bestCombo = Math.max(MET.bestCombo, MET.combo);
+  } else {
+    MET.letters[MET.index].className='letter incorrect';
+    MET.combo=0; playSound('incorrect');
+  }
+  MET.letters.forEach(l=>l.classList.remove('current'));
+  MET.index++;
+  if(MET.index<MET.letters.length) MET.letters[MET.index].classList.add('current');
+  metUpdateHud();
+  if(MET.index>=MET.letters.length) metFinish();
+}
+function metFinish(){
+  metStop();
+  document.getElementById('metroFinalScore').textContent = MET.score;
+  document.getElementById('metroBestCombo').textContent = MET.bestCombo;
+  const pct = MET.totalHits ? Math.round((MET.onBeatHits/MET.totalHits)*100) : 100;
+  document.getElementById('metroFinalOnBeat').textContent = pct+'%';
+  document.getElementById('metroFinalBpm').textContent = MET.bpm;
+  document.getElementById('metroResultsOverlay').classList.remove('hidden');
+}
+document.getElementById('metroTyper').addEventListener('focus', () => { document.getElementById('metroStartHint').style.display='none'; document.getElementById('metroPaper').classList.add('focused'); });
+document.getElementById('metroTyper').addEventListener('blur', () => { document.getElementById('metroPaper').classList.remove('focused'); if(MET.index===0) document.getElementById('metroStartHint').style.display='flex'; });
+document.getElementById('metroStartHint').addEventListener('click', () => document.getElementById('metroTyper').focus());
+document.getElementById('metroPaper').addEventListener('click', () => document.getElementById('metroTyper').focus());
+document.getElementById('metroTyper').addEventListener('keydown', metHandleKey);
+document.addEventListener('keydown', (e) => {
+  if(document.getElementById('metronomeView').style.display==='none') return;
+  if(document.activeElement!==document.getElementById('metroTyper') && e.key.length===1){ document.getElementById('metroTyper').focus(); }
+});
+document.getElementById('playMetroBtn').addEventListener('click', () => {
+  document.getElementById('funSelectView').style.display='none';
+  document.getElementById('metronomeView').style.display='flex';
+  metStart();
+});
+document.getElementById('metroBackBtn').addEventListener('click', () => { metStop(); openFunMode(); });
+document.getElementById('metroExitBtn').addEventListener('click', () => { metStop(); openFunMode(); });
+document.getElementById('metroReplayBtn').addEventListener('click', metStart);
+
+/* ==========================================================================
+   11. FUN MODE — Tug-of-War (Bot vs Human)
+   ========================================================================== */
+const TOW = { running:false, botWpm:45, text:'', index:0, letters:[], startTime:null, correctChars:0, animHandle:null, finished:false };
+function towText(){
+  const pool = lessons.filter(l=>l.type!=='code').map(l=>l.paragraphDrill).filter(Boolean);
+  return pool[randInt(0,pool.length-1)] || "Practice makes the mechanics disappear, one steady keystroke at a time.";
+}
+function towRender(){
+  const disp = document.getElementById('towTextDisplay');
+  disp.innerHTML=''; const frag = document.createDocumentFragment();
+  for(const ch of TOW.text){
+    const span=document.createElement('span'); span.className='letter default';
+    span.textContent=(ch===' ')?'\u00A0':ch; frag.appendChild(span);
+  }
+  disp.appendChild(frag);
+  TOW.letters = Array.from(disp.querySelectorAll('.letter'));
+  if(TOW.letters.length) TOW.letters[0].classList.add('current');
+}
+function towStart(){
+  TOW.botWpm = parseInt(document.getElementById('towBotSpeedSelect').value,10) || 45;
+  TOW.text = towText(); TOW.index=0; TOW.correctChars=0; TOW.startTime=null; TOW.finished=false; TOW.running=true;
+  document.getElementById('towBotWpmLabel').textContent = TOW.botWpm;
+  document.getElementById('towUserWpm').textContent = 0;
+  document.getElementById('towFlag').style.left = '50%';
+  document.getElementById('towResultsOverlay').classList.add('hidden');
+  towRender();
+  document.getElementById('towTyper').value='';
+  document.getElementById('towStartHint').style.display='flex';
+  cancelAnimationFrame(TOW.animHandle);
+  TOW.animHandle = requestAnimationFrame(towLoop);
+}
+function towStop(){ TOW.running=false; cancelAnimationFrame(TOW.animHandle); }
+function towLoop(){
+  if(!TOW.running) return;
+  if(TOW.startTime){
+    const elapsedMin = (Date.now()-TOW.startTime)/60000;
+    const userWpm = elapsedMin>0 ? Math.round((TOW.correctChars/5)/elapsedMin) : 0;
+    document.getElementById('towUserWpm').textContent = userWpm;
+
+    const userProgress = Math.min(1, TOW.correctChars/TOW.text.length);
+    const botCharsPerSec = (TOW.botWpm*5)/60;
+    const botProgress = Math.min(1, ((Date.now()-TOW.startTime)/1000*botCharsPerSec)/TOW.text.length);
+    const flagPct = Math.max(4, Math.min(96, 50 + (userProgress-botProgress)*50));
+    document.getElementById('towFlag').style.left = flagPct+'%';
+
+    if(!TOW.finished && botProgress>=1){ towFinish(false); }
+    else if(!TOW.finished && userProgress>=1){ towFinish(true); }
+  }
+  TOW.animHandle = requestAnimationFrame(towLoop);
+}
+function towHandleKey(e){
+  if(!TOW.running || TOW.finished) return;
+  if(e.key===' ') e.preventDefault();
+  if(e.key.length!==1) return;
+  if(TOW.index>=TOW.letters.length) return;
+  e.preventDefault();
+  if(!TOW.startTime) TOW.startTime = Date.now();
+  const expected = TOW.text[TOW.index];
+  const isCorrect = e.key===expected;
+  if(isCorrect){ TOW.letters[TOW.index].className='letter correct'; TOW.correctChars++; playSound('correct'); }
+  else{ TOW.letters[TOW.index].className='letter incorrect'; playSound('incorrect'); }
+  TOW.letters.forEach(l=>l.classList.remove('current'));
+  TOW.index++;
+  if(TOW.index<TOW.letters.length) TOW.letters[TOW.index].classList.add('current');
+}
+function towFinish(userWon){
+  TOW.finished = true; towStop();
+  const elapsedMin = TOW.startTime ? (Date.now()-TOW.startTime)/60000 : 0.001;
+  const userWpm = Math.round((TOW.correctChars/5)/Math.max(elapsedMin,0.001));
+  document.getElementById('towResultTitle').textContent = userWon ? '🏆 You pulled the flag!' : '🤖 The bot out-typed you';
+  document.getElementById('towFinalUserWpm').textContent = userWpm;
+  document.getElementById('towFinalBotWpm').textContent = TOW.botWpm;
+  document.getElementById('towResultsOverlay').classList.remove('hidden');
+}
+document.getElementById('towTyper').addEventListener('focus', () => { document.getElementById('towStartHint').style.display='none'; document.getElementById('towPaper').classList.add('focused'); });
+document.getElementById('towTyper').addEventListener('blur', () => { document.getElementById('towPaper').classList.remove('focused'); if(TOW.index===0) document.getElementById('towStartHint').style.display='flex'; });
+document.getElementById('towStartHint').addEventListener('click', () => document.getElementById('towTyper').focus());
+document.getElementById('towPaper').addEventListener('click', () => document.getElementById('towTyper').focus());
+document.getElementById('towTyper').addEventListener('keydown', towHandleKey);
+document.addEventListener('keydown', (e) => {
+  if(document.getElementById('tugOfWarView').style.display==='none') return;
+  if(document.activeElement!==document.getElementById('towTyper') && e.key.length===1){ document.getElementById('towTyper').focus(); }
+});
+document.getElementById('playTowBtn').addEventListener('click', () => {
+  document.getElementById('funSelectView').style.display='none';
+  document.getElementById('tugOfWarView').style.display='flex';
+  towStart();
+});
+document.getElementById('towBackBtn').addEventListener('click', () => { towStop(); openFunMode(); });
+document.getElementById('towExitBtn').addEventListener('click', () => { towStop(); openFunMode(); });
+document.getElementById('towReplayBtn').addEventListener('click', towStart);
+
+/* ==========================================================================
+   12. FEEDBACK BOX (stored locally — this app has no backend/server)
+   ========================================================================== */
+const FEEDBACK_KEY = 'typingMasterFeedback';
+let feedbackRating = 0;
+function loadFeedback(){ try{ return JSON.parse(localStorage.getItem(FEEDBACK_KEY)||'[]'); }catch(e){ return []; } }
+function saveFeedbackEntry(entry){
+  const all = loadFeedback(); all.unshift(entry);
+  try{ localStorage.setItem(FEEDBACK_KEY, JSON.stringify(all.slice(0,50))); }catch(e){}
+}
+function renderFeedbackHistory(){
+  const all = loadFeedback();
+  const el = document.getElementById('feedbackHistory');
+  if(all.length===0){ el.innerHTML=''; return; }
+  el.innerHTML = '<div style="font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-bottom:4px;">Your previous feedback</div>' +
+    all.map(f => `<div class="feedback-entry"><span class="fe-stars">${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</span><span class="fe-date">${f.date}</span><div>${f.text.replace(/</g,'&lt;')}</div></div>`).join('');
+}
+function setFeedbackStars(n){
+  feedbackRating = n;
+  document.querySelectorAll('#feedbackStars span').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.star,10) <= n);
+  });
+}
+document.querySelectorAll('#feedbackStars span').forEach(s => {
+  s.addEventListener('click', () => setFeedbackStars(parseInt(s.dataset.star,10)));
+});
+document.getElementById('feedbackBtn').addEventListener('click', () => {
+  document.getElementById('feedbackModal').classList.remove('hidden');
+  document.getElementById('feedbackThanks').classList.add('hidden');
+  renderFeedbackHistory();
+});
+document.getElementById('feedbackCloseBtn').addEventListener('click', () => document.getElementById('feedbackModal').classList.add('hidden'));
+document.getElementById('feedbackSubmitBtn').addEventListener('click', () => {
+  const text = document.getElementById('feedbackText').value.trim();
+  if(!text && feedbackRating===0) return;
+  saveFeedbackEntry({ rating: feedbackRating, text: text || '(no comment)', date: new Date().toLocaleDateString() });
+  document.getElementById('feedbackText').value=''; setFeedbackStars(0);
+  document.getElementById('feedbackThanks').classList.remove('hidden');
+  renderFeedbackHistory();
+});
+
+typer.addEventListener('focus', () => { startHint.style.display='none'; paper.classList.add('focused'); });
+typer.addEventListener('blur', () => { paper.classList.remove('focused'); if(!lessonFinished && currentIndex===0) startHint.style.display='flex'; });
+startHint.addEventListener('click', () => typer.focus());
+paper.addEventListener('click', () => typer.focus());
+
+document.getElementById('backBtn').addEventListener('click', backToDashboard);
+document.getElementById('dashboardBtn').addEventListener('click', backToDashboard);
+document.getElementById('restartBtn').addEventListener('click', resetLesson);
+document.getElementById('retryBtn').addEventListener('click', resetLesson);
+
+/* ---- theme switcher (affects header / dashboard / results only) ---- */
+const THEME_KEY='typingMasterTheme'; const themeToggle=document.getElementById('themeToggle');
+function applyTheme(theme){ document.documentElement.setAttribute('data-theme', theme); themeToggle.textContent = theme==='dark'?'🌙':'☀️'; try{ localStorage.setItem(THEME_KEY, theme); }catch(e){} }
+themeToggle.addEventListener('click', () => { const c=document.documentElement.getAttribute('data-theme'); applyTheme(c==='dark'?'light':'dark'); });
+window.addEventListener('beforeunload', saveKeyStats);
+
+/* ---- init ---- */
+(function init(){
+  let savedTheme='dark'; try{ savedTheme = localStorage.getItem(THEME_KEY)||'dark'; }catch(e){}
+  applyTheme(savedTheme);
+  loadProgress(); loadStreak(); loadKeyStats(); loadAnalytics();
+  cardDashboard.style.display='flex'; lessonView.style.display='none';
+  document.getElementById('funSelectView').style.display='none';
+  document.getElementById('spaceInvadersView').style.display='none';
+  document.getElementById('metronomeView').style.display='none';
+  document.getElementById('tugOfWarView').style.display='none';
+  document.getElementById('reviewPanel').style.display='flex';
+  document.getElementById('coachPanel').style.display='flex';
+  renderDashboard(); renderReviewPanel(); renderCoachPanel();
+})();
+</script>
+</body>
+</html>
