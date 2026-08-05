@@ -21,7 +21,11 @@
 }
 :root[data-theme="light"]{
   --bg:#eaeaea; --sub:#9a9a9a; --sub-alt:#dcdcdc; --text:#3a3a3a;
-  --accent:#a17f0a; --accent-ink:#ffffff; --accent-soft:rgba(161,127,10,0.12);
+  /* Darker than it looks like it "should" be: the accent has to carry the same
+     emphasis on a light bg that #e2b714 carries on the dark one (6.5:1 there).
+     #a17f0a only managed 3.1:1 on --bg and 2.8:1 on --sub-alt, so accent text
+     and chips read as muted rather than emphasised. */
+  --accent:#665006; --accent-ink:#ffffff; --accent-soft:rgba(102,80,6,0.12);
   --error:#c0374a; --error-soft:rgba(192,55,74,0.12);
   --border:rgba(0,0,0,0.08); --shadow:rgba(0,0,0,0.18); --scrim:rgba(90,90,90,0.55);
 }
@@ -130,6 +134,10 @@ button{font-family:var(--mono);}
 .fun-card{background:var(--sub-alt); border:none; border-radius:12px; padding:22px; display:flex; flex-direction:column; gap:9px; align-items:flex-start; transition:transform .14s ease;}
 .fun-card:hover{transform:translateY(-3px);}
 .fun-card .btn{margin-top:6px; align-self:stretch;}
+/* Cards stretch to a shared height but carry different numbers of controls
+   (Space Invaders has no settings select), so pin the final button to the
+   bottom to keep the Play row level across the grid. */
+.fun-card .btn:last-child{margin-top:auto;}
 .fun-card select.btn{appearance:none; color:var(--sub); background:var(--bg); border:none;}
 .fun-card.disabled{opacity:0.5;}
 .fun-icon{font-size:26px;}
@@ -219,7 +227,10 @@ button{font-family:var(--mono);}
 }
 @keyframes caretBlink{0%,49%{opacity:1;} 50%,100%{opacity:0;}}
 @media (prefers-reduced-motion: reduce){ .letter.current::before{animation:none;} }
-#typer{position:absolute; inset:0; width:100%; height:100%; opacity:0; resize:none; border:none; outline:none; padding:24px 4px; font-family:var(--mono); font-size:25px; line-height:1.9; background:transparent; color:transparent; caret-color:transparent;}
+/* The capture textarea is an invisible overlay on top of .text-display — the
+   arcade modes reuse that markup, so they need the same treatment or they show
+   a default white browser textarea over the dark UI. */
+#typer,#metroTyper,#towTyper{position:absolute; inset:0; width:100%; height:100%; opacity:0; resize:none; border:none; outline:none; padding:24px 4px; font-family:var(--mono); font-size:25px; line-height:1.9; background:transparent; color:transparent; caret-color:transparent;}
 .paper.focused{box-shadow:none;}
 .start-hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; backdrop-filter:blur(3.5px); color:var(--sub); font-size:13px; border-radius:10px; cursor:text; transition:color .12s ease;}
 .start-hint:hover{color:var(--text);}
@@ -270,7 +281,7 @@ button{font-family:var(--mono);}
 .results-actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
 @media (max-width:640px){
   .app-wrapper{padding:20px 16px 60px;}
-  .text-display,#typer{font-size:19px;}
+  .text-display,#typer,#metroTyper,#towTyper{font-size:19px;}
   .results-grid{grid-template-columns:repeat(2,1fr);}
   .hands-stage{gap:36px;}
   .home-stats{gap:26px;}
