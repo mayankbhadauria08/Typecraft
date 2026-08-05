@@ -1,0 +1,74 @@
+TypeCraft — WCAG contrast audit
+Generated 2026-08-06 against index.html @ e38a7d3
+
+Ratios are computed with the WCAG 2.x relative-luminance formula.
+Thresholds: 4.5:1 for normal text (AA), 3.0:1 for large text (AA-large).
+
+Surfaces: --bg is the page background, --sub-alt is the card/panel background.
+Both are checked, because muted text sits on cards as often as on the page.
+
+
+=== DARK THEME (unchanged) ===
+  text       on bg        8.05  AA
+  text       on sub-alt   8.78  AA
+  sub        on bg        2.17  FAIL   <- see note below
+  sub        on sub-alt   2.36  FAIL   <- see note below
+  accent     on bg        6.55  AA
+  accent     on sub-alt   7.14  AA
+  accent-ink on accent    6.55  AA
+
+  Palette: --bg #323437  --sub #646669  --sub-alt #2c2e31
+           --text #d1d0c5  --accent #e2b714  --accent-ink #323437
+
+
+=== LIGHT THEME — BEFORE ===
+  text       on bg        9.45  AA
+  text       on sub-alt   8.29  AA
+  sub        on bg        2.34  FAIL
+  sub        on sub-alt   2.05  FAIL
+  accent     on bg        3.14  AA-large only
+  accent     on sub-alt   2.76  FAIL
+  accent-ink on accent    3.78  AA-large only
+
+  Palette: --bg #eaeaea  --sub #9a9a9a  --sub-alt #dcdcdc
+           --text #3a3a3a  --accent #a17f0a  --accent-ink #ffffff
+
+
+=== LIGHT THEME — AFTER (current) ===
+  text       on bg        9.45  AA
+  text       on sub-alt   8.29  AA
+  sub        on bg        5.15  AA
+  sub        on sub-alt   4.52  AA
+  accent     on bg        6.43  AA
+  accent     on sub-alt   5.64  AA
+  accent-ink on accent    7.73  AA
+
+  Palette: --bg #eaeaea  --sub #616161  --sub-alt #dcdcdc
+           --text #3a3a3a  --accent #665006  --accent-ink #ffffff
+
+  Every light-theme pairing now clears AA for normal text.
+
+
+--- Why --accent was the real defect -------------------------------------
+
+The accent is the design's one loud element. In dark it carries 6.55:1; in
+light it carried 2.76:1 on cards — quieter than the body text it was meant to
+outrank. Stat values, the "Generate smart practice" button and the active tier
+filter all read as muted. #665006 restores the relationship at 6.43:1, which
+is within 0.12 of the dark theme's figure.
+
+
+--- Why dark --sub still says FAIL ---------------------------------------
+
+#646669 on #323437 is monkeytype's own "serika dark" pairing, and the redesign
+is a deliberate homage to it. Its 2.17:1 is a design choice inherited from the
+reference, not a regression introduced here, so it was left alone.
+
+The light theme's --sub was raised anyway (2.34 -> 5.15) because the same ratio
+that reads as "muted" on a dark surface reads as "washed out" on light grey.
+The two themes therefore diverge on this token on purpose.
+
+If dark --sub should match, #9fa2a7 clears AA on both dark surfaces
+(4.88:1 on --bg, 5.32:1 on --sub-alt). That is a large jump from #646669 and
+visibly departs from the monkeytype look, so it is worth a deliberate decision
+rather than a silent change.
