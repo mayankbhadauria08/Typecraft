@@ -20,7 +20,11 @@
   --border:rgba(255,255,255,0.07); --shadow:rgba(0,0,0,0.45); --scrim:rgba(20,21,23,0.72);
 }
 :root[data-theme="light"]{
-  --bg:#eaeaea; --sub:#9a9a9a; --sub-alt:#dcdcdc; --text:#3a3a3a;
+  /* --sub is deliberately darker than the dark theme's equivalent: #9a9a9a
+     managed only 2.3:1 on --bg and 2.1:1 on --sub-alt, which is legible enough
+     on a dark surface but not against light grey. #616161 clears AA on both
+     (5.2:1 / 4.5:1). */
+  --bg:#eaeaea; --sub:#616161; --sub-alt:#dcdcdc; --text:#3a3a3a;
   /* Darker than it looks like it "should" be: the accent has to carry the same
      emphasis on a light bg that #e2b714 carries on the dark one (6.5:1 there).
      #a17f0a only managed 3.1:1 on --bg and 2.8:1 on --sub-alt, so accent text
