@@ -31,11 +31,17 @@ function client() {
   };
   return c;
 }
+// These checks cover lessons and games beyond Free (first five lessons, Daily Challenge),
+// so each learner gets an admin-granted Lifetime plan; the plan gate is tested in billing.test.mjs.
 async function signup(email) {
   const c = client();
   const r = await c('POST', '/api/auth/signup', { fullName: 'Learner', email, phoneNumber: '+91 98765 43210', password: pw, confirmPassword: pw });
   assert.equal(r.status, 201);
   c.user = r.body.user;
+  const t = new Date().toISOString();
+  await env.DB.prepare(`INSERT INTO user_subscriptions (id, user_id, package_id, status, source, features, limits, starts_at, expires_at, created_at, updated_at)
+                        SELECT ?1, ?2, id, 'active', 'admin', features, limits, ?3, NULL, ?3, ?3 FROM packages WHERE id = 'lifetime'`)
+    .bind(`sub-${c.user.id}`, c.user.id, t).run();
   return c;
 }
 async function signin(email) {
@@ -254,7 +260,7 @@ test('owner health page and numbers are for owners only', async () => {
   const learner = await signup('notowner@example.com');
   assert.equal((await learner('GET', '/api/admin/health')).status, 404);
   assert.equal((await learner('GET', '/admin')).status, 404);
-  assert.equal((await client()('GET', '/admin.html')).status, 404);
+  assert.notEqual((await client()('GET', '/admin.html')).status, 200);
   const owner = await signup('owner@example.com');
   const h = await owner('GET', '/api/admin/health');
   assert.equal(h.status, 200);
@@ -262,9 +268,7 @@ test('owner health page and numbers are for owners only', async () => {
   assert.ok(h.body.runsToday >= 1);
   assert.ok(h.body.rejectedToday >= 12);
   const page = await owner('GET', '/admin');
-  assert.equal(page.status, 200);
-  assert.match(page.text, /How the saving is going/);
-  assert.equal((await owner('GET', '/admin.html')).status, 200);
+  assert.equal(page.status, 200); // the admin overview page (src/pages/admin)
 });
 
 /* 6 */

@@ -15,6 +15,7 @@ let specialLesson = null;  // the placement test
 function getLessonById(id){
   if(id === 'review') return reviewLesson;
   if(id === 'placement') return specialLesson;
+  if(id === 'custom' || String(id).startsWith('pack:')) return Plan.practice;   // practice packs and custom practice (section 16)
   return TC_COURSE.byId(id);
 }
 function lessonNumber(lesson){ const m = TC_META.BY_ID[lesson.id]; return m ? m.n : 0; }
@@ -29,17 +30,20 @@ const FLOW_STEPS = new Set(['challenge', 'timed', 'sprint', 'exam']);
 function getStagesForLesson(lesson){
   if(lesson.isReview) return (lesson.wordDrill && lesson.wordDrill.length) ? ['character','word'] : ['character'];
   if(lesson.isPlacement) return ['timed'];
+  if(lesson.isPractice) return ['challenge'];
   return TC_COURSE.steps(lesson);
 }
 function getStageText(lesson, step){
   if(lesson.isReview) return step === 'word' ? TC_COURSE.gen.generateFromPool(lesson.wordDrill) : TC_COURSE.gen.generateFromTokens(lesson.charDrill);
   if(lesson.isPlacement) return TC_COURSE.placementText();
+  if(lesson.isPractice) return lesson.text;
   return TC_COURSE.stepText(lesson, step);
 }
 /* seconds a step lasts when it is timed (0 = untimed) */
 function stepLimit(lesson, step){
   if(!lesson) return 0;
   if(lesson.isPlacement) return 120;
+  if(lesson.isPractice) return lesson.timed || 0;
   if(step === 'timed' || step === 'exam') return lesson.timed || 60;
   if(step === 'sprint') return lesson.timed || 15;
   if(step === 'challenge') return 30;
@@ -217,7 +221,7 @@ function loadStage(){
   markStepStart();
   if(lessonMachine){ lessonMachine.setText(exerciseText); lessonMachine.setPosition(0); machineMeta(); machineReadings(); }
   updateCaretPosition(); updateCarriage(); updateFingerGuide(); renderStageRow();
-  if(!lesson.isReview && !lesson.isPlacement) notePosition(currentLessonId, currentStage);
+  if(!lesson.isReview && !lesson.isPlacement && !lesson.isPractice) notePosition(currentLessonId, currentStage);
 }
 /* Watch: about five seconds, not scored, with Skip — which finger presses each new key */
 function startWatch(lesson){
@@ -695,6 +699,7 @@ function renderCourseMap(){
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="route-bg" d="${d}"/><path class="route-fg" d="${d}" pathLength="100" style="stroke-dashoffset:${(100 - total*100).toFixed(1)}"/></svg>` +
     LEVELS.map((L,i) => `<button class="route-node${activeTier===L.name?' active':''}${next && next.lesson.level===L.n?' next':''}" style="left:${(xs[i]/W*100).toFixed(1)}%;top:${(ys[i]/H*100).toFixed(1)}%" data-level="${esc(L.name)}" title="${esc(L.name)}: ${Math.round(pct(L)*100)}% done">
       <b>${L.n}</b><span>${esc(L.name)}</span><small>${Math.round(pct(L)*100)}%</small></button>`).join('');
+  Plan.decorateMap(el);
   el.querySelectorAll('.route-node').forEach(b => b.addEventListener('click', () => { activeTier = activeTier === b.dataset.level ? 'all' : b.dataset.level; renderTierFilter(); renderDashboard(); renderCourseMap(); }));
 }
 
@@ -716,6 +721,7 @@ function renderDashboard(){
       const best = p && p.bestWpm ? `${p.bestWpm} wpm` : (l.kind === 'boss' ? 'Boss' : '');
       const state = (p && p.status === 'in_progress') ? '<div class="lstate">in progress</div>' : (next && next.lesson === l ? '<div class="lstate">next</div>' : '');
       card.innerHTML = `<div class="lnum">L${lessonNumber(l)}${best ? ' · ' + best : ''}</div><div class="ltitle">${esc(l.title)}</div>${state}<div class="lstars">${dotGlyphs(stars)}${p && p.crown ? '<span class="lcrown" title="Crown">♛</span>' : ''}</div>`;
+      Plan.decorateCard(card, l.id);
       card.addEventListener('click', () => openLesson(l.id));
       grid.appendChild(card);
     });
@@ -734,9 +740,10 @@ function renderPlacementOffer(){
   document.getElementById('placementGo').addEventListener('click', openPlacement);
   document.getElementById('placementSkip').addEventListener('click', () => { try{ localStorage.setItem('typingMasterPlacementDismissed','1'); }catch(e){} el.hidden = true; });
 }
-function renderHome(){ renderTierFilter(); renderHomeStats(); renderPlacementOffer(); renderContinuePanel(); renderRewardBits(); renderCourseMap(); renderDashboard(); renderReviewPanel(); renderCoachPanel(); }
+function renderHome(){ renderTierFilter(); renderHomeStats(); renderPlacementOffer(); renderContinuePanel(); renderRewardBits(); renderCourseMap(); renderDashboard(); renderReviewPanel(); renderCoachPanel(); Plan.renderHome(); }
 
 function openLesson(lessonId, startStage){
+  if(!Plan.lessonAllowed(lessonId)) return Plan.lockedLesson(lessonId, () => openLesson(lessonId, startStage));
   document.documentElement.classList.add('in-lesson');
   hideExtraViews(); setNavCurrent('homeView'); closeThemeMenu();
   currentLessonId = lessonId;
@@ -790,7 +797,7 @@ function finishStep(){
   const lesson = getLessonById(currentLessonId), step = stages[currentStage];
   const st = stepStats();
   if(step === 'challenge') challengeResult = st;
-  if(!lesson.isReview && !lesson.isPlacement && step !== 'watch') emitEvent({ type:'step', lessonId:lesson.id, step:currentStage, kind:step, wpm:st.wpm, accuracy:st.accuracy, errors:st.errors, seconds:st.seconds });
+  if(!lesson.isReview && !lesson.isPlacement && !lesson.isPractice && step !== 'watch') emitEvent({ type:'step', lessonId:lesson.id, step:currentStage, kind:step, wpm:st.wpm, accuracy:st.accuracy, errors:st.errors, seconds:st.seconds });
   if(currentStage < stages.length - 1){ currentStage++; stopTimers(); startTime = null; showStepNote(''); loadStage(); }
   else finishLesson();
 }
@@ -828,6 +835,7 @@ function finishLesson(){
   saveKeyStats();
 
   if(lesson.isPlacement) return finishPlacement(finalWpm, finalAcc, elapsedSec);
+  if(lesson.isPractice) return Plan.finishPractice(lesson, finalWpm, finalAcc, elapsedSec);
 
   const stars = TC_META.starsFor(finalAcc);
   const target = levelOf(lesson).target;
@@ -956,8 +964,10 @@ function renderArcade(){
     `<button type="button" class="tcg-card" data-game="${g.id}" data-accent="${g.accent || 'teal'}" aria-label="${esc(g.title)}. ${esc(g.blurb)}">${g.scene}<div class="tcg-card-body"><div class="tcg-card-top"><h3>${esc(g.title)}</h3><span class="tcg-card-best">Best <b>${best[g.id] ? best[g.id].best : '-'}</b></span></div><p>${esc(g.blurb)}</p><div class="tcg-trains"><span>Trains</span> ${esc(g.trains)}</div></div></button>`).join('');
   const today = localDay(); const done = !!(best.daily && Progress.rules && Progress.rules.daily && Progress.rules.daily[today]);
   document.getElementById('dailyBanner').innerHTML = `<div><p class="eyebrow">Daily Challenge · ${today}</p><h2>One passage a day</h2><p class="lede">${done ? 'Today is counted. You can still practise the passage.' : 'Your first finished run today counts and is compared with your earlier days.'}</p></div><button class="btn primary" data-game="daily">${done ? 'Practise today' : 'Play today'}</button>`;
+  Plan.decorateArcade();
 }
 function playGame(id){
+  if(!Plan.gameAllowed(id)) return Plan.lockedGame(id, () => playGame(id));
   stopArcade();
   document.getElementById('funSelectView').style.display = 'none';
   const play = document.getElementById('arcadePlay'); play.style.display = 'flex';
@@ -970,6 +980,7 @@ function playGame(id){
 }
 document.getElementById('funSelectView').addEventListener('click', (e) => { const b = e.target.closest('[data-game]'); if(b) playGame(b.dataset.game); });
 document.getElementById('arcadeBackBtn').addEventListener('click', openFunMode);
+document.getElementById('funModeBtn').addEventListener('click', openFunMode);   // the Arcade button in the top bar
 document.getElementById('funSelectView').addEventListener('pointermove', (e) => {
   if(Settings.effects !== 'full' || (e.pointerType && e.pointerType !== 'mouse')) return;
   const card = e.target.closest('.tcg-card'); if(!card) return;
@@ -1118,7 +1129,9 @@ async function api(method, path, body){
   let data = null;
   try{ data = await res.json(); }catch(e){}
   if(!data || typeof data !== 'object') return { ok:false, status:res.status, error:{ code:'no_backend', message:"Accounts aren't available on this copy of TypeCraft." } };
-  return Object.assign({}, data, { ok:res.ok, status:res.status });
+  const out = Object.assign({}, data, { ok:res.ok, status:res.status });
+  Plan.seen(out);   // a 402 or an event refused with plan_required opens the upgrade sheet once
+  return out;
 }
 function newEventId(){
   if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -1254,6 +1267,7 @@ async function refreshAccountData(){
 
 async function enterAccount(user){
   Account.user = user; Account.loaded = false;
+  Plan.begin(user);
   const cache = readAccountCache();
   Account.data = (cache && cache.user && cache.user.id === user.id && cache.data) ? cache.data : {};
   saveAccountCache();
@@ -1315,6 +1329,7 @@ function renderAccountUi(){
     document.getElementById('amName').textContent = Account.user.fullName;
     document.getElementById('amEmail').textContent = Account.user.email;
   }
+  Plan.renderChip();
   if(homeView.style.display !== 'none') renderContinuePanel();
 }
 function closeAccountMenu(){
@@ -2015,6 +2030,7 @@ async function renderProgressPage(){
   body.innerHTML = TC_REWARDS_UI.progressScreen(Object.assign({}, Progress.view || {}, { settings: Settings }), history,
     { keyStats, bigramLatency, errorClasses, today: localDay(), name: Account.user ? Account.user.fullName : '', defs: TC_RULES.BADGES });
   TC_REWARDS_UI.enhance(body, { name: Account.user ? Account.user.fullName : '' });
+  Plan.decorateCertificates(body);
 }
 document.getElementById('navWorkshop').addEventListener('click', ()=>{ openPage('workshopView'); renderWorkshop(); });
 
@@ -2066,7 +2082,7 @@ function setupMachines(){
 function machineMeta(){
   if(!lessonMachine) return;
   const l = getLessonById(currentLessonId); if(!l) return;
-  const left = l.isPlacement ? 'Placement test' : l.isReview ? 'Problem keys drill' : `Level ${l.level} · ${l.title}`;
+  const left = l.isPlacement ? 'Placement test' : l.isReview ? 'Problem keys drill' : l.isPractice ? l.tier : `Level ${l.level} · ${l.title}`;
   lessonMachine.setMeta(left, `Step ${currentStage+1} of ${stages.length} · ${STEP_LABEL[stages[currentStage]] || ''}`);
 }
 function machineReadings(){ if(lessonMachine) lessonMachine.readings({ wpm:(startTime && Date.now()-startTime > 2000) ? currentWpm() : 0, accuracy:currentAccuracy(), seconds:parseFloat(timeValueEl.textContent)||0, errors:errorCount }); }
@@ -2088,6 +2104,386 @@ function showUpdateReady(reg){
   document.getElementById('updateReload').addEventListener('click', () => { window.__tcUpdateChosen = true; if(reg.waiting) reg.waiting.postMessage('skipWaiting'); else location.reload(); });
 }
 window.addEventListener('beforeunload', saveKeyStats);
+
+/* ==========================================================================
+   16. PLANS — what the learner's plan unlocks (docs/SAAS-CONTRACTS.md §2, §3, §6)
+   Free: the first five lessons in course order, the placement test, the
+   problem-keys drill and the Daily Challenge. Anything else shows a lock and
+   opens the upgrade sheet (plans and prices come from GET /api/packages).
+   The server enforces the same rules (events, content packs); this keeps the
+   screen honest. Also here: practice packs and custom practice, which run in
+   the lesson engine as a one-step special lesson saved with lessonId 'custom'.
+   One-line hooks elsewhere in this file call into Plan: getLessonById,
+   getStagesForLesson, getStageText, stepLimit, loadStage, finishStep,
+   finishLesson, machineMeta, renderCourseMap, renderDashboard, renderHome,
+   openLesson, renderArcade, playGame, api, enterAccount, renderAccountUi,
+   renderProgressPage.
+   ========================================================================== */
+const PLAN_CACHE_KEY = 'typingMasterPlan';
+const FREE_PLAN = { plan:'free', planName:'Free', expiresAt:null, features:['lessons.first5','arcade.daily','tests.basic'], limits:{ lessons:'first5', dailyTests:3, historyDays:7 } };
+const FREE_LESSONS = new Set(TC_META.ORDER.slice(0, 5));
+const ALWAYS_FREE = new Set(['placement', 'review']);
+/* who to name on a lock until the packages arrive (the sheet itself only shows what the server sends) */
+const PLAN_FALLBACK = { 'lessons.all':'Starter', 'arcade.all':'Starter', 'practice.custom':'Pro', 'exercises.premium':'Pro', 'certificates':'Premium' };
+const CUSTOM_MAX = 2000;
+const LOCK_SVG = '<svg class="plan-lock-svg" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.75"/><path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7"/></svg>';
+
+const Plan = {
+  ent: FREE_PLAN, userId: null, loaded: false, loading: null, loadedAt: 0,
+  packages: null, packagesLoading: null, autoShown: false, lastFocus: null,
+  packs: null, packsState: '', openPack: null, packTexts: {}, practice: null,
+
+  /* ---- what is allowed ---- */
+  enforced(){ return !!Account.user; },     // a copy with no server (guest mode) has nothing to sell
+  has(feature){ return !this.enforced() || (this.ent.features || []).includes(feature); },
+  lessonAllowed(id){
+    if(!this.enforced() || ALWAYS_FREE.has(id)) return true;
+    if(id === 'custom') return this.has('practice.custom');
+    if(String(id).startsWith('pack:')) return this.has('exercises.premium');
+    return this.has('lessons.all') || (this.ent.limits && this.ent.limits.lessons === 'all') || FREE_LESSONS.has(id);
+  },
+  gameAllowed(id){ return id === 'daily' || this.has('arcade.all'); },
+  isPaid(){ return this.enforced() && this.ent.plan && this.ent.plan !== 'free'; },
+  /** The cheapest active package that grants the feature: its name for the lock badge. */
+  unlockName(feature){
+    const list = (this.packages || []).filter(p => (p.pricePaise || 0) > 0 && (p.features || []).some(f => (f.key || f) === feature))
+      .sort((a, b) => a.pricePaise - b.pricePaise);
+    return list.length ? list[0].name : (PLAN_FALLBACK[feature] || 'Paid');
+  },
+  tag(feature){ return `<span class="plan-tag">${LOCK_SVG}${esc(this.unlockName(feature))}</span>`; },
+
+  /* ---- loading the plan ---- */
+  /** Called when a user is signed in: shows the last known plan at once, then asks the server. */
+  begin(user){
+    this.userId = user.id; this.loaded = false; this.autoShown = false; this.packs = null; this.packsState = ''; this.openPack = null; this.packTexts = {};
+    let cache = null; try{ cache = JSON.parse(localStorage.getItem(PLAN_CACHE_KEY) || 'null'); }catch(e){}
+    this.ent = (cache && cache.userId === user.id && this.valid(cache.ent)) ? cache.ent : FREE_PLAN;
+    this.load();
+    this.loadPackages();
+  },
+  valid(e){ return !!e && typeof e === 'object' && Array.isArray(e.features); },
+  load(){
+    if(this.loading) return this.loading;
+    this.loading = (async () => {
+      const res = await api('GET', '/api/me/entitlements');
+      if(!Account.user || Account.user.id !== this.userId) return;
+      if(res.status === 401) return;
+      const e = res.ok ? (this.valid(res.entitlements) ? res.entitlements : res) : null;
+      if(this.valid(e)){
+        this.ent = { plan:e.plan || 'free', planName:e.planName || 'Free', expiresAt:e.expiresAt || null, features:e.features.slice(), limits:Object.assign({}, e.limits || {}) };
+        try{ localStorage.setItem(PLAN_CACHE_KEY, JSON.stringify({ userId:this.userId, ent:this.ent })); }catch(err){}
+      } else if(!res.network) this.ent = FREE_PLAN;   // no entitlements yet (404) or an error: Free. Offline: the last known plan.
+      this.loaded = true; this.loadedAt = Date.now();
+      this.packs = null; this.packsState = '';
+      this.refresh();
+    })().finally(() => { this.loading = null; });
+    return this.loading;
+  },
+  loadPackages(){
+    if(this.packages || this.packagesLoading) return this.packagesLoading;
+    this.packagesLoading = api('GET', '/api/packages').then(res => {
+      if(res.ok && Array.isArray(res.packages)) this.packages = res.packages.filter(p => p && p.id && p.active !== false);
+      this.packagesLoading = null;
+      this.refresh();
+    });
+    return this.packagesLoading;
+  },
+  /** Repaints everything that shows a lock. */
+  refresh(){
+    this.renderChip();
+    if(homeView.style.display !== 'none' && lessonView.style.display === 'none') renderHome();
+    if(document.getElementById('funSelectView').style.display !== 'none') renderArcade();
+    const pb = document.getElementById('progressBody'); if(pb) this.decorateCertificates(pb);
+  },
+
+  /* ---- server answers: a 402, or events refused with plan_required (hook in api()) ---- */
+  seen(res){
+    if(!res || !Account.user) return;
+    let err = null;
+    if(res.status === 402) err = res.error || {};
+    else if(res.sync && Array.isArray(res.sync.rejected)) err = res.sync.rejected.find(r => r && (r.code === 'plan_required' || r.reason === 'plan_required')) || null;
+    if(!err || this.autoShown) return;  // once per page: a refused save is never retried, and the sheet never loops
+    this.autoShown = true;
+    setTimeout(() => this.sheet({ feature: err.feature, title: 'That needs a paid plan',
+      text: err.message || 'This part of TypeCraft is not in your plan, so it was not saved. Choose a plan to unlock it.' }), 0);
+  },
+
+  /* ---- the upgrade sheet ---- */
+  sheet(o){
+    o = o || {};
+    const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
+    if(!el.classList.contains('hidden') && this.sheetFeature === o.feature && !o.force) return;
+    this.sheetFeature = o.feature;
+    if(el.classList.contains('hidden')) this.lastFocus = document.activeElement;
+    const list = (this.packages || []).filter(p => (p.pricePaise || 0) > 0 && (!o.feature || (p.features || []).some(f => (f.key || f) === o.feature)));
+    const money = (paise) => '₹' + (paise / 100).toLocaleString('en-IN', { maximumFractionDigits: paise % 100 ? 2 : 0 });
+    const term = (p) => p.validityDays ? `${p.validityDays} days` : 'never expires';
+    const plans = list.length ? `<ul class="plan-options">${list.map(p => `<li class="plan-option${p.highlight ? ' recommended' : ''}">
+        <div class="plan-option-main"><b>${esc(p.name)}</b>${p.highlight ? '<span class="plan-reco">Recommended</span>' : ''}<small>${esc(p.description || '')}</small></div>
+        <div class="plan-option-buy"><span class="plan-price">${esc(money(p.pricePaise))}<small> · ${esc(term(p))}</small></span>
+        <a class="btn ${p.highlight ? 'primary' : 'secondary'} plan-buy" href="/checkout?plan=${encodeURIComponent(p.id)}">Buy ${esc(p.name)}</a></div></li>`).join('')}</ul>`
+      : (this.packagesLoading ? '<p class="plan-note">Loading the plans…</p>' : '<p class="plan-note">See every plan and what it includes on the plans page.</p>');
+    body.innerHTML = `<button type="button" class="plan-x" data-plan-close aria-label="Close">&times;</button>
+      <p class="eyebrow">${this.enforced() ? 'Your plan: ' + esc(this.ent.planName || 'Free') : 'Upgrade'}</p>
+      <h2 id="upgradeTitle">${esc(o.title || 'Unlock more of TypeCraft')}</h2>
+      <p class="lede">${esc(o.text || 'Choose a plan to unlock it.')}</p>
+      ${plans}
+      <div class="results-actions plan-sheet-actions"><a class="btn secondary" href="/pricing">See plans</a><button type="button" class="btn secondary" data-plan-close>Not now</button></div>`;
+    el.classList.remove('hidden');
+    document.documentElement.classList.add('plan-sheet-open');
+    const first = body.querySelector('.plan-buy') || body.querySelector('a.btn'); if(first) first.focus();
+    if(!this.packages && !this.packagesLoading) this.loadPackages();
+    if(this.packagesLoading) this.packagesLoading.then(() => { if(!el.classList.contains('hidden') && this.sheetFeature === o.feature) this.sheet(Object.assign({}, o, { force:true })); });
+  },
+  closeSheet(){
+    const el = document.getElementById('upgradeSheet');
+    if(el.classList.contains('hidden')) return;
+    el.classList.add('hidden'); this.sheetFeature = undefined;
+    document.documentElement.classList.remove('plan-sheet-open');
+    if(this.lastFocus && this.lastFocus.focus) try{ this.lastFocus.focus(); }catch(e){}
+  },
+  /** A locked thing was chosen. While the plan is still loading, wait for it and try again. */
+  blocked(feature, retry, title, text){
+    if(this.loading && retry) return this.loading.then(() => retry());
+    this.sheet({ feature, title, text });
+  },
+
+  /* ---- lessons ---- */
+  lockedLesson(id, retry){
+    if(id === 'custom') return this.blocked('practice.custom', retry, 'Custom practice', `Custom practice is included with ${this.unlockName('practice.custom')} and above.`);
+    if(String(id).startsWith('pack:')) return this.blocked('exercises.premium', retry, 'Practice packs', `Practice packs are included with ${this.unlockName('exercises.premium')} and above.`);
+    const l = TC_COURSE.byId(id);
+    const name = this.unlockName('lessons.all');
+    this.blocked('lessons.all', retry, l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is locked',
+      `Free includes the first ${FREE_LESSONS.size} lessons, the placement test, the problem-keys drill and the Daily Challenge. ${name} and above unlock all ${lessons.length} lessons.`);
+  },
+  decorateCard(card, id){
+    if(this.lessonAllowed(id)) return;
+    card.classList.add('is-locked');
+    card.insertAdjacentHTML('beforeend', this.tag('lessons.all'));
+    const t = card.querySelector('.ltitle'); card.setAttribute('aria-label', `${t ? t.textContent : 'Lesson'}. Locked: needs ${this.unlockName('lessons.all')}.`);
+  },
+  decorateMap(el){
+    el.querySelectorAll('.route-node').forEach(b => {
+      const L = LEVELS.find(x => x.name === b.dataset.level); if(!L) return;
+      const locked = !lessons.some(l => l.level === L.n && this.lessonAllowed(l.id));
+      b.classList.toggle('is-locked', locked);
+      if(locked && !b.querySelector('.plan-lock-svg')) b.querySelector('b').insertAdjacentHTML('beforeend', LOCK_SVG);
+    });
+  },
+
+  /* ---- arcade ---- */
+  lockedGame(id, retry){
+    const g = TC_GAMES.get(id);
+    this.blocked('arcade.all', retry, g ? `${g.title} is locked` : 'This game is locked',
+      `Free includes the Daily Challenge. ${this.unlockName('arcade.all')} and above unlock all eight arcade games.`);
+  },
+  decorateArcade(){
+    document.querySelectorAll('#arcadeCards [data-game]').forEach(c => {
+      if(this.gameAllowed(c.dataset.game)) return;
+      c.classList.add('is-locked');
+      const top = c.querySelector('.tcg-card-top') || c; top.insertAdjacentHTML('beforeend', this.tag('arcade.all'));
+      c.setAttribute('aria-label', (c.getAttribute('aria-label') || '') + ' Locked: needs ' + this.unlockName('arcade.all') + '.');
+    });
+  },
+
+  /* ---- certificates: earned on every plan, printed with 'certificates' ---- */
+  decorateCertificates(host){
+    const can = this.has('certificates');
+    host.querySelectorAll('[data-action="print-certificate"]').forEach(b => {
+      if(can){ if(b.dataset.locked){ delete b.dataset.locked; b.textContent = 'Print'; b.removeAttribute('aria-label'); } return; }
+      if(b.dataset.locked) return;
+      b.dataset.locked = '1';
+      b.innerHTML = `${LOCK_SVG}Print · ${esc(this.unlockName('certificates'))}`;
+      b.setAttribute('aria-label', `Print certificate. Needs ${this.unlockName('certificates')}.`);
+    });
+  },
+
+  /* ---- header chip ---- */
+  renderChip(){
+    const chip = document.getElementById('planChip'), link = document.getElementById('amPlans');
+    if(!chip) return;
+    if(!Account.user){ chip.hidden = true; return; }
+    const name = this.ent.planName || 'Free';
+    chip.hidden = false;
+    chip.classList.toggle('paid', this.isPaid());
+    chip.textContent = name;
+    chip.title = this.isPaid() ? `Your plan: ${name}${this.ent.expiresAt ? ' until ' + new Date(this.ent.expiresAt).toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }) : ''}` : 'Free plan: see what the paid plans unlock';
+    if(link) link.textContent = `Plans · ${name}`;
+  },
+
+  /* ---- home: Continue for a locked next lesson, practice packs, custom practice ---- */
+  renderHome(){
+    const next = nextLessonInfo(), btn = document.getElementById('continueBtn');
+    if(next && btn && !this.lessonAllowed(next.lesson.id) && !btn.dataset.locked){
+      btn.dataset.locked = '1'; btn.innerHTML = `${LOCK_SVG}Unlock lesson ${lessonNumber(next.lesson)}`;
+    }
+    this.renderPacks(); this.renderCustom();
+  },
+  loadPacks(){
+    if(this.packsState === 'loading' || this.packsState === 'ready') return;
+    this.packsState = 'loading';
+    api('GET', '/api/content/packs').then(res => {
+      if(res.ok && Array.isArray(res.packs)){ this.packs = res.packs; this.packsState = 'ready'; }
+      else this.packsState = res.status === 404 ? 'none' : 'error';
+      this.renderPacks();
+    });
+  },
+  renderPacks(){
+    const el = document.getElementById('packsPanel'); if(!el) return;
+    if(!Account.user || this.packsState === 'none'){ el.hidden = true; return; }
+    el.hidden = false;
+    if(!this.packsState) this.loadPacks();
+    const locked = !this.has('exercises.premium');
+    const head = `<div class="plan-panel-head"><div><p class="eyebrow">Practice packs</p><h2 id="packsTitle">Real-world typing</h2></div>${locked ? this.tag('exercises.premium') : ''}</div>`;
+    if(this.packsState === 'loading' || !this.packsState){ el.innerHTML = head + '<div class="pack-grid"><div class="pack-card skeleton"></div><div class="pack-card skeleton"></div></div>'; return; }
+    if(this.packsState === 'error'){ el.innerHTML = head + `<p class="plan-note">The practice packs couldn't be loaded. <button type="button" class="link-btn" data-pack-retry>Try again</button></p>`; return; }
+    const open = this.openPack && this.packs.find(p => p.id === this.openPack);
+    if(open && !locked){
+      const full = this.packTexts[open.id];
+      el.innerHTML = head + `<div class="pack-open"><div class="pack-open-head"><button type="button" class="back-btn" data-pack-back>&larr; All packs</button><h3>${esc(open.title)}</h3><p class="plan-note">${esc(open.description)}</p></div>` +
+        (full ? `<div class="pack-exercises">${full.exercises.map(x => `<button type="button" class="pack-ex" data-pack-ex="${esc(x.id)}"><b>${esc(x.title)}</b><small>${x.text.length.toLocaleString()} characters</small></button>`).join('')}</div>`
+          : (open.error ? `<p class="plan-note">${esc(open.error)} <button type="button" class="link-btn" data-pack="${esc(open.id)}">Try again</button></p>` : '<p class="plan-note">Loading the exercises…</p>')) + '</div>';
+      return;
+    }
+    el.innerHTML = head + (locked ? `<p class="plan-note">Numbers and data entry, code, business writing and exam passages: ${this.packs.reduce((s, p) => s + p.exerciseCount, 0)} exercises written for TypeCraft. Included with ${esc(this.unlockName('exercises.premium'))} and above.</p>` : '') +
+      `<div class="pack-grid">${this.packs.map(p => `<button type="button" class="pack-card${locked ? ' is-locked' : ''}" data-pack="${esc(p.id)}" aria-label="${esc(p.title)}: ${p.exerciseCount} exercises${locked ? '. Locked' : ''}">
+        <b>${esc(p.title)}</b><span>${esc(p.description)}</span><small>${p.exerciseCount} exercises${locked ? ' · ' + LOCK_SVG + 'locked' : ''}</small></button>`).join('')}</div>`;
+  },
+  async choosePack(id){
+    if(!this.has('exercises.premium')) return this.blocked('exercises.premium', () => this.choosePack(id), 'Practice packs',
+      `Practise with invoices, phone numbers, code, business letters and exam passages. Included with ${this.unlockName('exercises.premium')} and above.`);
+    this.openPack = id; const meta = this.packs.find(p => p.id === id); if(meta) delete meta.error;
+    this.renderPacks();
+    if(this.packTexts[id]) return;
+    const res = await api('GET', '/api/content/packs/' + encodeURIComponent(id));
+    if(res.ok && res.pack){ this.packTexts[id] = res.pack; }
+    else if(res.status === 402){ this.openPack = null; this.sheet({ feature:'exercises.premium', title:'Practice packs', text:(res.error && res.error.message) || 'Practice packs need a paid plan.' }); }
+    else if(meta) meta.error = (res.error && res.error.message) || "The pack couldn't be loaded.";
+    this.renderPacks();
+  },
+  startPackExercise(packId, exId){
+    const pack = this.packTexts[packId]; const ex = pack && pack.exercises.find(x => x.id === exId); if(!ex) return;
+    this.startPractice({ id:`pack:${packId}:${exId}`, title:ex.title, tier:`Practice pack · ${pack.title}`, text:ex.text, data:{ pack:packId, exercise:exId } });
+  },
+
+  renderCustom(){
+    const el = document.getElementById('customPanel'); if(!el) return;
+    if(!Account.user){ el.hidden = true; return; }
+    el.hidden = false;
+    const locked = !this.has('practice.custom');
+    const head = `<div class="plan-panel-head"><div><p class="eyebrow">Custom practice</p><h2 id="customTitle">Type what you need to type</h2></div>${locked ? this.tag('practice.custom') : ''}</div>`;
+    if(locked){
+      el.innerHTML = head + `<p class="plan-note">Paste your own text (up to ${CUSTOM_MAX.toLocaleString()} characters), or get a drill built from your weakest keys and the words that use them. Included with ${esc(this.unlockName('practice.custom'))} and above.</p>
+        <div class="plan-actions"><button type="button" class="btn secondary" data-custom-unlock>${LOCK_SVG}Unlock custom practice</button></div>`;
+      return;
+    }
+    if(el.querySelector('#customText')) return;   // keep what the learner is typing
+    el.innerHTML = head + `<label class="custom-field"><span class="sr-only">Your text</span>
+        <textarea id="customText" maxlength="${CUSTOM_MAX * 2}" rows="4" spellcheck="false" placeholder="Paste a letter, a report, code or anything you type at work."></textarea></label>
+      <div class="custom-foot"><span class="plan-note" id="customCount">0 / ${CUSTOM_MAX.toLocaleString()}</span><span class="form-msg" id="customMsg" role="status"></span></div>
+      <div class="plan-actions"><button type="button" class="btn primary" data-custom-text>Practise this text</button><button type="button" class="btn secondary" data-custom-weak>Drill my weakest keys</button></div>`;
+  },
+  /** The learner's own text, made typeable: printable characters (and ₹) only, at most 2,000. */
+  cleanCustom(raw){
+    let t = String(raw || '').replace(/\r\n?/g, '\n').replace(/\t/g, '  ')
+      .replace(/[‘’‚′]/g, "'").replace(/[“”„″]/g, '"').replace(/[–—−]/g, '-')
+      .replace(/…/g, '...').replace(/[   ]/g, ' ');
+    t = t.split('\n').map(line => line.replace(/\s+$/, '')).join('\n').replace(/\n{2,}/g, '\n').trim();
+    if(!t) return { error:'Paste or type some text first.' };
+    const bad = Array.from(new Set(Array.from(t).filter(c => !(c === '\n' || c === '₹' || (c >= ' ' && c <= '~')))));
+    if(bad.length) return { error:`These characters can't be typed here: ${bad.slice(0, 6).join(' ')}${bad.length > 6 ? ' …' : ''}. Remove them and try again.` };
+    if(t.length > CUSTOM_MAX) return { error:`That's ${t.length.toLocaleString()} characters. Keep it to ${CUSTOM_MAX.toLocaleString()}.` };
+    if(t.length < 10) return { error:'Use at least 10 characters.' };
+    return { text:t };
+  },
+  weakKeysText(){
+    const weak = computeProblemKeys(); if(!weak.length) return null;
+    const chars = weak.map(k => k.char);
+    const words = new Set(); lessons.forEach(l => (l.wordDrill || []).forEach(w => words.add(w)));
+    const matched = Array.from(words).filter(w => chars.some(c => w.includes(c)));
+    const out = [];
+    for(let i = 0; i < 48; i++){
+      if(matched.length && i % 3 !== 2) out.push(pick(matched));
+      else { let f = ''; const len = randInt(2, 4); for(let j = 0; j < len; j++) f += pick(chars); out.push(f); }
+    }
+    return { text: out.join(' '), keys: chars.join('') };
+  },
+  startCustom(kind){
+    if(!this.has('practice.custom')) return this.blocked('practice.custom', () => this.startCustom(kind), 'Custom practice', `Custom practice is included with ${this.unlockName('practice.custom')} and above.`);
+    const msg = document.getElementById('customMsg');
+    const say = (t) => { if(msg){ msg.textContent = t || ''; msg.classList.toggle('error', !!t); } };
+    if(kind === 'weak'){
+      const w = this.weakKeysText();
+      if(!w) return say('Complete a few lessons first: your weakest keys show up once there is enough typing to judge.');
+      say('');
+      return this.startPractice({ id:'custom', title:`Your weakest keys: ${w.keys.split('').join(' ')}`, tier:'Custom practice · weakest keys', text:w.text, keys:w.keys.split(''), data:{ custom:'weak', keys:w.keys.slice(0, 12) } });
+    }
+    const r = this.cleanCustom((document.getElementById('customText') || {}).value);
+    if(r.error) return say(r.error);
+    say('');
+    this.startPractice({ id:'custom', title:'Your own text', tier:'Custom practice', text:r.text, data:{ custom:'text', chars:r.text.length } });
+  },
+
+  /* ---- a practice run in the lesson engine: one untimed step, saved as lessonId 'custom' ---- */
+  startPractice(o){
+    this.practice = { id:o.id, isPractice:true, title:o.title, tier:o.tier, text:o.text, keys:(o.keys || []).map(k => k === ' ' ? 'space' : esc(k)), level:1, timed:0, data:o.data || {} };
+    openLesson(o.id);
+  },
+  finishPractice(lesson, wpm, acc, secs){
+    const earned = emitEvent({ type:'run', lessonId:'custom', kind:'challenge', wpm, accuracy:acc, errors:Math.min(errorCount, 100000),
+      seconds:Math.max(1, Math.min(secs, 7200)), data:lesson.data });
+    recordStreak();
+    paper.style.opacity = '0';
+    showResults({ title:'Practice complete', stars:0, crown:false, wpm, accuracy:acc, errors:errorCount, seconds:secs, samples:wpmSamples, earned, nextLabel:null });
+  },
+};
+
+/* sheet: close on the button, the backdrop or Escape; keep Tab inside */
+document.getElementById('upgradeSheet').addEventListener('click', (e) => {
+  if(e.target.closest('[data-plan-close]') || e.target.id === 'upgradeSheet') Plan.closeSheet();
+});
+document.addEventListener('keydown', (e) => {
+  const el = document.getElementById('upgradeSheet'); if(el.classList.contains('hidden')) return;
+  if(e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); Plan.closeSheet(); return; }
+  if(e.key === 'Tab'){
+    e.stopImmediatePropagation();   // never restarts a lesson underneath
+    const f = Array.from(el.querySelectorAll('a[href],button')); if(!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+    return;
+  }
+  e.stopImmediatePropagation();   // nothing behind the sheet reacts (no typing into a lesson, no Enter = next lesson); buttons still work
+}, true);
+/* home panels */
+document.getElementById('packsPanel').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.hasAttribute('data-pack-retry')){ Plan.packsState = ''; Plan.renderPacks(); }
+  else if(b.hasAttribute('data-pack-back')){ Plan.openPack = null; Plan.renderPacks(); }
+  else if(b.dataset.packEx) Plan.startPackExercise(Plan.openPack, b.dataset.packEx);
+  else if(b.dataset.pack) Plan.choosePack(b.dataset.pack);
+});
+document.getElementById('customPanel').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.hasAttribute('data-custom-unlock')) Plan.sheet({ feature:'practice.custom', title:'Custom practice', text:`Practise your own text or your weakest keys. Included with ${Plan.unlockName('practice.custom')} and above.` });
+  else if(b.hasAttribute('data-custom-text')) Plan.startCustom('text');
+  else if(b.hasAttribute('data-custom-weak')) Plan.startCustom('weak');
+});
+document.getElementById('customPanel').addEventListener('input', (e) => {
+  if(e.target.id !== 'customText') return;
+  const n = e.target.value.length, c = document.getElementById('customCount');
+  if(c){ c.textContent = `${n.toLocaleString()} / ${CUSTOM_MAX.toLocaleString()}`; c.classList.toggle('over', n > CUSTOM_MAX); }
+});
+/* certificates: a locked Print opens the sheet instead (capture runs before the rewards UI's own handler) */
+document.getElementById('progressBody').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-action="print-certificate"]'); if(!b || Plan.has('certificates')) return;
+  e.preventDefault(); e.stopPropagation();
+  Plan.blocked('certificates', null, 'Printable certificates', `You keep every certificate you earn. Printing them is included with ${Plan.unlockName('certificates')} and above.`);
+}, true);
+/* a plan bought in another tab shows up when you come back */
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && Account.user && Date.now() - Plan.loadedAt > 30000) Plan.load();
+});
 
 /* ---- init ---- */
 (function init(){

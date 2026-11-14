@@ -40,10 +40,23 @@ function client(ip = '10.0.0.1') {
 const pw = 'correct horse 9';
 const signupBody = (email, extra = {}) => ({ fullName: 'Test User', email, phoneNumber: '+91 98765 43210', password: pw, confirmPassword: pw, ...extra });
 let evt = 0; const eventId = () => `evt-${Date.now()}-${++evt}`;
+// lessons past the first five need a plan (docs/SAAS-CONTRACTS.md §3): these progress tests run on Lifetime
+async function grant(c) {
+  const me = await c('GET', '/api/auth/me');
+  if (!me.body || !me.body.user) return;
+  const t = new Date().toISOString();
+  await env.DB.prepare(`INSERT OR IGNORE INTO user_subscriptions (id, user_id, package_id, status, source, features, limits, starts_at, expires_at, created_at, updated_at)
+                        SELECT ?1, ?2, id, 'active', 'admin', features, limits, ?3, NULL, ?3, ?3 FROM packages WHERE id = 'lifetime'`)
+    .bind(`sub-${me.body.user.id}`, me.body.user.id, t).run();
+}
 async function complete(c, lessonId, stars = 3, extra = {}) {
+  await grant(c);
   return c('POST', '/api/user/progress/lesson-complete', { lessonId, eventId: eventId(), stars, wpm: 40, accuracy: 97, errors: 2, seconds: 60, ...extra });
 }
-const lastLink = (kind) => { const m = outbox[outbox.length - 1].text.match(new RegExp(`#${kind}=([\\w-]+)`)); return m && m[1]; };
+// links in emails: ${SITE_URL}/reset-password#token=… and ${SITE_URL}/verify-email#token=… (the newest such email)
+const LINK_PATHS = { reset: 'reset-password', verify: 'verify-email' };
+const lastMailWith = (kind) => [...outbox].reverse().find((m) => new RegExp(`/${LINK_PATHS[kind]}#token=`).test(m.text));
+const lastLink = (kind) => { const mail = lastMailWith(kind); const m = mail && mail.text.match(new RegExp(`/${LINK_PATHS[kind]}#token=([\\w-]+)`)); return m && m[1]; };
 
 /* ---------------- authentication ---------------- */
 test('signup creates an account and signs you in', async () => {
@@ -145,6 +158,7 @@ test('change password: needs the current one, signs out other devices, keeps thi
 
 /* ---------------- forgot / reset password ---------------- */
 test('forgot password: same answer for known and unknown emails; email only sent for real accounts', async () => {
+  await Promise.all(srv.pending); // background emails from earlier tests
   const before = outbox.length;
   const known = await client('10.0.2.1')('POST', '/api/auth/forgot-password', { email: 'alice@example.com' });
   await Promise.all(srv.pending);
@@ -215,7 +229,7 @@ test('email change only happens after the new address confirms it', async () => 
   const req = await p('POST', '/api/user/email-change', { newEmail: 'new@example.com', password: pw });
   assert.equal(req.status, 200);
   assert.equal((await p('GET', '/api/user/profile')).body.user.email, 'old@example.com');
-  assert.deepEqual(outbox[outbox.length - 1].to, ['new@example.com']);
+  assert.deepEqual(lastMailWith('verify').to, ['new@example.com']);
   const token = lastLink('verify');
   assert.equal((await client()('POST', '/api/auth/verify-email', { token })).status, 200);
   const after = (await p('GET', '/api/user/profile')).body.user;
@@ -300,6 +314,7 @@ test('retried saves are idempotent: the same run is never counted twice', async 
   const a = client('10.0.5.5');
   await a('POST', '/api/auth/signup', signupBody('retry@example.com'));
   const body = { lessonId: 'l9', eventId: 'evt-fixed-retry-1', stars: 3, wpm: 30, accuracy: 99, errors: 0, seconds: 50 };
+  await grant(a);
   const first = await a('POST', '/api/user/progress/lesson-complete', body);
   const second = await a('POST', '/api/user/progress/lesson-complete', body);
   assert.equal(first.body.duplicate, false); assert.equal(second.body.duplicate, true);
@@ -414,30 +429,42 @@ test('the setup SQL can be run twice without harm', async () => {
   assert.equal((await db.prepare('SELECT count FROM rate_limits WHERE key = ?1').bind('k').first()).count, 1);
 });
 
-/* ---------------- the sign-in gate ---------------- */
-test('signed out, every way to the app gets the sign-in page; signed in, the app', async () => {
+/* ---------------- the sign-in gate (the app at /app) ---------------- */
+test('signed out, the app at /app sends you to sign in; signed in, the app; "/" is the public home', async () => {
   const anon = async (p) => { const r = await realFetch(base + p, { redirect: 'manual' }); return { status: r.status, loc: r.headers.get('location'), cache: r.headers.get('cache-control'), body: await r.text() }; };
   const home = await anon('/');
   assert.equal(home.status, 200);
-  assert.match(home.body, /<title>Sign in · TypeCraft<\/title>/);
   assert.ok(!home.body.includes('js/app.js'), 'the app must not be sent to a signed-out browser');
-  assert.match(home.cache, /no-store/);
-  assert.equal((await anon('/index.html')).status, 302);
-  assert.match((await anon('/login')).body, /Sign in · TypeCraft/);
+  const app0 = await anon('/app');
+  assert.equal(app0.status, 302);
+  assert.equal(new URL(app0.loc, base).pathname, '/login');
+  assert.equal((await anon('/index.html')).status, 301);
+  assert.match((await anon('/login')).body, /<h1/);
 
   const a = client('10.0.9.1');
   await a('POST', '/api/auth/signup', signupBody('gate@example.com'));
-  const app = await realFetch(base + '/', { headers: { Cookie: a.cookie() } });
+  const app = await realFetch(base + '/app', { headers: { Cookie: a.cookie() } });
   assert.match(await app.text(), /js\/app\.js/);
+  assert.match(app.headers.get('cache-control'), /no-store/);
   const loginWhileIn = await realFetch(base + '/login', { headers: { Cookie: a.cookie() }, redirect: 'manual' });
-  assert.equal(loginWhileIn.status, 302); assert.equal(new URL(loginWhileIn.headers.get('location')).pathname, '/');
+  assert.equal(loginWhileIn.status, 302); assert.equal(new URL(loginWhileIn.headers.get('location')).pathname, '/dashboard');
   await a('POST', '/api/auth/logout', {});
-  const after = await realFetch(base + '/', { headers: { Cookie: a.cookie() || '' } });
-  assert.match(await after.text(), /Sign in · TypeCraft/);
+  const after = await realFetch(base + '/app', { headers: { Cookie: a.cookie() || '' }, redirect: 'manual' });
+  assert.equal(after.status, 302);
 });
 
-test('without a database the app is served as before (guest mode)', async () => {
+test('without a database the trainer at /app is served as a guest app', async () => {
   const { default: worker } = await import('../src/index.js');
-  const res = await worker.fetch(new Request(`${base}/`), { ASSETS: env.ASSETS }, {});
+  const res = await worker.fetch(new Request(`${base}/app`), { ASSETS: env.ASSETS }, {});
   assert.match(await res.text(), /js\/app\.js/);
+});
+
+test('plan gate: on Free, the old lesson-complete route saves the first five lessons and refuses later ones (402)', async () => {
+  const c = client('10.0.7.7');
+  assert.equal((await c('POST', '/api/auth/signup', signupBody('gate-free@example.com'))).status, 201);
+  const save = (lessonId) => c('POST', '/api/user/progress/lesson-complete', { lessonId, eventId: eventId(), stars: 3, wpm: 30, accuracy: 96, errors: 1, seconds: 60 });
+  assert.equal((await save('l1')).status, 200);
+  const locked = await save('l20');
+  assert.equal(locked.status, 402);
+  assert.equal(locked.body.error.code, 'plan_required');
 });

@@ -11,6 +11,11 @@ export function isOwner(env, email) {
 export async function getHealth(request, env) {
   const { user } = await requireSession(env, request);
   if (!isOwner(env, user.email)) throw new HttpError(404, 'not_found', 'Not found.');
+  return json(await healthNumbers(env));
+}
+
+/** The saving-health numbers (also part of GET /api/admin/overview). */
+export async function healthNumbers(env) {
   const DB = env.DB;
   const now = nowIso();
   const today = now.slice(0, 10);
@@ -32,7 +37,7 @@ export async function getHealth(request, env) {
   if (last) {
     lastDiffs = (await DB.prepare('SELECT table_name, COUNT(*) AS n FROM rebuild_diffs WHERE run_id = ?1 GROUP BY table_name ORDER BY n DESC').bind(last.id).all()).results;
   }
-  return json({
+  return {
     at: now,
     learners: one(0).n,
     activeToday: one(1).n,
@@ -43,7 +48,7 @@ export async function getHealth(request, env) {
     rejectReasons7d: res[6].results,
     feedback7d: one(8).n,
     lastRebuild: last ? { at: last.started_at, finishedAt: last.finished_at, users: last.users, differences: last.differences, errors: last.errors, byTable: lastDiffs } : null,
-  });
+  };
 }
 
 /** /admin and /admin.html: the page itself, only for owners. */

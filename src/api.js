@@ -5,7 +5,9 @@ import { HttpError, json, readJson, fieldError, nowIso } from './http.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { uuid } from './crypto.js';
 import { cleanState } from './progress.js';
-import { META, RULES, loadStored, rowsToState, ensureUser, processEvents } from './pipeline.js';
+import { META, RULES, loadStored, rowsToState, ensureUser, processEvents, countRejects } from './pipeline.js';
+import { entitlementsFor, eventAllowed } from './entitlements.js';
+import { takeCustomEvents } from './content.js'; // app part: lessonId 'custom'
 
 const DAY_MS = 86400000;
 const ID_RE = /^[\w:.-]{8,100}$/;
@@ -82,15 +84,32 @@ export async function getState(request, env) {
   return json(await buildState(env, user.id, today));
 }
 
+/* ---------------- plan gate (docs/SAAS-CONTRACTS.md §3) ---------------- */
+/** Splits events into those the learner's plan allows and per-event 'plan_required' rejections (counted like other rejects). */
+export async function gateEvents(env, userId, events) {
+  const ent = await entitlementsFor(env, userId);
+  const allowed = [], rejected = [];
+  for (const e of events) {
+    if (eventAllowed(ent, e)) allowed.push(e);
+    else rejected.push({ id: e && typeof e.id === 'string' ? e.id.slice(0, 100) : null, code: 'plan_required', message: 'This lesson or game needs a paid plan.' });
+  }
+  if (rejected.length) await countRejects(env, userId, rejected.map((r) => r.code));
+  return { allowed, rejected };
+}
+
 /* ---------------- POST /api/user/events ---------------- */
 export async function postEvents(request, env) {
   const { user } = await requireSession(env, request);
   const body = await readJson(request, 512 * 1024);
   if (!Array.isArray(body.events)) throw fieldError({ events: 'Send the events as a list.' });
   if (body.events.length > 100) throw new HttpError(400, 'too_many_events', 'Send at most 100 events at a time.');
-  const r = await processEvents(env, user.id, body.events);
+  // lessonId 'custom' (custom practice, practice packs) is checked by content.js (practice.custom or
+  // exercises.premium); every other lesson and game by the plan gate
+  const custom = await takeCustomEvents(env, user.id, body.events);
+  const g = await gateEvents(env, user.id, custom.rest);
+  const r = await custom.finish(await processEvents(env, user.id, g.allowed));
   const state = await buildState(env, user.id, todayOf(body.today));
-  return json({ ...state, sync: { accepted: r.accepted, duplicates: r.duplicates, rejected: r.rejected }, awarded: r.awarded });
+  return json({ ...state, sync: { accepted: r.accepted, duplicates: r.duplicates, rejected: [...g.rejected, ...r.rejected] }, awarded: r.awarded });
 }
 
 /* ---------------- PUT /api/user/position ---------------- */
@@ -243,7 +262,9 @@ export async function importCore(env, userId, body, today) {
   let rejected = [];
   // the guest's own events (new app): saved like any other, each id once
   if (Array.isArray(body.events)) {
-    const list = body.events.slice(0, 2000);
+    const g = await gateEvents(env, userId, body.events.slice(0, 2000));
+    const list = g.allowed;
+    rejected = g.rejected;
     for (let i = 0; i < list.length; i += 100) rejected = rejected.concat((await processEvents(env, userId, list.slice(i, i + 100))).rejected);
   }
   const base = { type: 'import', gameId: null, step: null, kind: null, errors: 0, seconds: 0, score: null, xpClaim: 0, hour: null, legacy: false, source: 'import' };

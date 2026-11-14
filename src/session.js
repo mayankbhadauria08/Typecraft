@@ -99,14 +99,17 @@ export function tooMany(minutes) {
 }
 
 /* ---------- email (Resend) ---------- */
+// Emails are sent by src/mail.js (sendTemplate). EMAIL_FROM has a default there, so the
+// API key alone decides whether email works.
 export function emailEnabled(env) {
-  return !!(env.RESEND_API_KEY && env.EMAIL_FROM);
+  return !!env.RESEND_API_KEY;
 }
 
 export function appUrl(env, request) {
   return (env.APP_URL || new URL(request.url).origin).replace(/\/+$/, '');
 }
 
+/** @deprecated kept for compatibility; use sendTemplate() from src/mail.js (logged, templated, retried). */
 export async function sendEmail(env, { to, subject, text }) {
   if (!emailEnabled(env)) {
     throw new HttpError(503, 'email_not_configured', "Email sending isn't set up for this site yet, so no email could be sent.");
@@ -118,7 +121,7 @@ export async function sendEmail(env, { to, subject, text }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to: [to], subject, text, html }),
+    body: JSON.stringify({ from: env.EMAIL_FROM || 'TypeCraft <hello@typecrafttyping.com>', to: [to], subject, text, html }),
   });
   if (!res.ok) {
     console.error('email provider rejected a message:', res.status);
