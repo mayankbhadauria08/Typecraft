@@ -2453,7 +2453,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
     return;
   }
-  if(!e.target.closest || !e.target.closest('#upgradeSheet')) e.stopImmediatePropagation();   // no typing into a lesson behind the sheet
+  e.stopImmediatePropagation();   // nothing behind the sheet reacts (no typing into a lesson, no Enter = next lesson); buttons still work
 }, true);
 /* home panels */
 document.getElementById('packsPanel').addEventListener('click', (e) => {
