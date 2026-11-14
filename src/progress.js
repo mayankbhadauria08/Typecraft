@@ -1,5 +1,7 @@
 // Learning progress: lesson status, finished runs, analytics state and guest-progress import.
 // Every query is scoped to the signed-in user's id taken from the session, never from the request body.
+import { entitlementsFor, lessonAllowed } from './entitlements.js';
+import { planResponse } from './billing.js';
 import { HttpError, json, readJson, fieldError, nowIso } from './http.js';
 import { requireSession } from './session.js';
 import { uuid } from './crypto.js';
@@ -160,6 +162,10 @@ export async function completeLesson(request, env) {
   const { user } = await requireSession(env, request);
   const body = await readJson(request);
   const lessonId = lessonIdOf(body.lessonId);
+  // the plan gate (docs/SAAS-CONTRACTS.md §3) applies to this older route too
+  if (!lessonAllowed(await entitlementsFor(env, user.id), lessonId)) {
+    return planResponse('plan_required', 'This lesson is part of the paid plans. See the plans to keep going.', 'lessons.all');
+  }
   const eventId = eventIdOf(body.eventId);
   const stars = intIn(body.stars, 0, 3, 'stars');
   const wpm = intIn(body.wpm, 0, 400, 'wpm');
