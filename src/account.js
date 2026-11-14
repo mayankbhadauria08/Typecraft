@@ -77,5 +77,5 @@ export async function deleteAccount(request, env) {
     env.DB.prepare('DELETE FROM rate_limits WHERE key = ?1').bind(`login-fail:${user.email}`),
     env.DB.prepare('DELETE FROM users WHERE id = ?1').bind(user.id),
   ]);
-  return json({ message: 'Your account and all of its data have been deleted.' }, 200, { 'Set-Cookie': clearSessionCookie() });
+  return json({ message: 'Your account and its learning data have been deleted. Invoices are kept for tax records.' }, 200, { 'Set-Cookie': clearSessionCookie() });
 }

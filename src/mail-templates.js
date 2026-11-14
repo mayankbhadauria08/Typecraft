@@ -86,12 +86,14 @@ function Button(label, href) {
   };
 }
 
-function Code(code) {
+function Code(code, label = 'Your code') {
   const c = String(code || '');
   return {
-    html: `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 20px;"><tr>
-<td style="padding:14px 22px;border:1px solid ${LINE};border-radius:10px;background:#f7faf9;font-family:'Courier New',Courier,monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:${INK};">${esc(c)}</td>
-</tr></table>`,
+    html: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 22px;"><tr>
+<td align="center" style="padding:20px 12px 18px;border:1px dashed #9cc9c1;border-radius:14px;background:#effaf7;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:${ACCENT};margin:0 0 8px;">${esc(label)}</div>
+<div style="font-family:'Courier New',Courier,monospace;font-size:38px;line-height:1.1;font-weight:bold;letter-spacing:12px;color:${INK};padding-left:12px;">${esc(c)}</div>
+</td></tr></table>`,
     text: `Your code: ${c}`,
   };
 }
@@ -124,34 +126,70 @@ function Paragraphs(body) {
 }
 
 /* ---------- the frame ---------- */
-function layout(site, { subject, preheader, blocks, unsubscribe = false }) {
+// Headline and small label shown at the top of each email (by template name; set in renderTemplate).
+const HEADS = {
+  welcome: ['Welcome', 'Welcome to TypeCraft'],
+  verify_email: ['Account', 'Confirm your email'],
+  otp_login: ['Sign in', 'Your sign-in code'],
+  login_alert: ['Security', 'New sign-in to your account'],
+  password_reset: ['Security', 'Reset your password'],
+  password_changed: ['Security', 'Your password was changed'],
+  security_alert: ['Security', 'Security notice'],
+  email_changed: ['Security', 'Your email was changed'],
+  payment_success: ['Payment', 'Payment received'],
+  payment_failed: ['Payment', "Your payment didn't go through"],
+  invoice: ['Invoice', 'Your invoice'],
+  subscription_renewal_reminder: ['Your plan', 'Your plan ends soon'],
+  subscription_expired: ['Your plan', 'Your plan has ended'],
+  refund_processed: ['Refund', 'Your refund is on its way'],
+  announcement: ['News', null],
+  account_update: ['Account', null],
+  test_completed: ['Typing test', 'Your typing test result'],
+  contact_received: ['Support', 'We got your message'],
+  contact_forward: ['Support', 'New contact message'],
+};
+const DARK = '#0f1b19';
+
+function layout(site, { subject, preheader, blocks, unsubscribe = false, heading }) {
   const support = site.supportEmail;
   const home = site.siteUrl;
   const homeLabel = home.replace(/^https?:\/\//, '');
   const unsub = unsubscribe && site.unsubscribeUrl ? site.unsubscribeUrl : null;
+  const eyebrow = site.eyebrow || '';
+  const title = heading || site.heading || subject;
+  const link = (path, label) => `<a href="${esc(home + path)}" style="color:${MUTED};text-decoration:underline;">${esc(label)}</a>`;
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>${esc(subject)}</title></head>
 <body style="margin:0;padding:0;background:${BG};-webkit-text-size-adjust:100%;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${BG};">${esc(preheader || '')}</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${BG};">${esc(preheader || '')}&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BG}" style="background:${BG};">
-<tr><td align="center" style="padding:28px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-<tr><td style="padding:0 6px 18px;font-family:Georgia,'Times New Roman',serif;font-size:26px;color:${INK};">
-<a href="${esc(home)}" style="color:${INK};text-decoration:none;">type<em style="color:${ACCENT};font-style:italic;">craft</em></a>
+<tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;">
+<tr><td bgcolor="${DARK}" style="background:${DARK};border-radius:16px 16px 0 0;padding:20px 28px;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td valign="middle" style="padding-right:10px;"><a href="${esc(home)}" style="text-decoration:none;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" valign="middle" width="34" height="34" bgcolor="#45cdb6" style="width:34px;height:34px;background:#45cdb6;border-radius:9px;border-bottom:3px solid #177a6c;font-family:Georgia,'Times New Roman',serif;font-size:19px;font-weight:bold;color:${DARK};">T</td></tr></table></a></td>
+    <td valign="middle" style="font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#ece7d9;"><a href="${esc(home)}" style="color:#ece7d9;text-decoration:none;">type<em style="color:#5fd6c0;font-style:italic;">craft</em></a></td>
+  </tr></table>
 </td></tr>
-<tr><td bgcolor="#ffffff" style="background:#ffffff;border:1px solid ${LINE};border-radius:14px;padding:30px 28px;font-family:Arial,Helvetica,sans-serif;">
+<tr><td bgcolor="#ffffff" style="background:#ffffff;border:1px solid ${LINE};border-top:0;border-radius:0 0 16px 16px;padding:30px 30px 26px;font-family:Arial,Helvetica,sans-serif;">
+${eyebrow ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:${ACCENT};margin:0 0 8px;">${esc(eyebrow)}</div>` : ''}
+<h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;font-weight:bold;color:${INK};">${esc(title)}</h1>
 ${blocks.map((b) => b.html).join('\n')}
+<div style="margin-top:8px;padding-top:16px;border-top:1px solid ${LINE};font-size:14px;line-height:1.6;color:${MUTED};">Happy typing,<br><span style="color:${INK};font-weight:bold;">The TypeCraft team</span></div>
 </td></tr>
-<tr><td style="padding:18px 6px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:${MUTED};">
-Questions? Write to <a href="mailto:${esc(support)}" style="color:${ACCENT};">${esc(support)}</a> or just reply to this email.<br>
-<a href="${esc(home)}" style="color:${MUTED};">${esc(homeLabel)}</a> · TypeCraft, touch typing for India${unsub ? `<br><a href="${esc(unsub)}" style="color:${MUTED};">Unsubscribe from announcements</a>` : ''}
+<tr><td align="center" style="padding:20px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:${MUTED};">
+${link('/dashboard', 'Dashboard')} &nbsp;·&nbsp; ${link('/faq', 'Help')} &nbsp;·&nbsp; ${link('/privacy', 'Privacy')}<br>
+Questions? Write to <a href="mailto:${esc(support)}" style="color:${ACCENT};">${esc(support)}</a> or reply to this email.<br>
+<a href="${esc(home)}" style="color:${MUTED};">${esc(homeLabel)}</a> · TypeCraft, touch typing made in India${unsub ? `<br><a href="${esc(unsub)}" style="color:${MUTED};">Unsubscribe from announcements</a>` : ''}
 </td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
   const text = [
+    title,
     ...blocks.map((b) => b.text).filter(Boolean),
+    'Happy typing,\nThe TypeCraft team',
     '—',
     `TypeCraft · ${home}`,
     `Questions? ${support} (or reply to this email)`,
@@ -181,7 +219,7 @@ export const TEMPLATES = {
     else blocks.push(P('Please confirm this email address for your TypeCraft account.'));
     blocks.push(Button(change ? 'Confirm new email' : 'Confirm email', d.link));
     if (d.code) {
-      blocks.push(P('Or enter this code on the confirmation page:'), Code(d.code));
+      blocks.push(P('Or enter this code on the confirmation page:'), Code(d.code, 'Confirmation code'));
       blocks.push(Small('The code expires in 10 minutes. The link works once and expires in 24 hours.'));
     } else {
       blocks.push(Small('The link works once and expires in 24 hours.'));
@@ -196,7 +234,7 @@ export const TEMPLATES = {
     return layout(site, { subject, preheader: `Expires in ${minutes} minutes.`, blocks: [
       P(hi(d)),
       P('Use this code to sign in to TypeCraft:'),
-      Code(d.code),
+      Code(d.code, 'Enter this code'),
       Small(`It expires in ${minutes} minutes and works once. Never share it: TypeCraft staff will never ask you for it.`),
       Small("If you didn't try to sign in, you can ignore this email; nobody can sign in without the code."),
     ] });
@@ -402,6 +440,8 @@ export function renderTemplate(name, data = {}, site) {
     siteUrl: String(site && site.siteUrl || 'https://typecrafttyping.in').replace(/\/+$/, ''),
     supportEmail: (site && site.supportEmail) || 'hello@typecrafttyping.com',
     unsubscribeUrl: site && site.unsubscribeUrl || null,
+    eyebrow: (HEADS[name] || [])[0] || '',
+    heading: (HEADS[name] || [])[1] || null,
   };
   const out = fn(data || {}, s);
   return { subject: String(out.subject).replace(/[\r\n]+/g, ' ').slice(0, 200), html: out.html, text: out.text };
