@@ -592,3 +592,18 @@ test('deleting an account that has paid orders removes every row of it', async (
     assert.equal(await count(`SELECT COUNT(*) AS n FROM ${t} WHERE user_id = ?1`, c.user.id), 0, t);
   }
 });
+
+test('deleting an account keeps its invoices and payments in billing_archive (tax records)', async () => {
+  const c = await signup('archive@example.com');
+  const r = await buy(c, 'starter');
+  assert.equal(r.verify.status, 200, JSON.stringify(r.verify.body));
+  const inv = await env.DB.prepare('SELECT number FROM invoices WHERE user_id = ?1').bind(c.user.id).first();
+  assert.ok(inv && inv.number);
+  const del = await c('POST', '/api/user/delete', { password: pw });
+  assert.equal(del.status, 200);
+  assert.equal(await count('SELECT COUNT(*) AS n FROM invoices WHERE user_id = ?1', c.user.id), 0);
+  const kept = await env.DB.prepare('SELECT * FROM billing_archive WHERE invoice_number = ?1').bind(inv.number).first();
+  assert.ok(kept, 'invoice archived');
+  assert.equal(kept.billed_email, 'archive@example.com');
+  assert.equal(JSON.parse(kept.payments_json)[0].status, 'captured');
+});

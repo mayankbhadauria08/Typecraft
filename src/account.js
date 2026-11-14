@@ -56,6 +56,15 @@ export async function deleteAccount(request, env) {
   if (!(await hitLimit(env, `delete:${user.id}`, 5, 3600))) throw tooMany(60);
   const row = await env.DB.prepare('SELECT password_hash FROM users WHERE id = ?1').bind(user.id).first();
   if (!(await verifyPassword(String(body.password || ''), row.password_hash))) throw fieldError({ password: "That isn't your password." });
+  // invoices and their payments are kept for tax records (migration 0004), without a link to the account
+  await env.DB.prepare(`INSERT OR IGNORE INTO billing_archive (invoice_number, former_user_id, billed_name, billed_email, amount_paise, currency, issued_at, invoice, order_json, payments_json, refunds_json, archived_at)
+    SELECT i.number, i.user_id, i.billed_name, i.billed_email, i.amount_paise, i.currency, i.issued_at,
+      json_object('id', i.id, 'number', i.number, 'seller', json(i.seller), 'lines', json(i.lines), 'issuedAt', i.issued_at),
+      (SELECT json_object('id', o.id, 'packageId', o.package_id, 'amountPaise', o.amount_paise, 'status', o.status, 'razorpayOrderId', o.razorpay_order_id, 'paidAt', o.paid_at, 'createdAt', o.created_at) FROM orders o WHERE o.id = i.order_id),
+      (SELECT json_group_array(json_object('razorpayPaymentId', p.razorpay_payment_id, 'amountPaise', p.amount_paise, 'status', p.status, 'method', p.method, 'capturedAt', p.captured_at)) FROM payments p WHERE p.order_id = i.order_id),
+      (SELECT json_group_array(json_object('razorpayRefundId', r.razorpay_refund_id, 'amountPaise', r.amount_paise, 'status', r.status, 'processedAt', r.processed_at)) FROM refunds r WHERE r.order_id = i.order_id),
+      ?2
+    FROM invoices i WHERE i.user_id = ?1`).bind(user.id, nowIso()).run();
   // foreign keys cascade these, but deleting them explicitly doesn't depend on that setting
   await env.DB.batch([
     ...USER_TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE user_id = ?1`).bind(user.id)),
