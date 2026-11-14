@@ -1,6 +1,8 @@
 // Entitlements — docs/SAAS-CONTRACTS.md §3.
 // What a learner may use = Free (the 'free' package row) + every active subscription
-// that has started and has not expired. Feature checks use feature keys only.
+// that has not expired (contract §2: a stacked renewal counts from the moment it is
+// bought, so an upgrade bought during a cheaper plan gives its features at once).
+// Feature checks use feature keys only.
 import '../shared/course-meta.js';
 import { nowIso } from './http.js';
 
@@ -52,7 +54,6 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
     ent.subscriptions.push({ id: s.id, packageId: s.package_id, packageName: s.package_name, status: s.status, startsAt: s.starts_at, expiresAt: s.expires_at, source: s.source });
     if (s.expires_at == null) lifetime = true;
     else if (!latest || s.expires_at > latest) latest = s.expires_at;
-    if (s.starts_at > now) continue; // a stacked renewal: counts from its start
     for (const f of parse(s.features, [])) features.add(f);
     ent.limits = mergeLimits(ent.limits, parse(s.limits, {}));
     if (!best || s.display_order > best.display_order) best = s;
