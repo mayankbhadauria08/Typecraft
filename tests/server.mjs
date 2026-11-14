@@ -15,7 +15,8 @@ export function makeEnv(extra = {}) {
   DB.applyMigrations(path.join(root, 'migrations'));
   const ASSETS = { fetch: async (req) => {
     const p = new URL(req.url).pathname;
-    if (p === '/' || p === '/index.html') return new Response(readFileSync(path.join(root, 'index.html')), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    // like Workers static assets with html_handling "none": pages at their exact paths only
+    if (p === '/index.html' || p === '/login.html') return new Response(readFileSync(path.join(root, p.slice(1))), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     if (p === '/admin') return new Response(readFileSync(path.join(root, 'admin.html')), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     if (p === '/admin.html') return new Response(null, { status: 307, headers: { Location: '/admin' } });
     // other public files (css/, js/, shared/, icons/, sw.js, manifest), like Workers static assets

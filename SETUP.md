@@ -25,7 +25,7 @@ Once that change is on `main`, Cloudflare's Workers Builds redeploys the site au
 
 ## 3. Check it
 
-Open https://typecraft.mayankbhadauria08.workers.dev. A **sign in** button now appears at the right of the header.
+Open https://typecraft.mayankbhadauria08.workers.dev. Visitors who are not signed in see the sign-in page (login.html); the app opens after signing in.
 
 1. Create your account. If this browser has guest progress, TypeCraft offers to add it to your account. Nothing in this browser is deleted.
 2. Finish a lesson, then open the site in a different browser (or a private window) and sign in. The lesson shows as completed, and **Continue** takes you to the next one.
