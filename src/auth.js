@@ -1,4 +1,5 @@
-// Sign up, sign in, sign out, password reset and password change.
+// Sign up, sign in (password or emailed code), sign out, password reset and change,
+// email confirmation (link or code) and new-device sign-in alerts.
 import {
   HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail, cleanPhone, checkPassword,
   clearSessionCookie, nowIso,
@@ -6,8 +7,10 @@ import {
 import { hashPassword, verifyPassword, burnPasswordCheck, randomToken, sha256Hex, uuid } from './crypto.js';
 import {
   createSession, getSession, requireSession, endSession, publicUser, hitLimit, isLimited, clearLimit, tooMany,
-  emailEnabled, sendEmail, appUrl,
+  emailEnabled,
 } from './session.js';
+import { sendTemplate, sendLater, siteUrl, getPreferences } from './mail.js';
+import { createOtp, verifyOtp, otpEnabled } from './otp.js';
 
 const HOUR = 60 * 60 * 1000;
 const WRONG_LOGIN = 'Email or password is incorrect.';
@@ -17,7 +20,12 @@ function requireMatch(password, confirm, fields, key = 'confirmPassword') {
 }
 
 /* ---------- email links ---------- */
-export async function sendVerificationEmail(env, request, user, newEmail = null) {
+/**
+ * Sends the confirmation email: a link (24 h) and, for the account's own address, a 6-digit
+ * code (10 min). Throws 503 when email isn't set up and 502 when the provider refused it.
+ */
+export async function sendVerificationEmail(env, request, user, newEmail = null, ctx = null) {
+  if (!emailEnabled(env)) throw new HttpError(503, 'email_not_configured', "Email sending isn't set up for this site yet, so no email could be sent.");
   const token = randomToken();
   const now = nowIso();
   await env.DB.prepare(
@@ -25,18 +33,70 @@ export async function sendVerificationEmail(env, request, user, newEmail = null)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
   ).bind(uuid(), user.id, newEmail ? 'change' : 'verify', newEmail, await sha256Hex(token),
     new Date(Date.now() + 24 * HOUR).toISOString(), now).run();
-  const link = `${appUrl(env, request)}/#verify=${token}`;
-  await sendEmail(env, {
-    to: newEmail || user.email,
-    subject: newEmail ? 'Confirm your new TypeCraft email' : 'Confirm your TypeCraft email',
-    text: `Hi ${user.fullName},\n\n` +
-      (newEmail ? `To make ${newEmail} the email for your TypeCraft account, open this link:` : 'To confirm this email address for your TypeCraft account, open this link:') +
-      `\n\n${link}\n\nThe link works once and expires in 24 hours. If you didn't ask for this, you can ignore this email.`,
+  const link = `${siteUrl(env)}/verify-email#token=${token}`;
+  let code = null;
+  if (!newEmail && otpEnabled(env)) {
+    const otp = await createOtp(env, { email: user.email, userId: user.id, purpose: 'verify_email' });
+    code = otp.code || null; // within the 60 s cooldown the email carries the link only
+  }
+  const sent = await sendTemplate(env, ctx, {
+    to: newEmail || user.email, userId: user.id, template: 'verify_email',
+    data: { name: user.fullName, link, code, newEmail },
   });
+  if (sent.status !== 'sent') throw new HttpError(502, 'email_failed', "We couldn't send the email just now. Please try again in a few minutes.");
+}
+
+/* ---------- devices (for "new sign-in" alerts) ---------- */
+/** "Chrome on Windows": browser and OS family only, so updates don't count as a new device. */
+export function deviceLabel(ua) {
+  const s = String(ua || '');
+  const browser =
+    /Edg(e|A|iOS)?\//.test(s) ? 'Edge'
+      : /OPR\/|Opera/.test(s) ? 'Opera'
+        : /SamsungBrowser\//.test(s) ? 'Samsung Internet'
+          : /Firefox\/|FxiOS\//.test(s) ? 'Firefox'
+            : /Chrome\/|CriOS\/|Chromium\//.test(s) ? 'Chrome'
+              : /Safari\//.test(s) && /Version\//.test(s) ? 'Safari'
+                : 'Unknown browser';
+  const os =
+    /Windows/.test(s) ? 'Windows'
+      : /Android/.test(s) ? 'Android'
+        : /iPhone|iPad|iPod/.test(s) ? 'iOS'
+          : /CrOS/.test(s) ? 'ChromeOS'
+            : /Mac OS X|Macintosh/.test(s) ? 'macOS'
+              : /Linux/.test(s) ? 'Linux'
+                : 'Unknown OS';
+  return `${browser} on ${os}`;
+}
+
+/**
+ * Remembers the device; on a sign-in from a device not seen before (and not the first one
+ * ever recorded for the account) sends a login_alert, unless the user turned alerts off.
+ */
+export async function noteDevice(env, ctx, request, user, { alert = true } = {}) {
+  try {
+    const label = deviceLabel(request.headers.get('User-Agent'));
+    const hash = await sha256Hex(`device:v1:${label}`);
+    const now = nowIso();
+    const seen = await env.DB.prepare('SELECT 1 AS x FROM known_devices WHERE user_id = ?1 AND ua_hash = ?2').bind(user.id, hash).first();
+    if (seen) {
+      await env.DB.prepare('UPDATE known_devices SET last_seen = ?3 WHERE user_id = ?1 AND ua_hash = ?2').bind(user.id, hash, now).run();
+      return;
+    }
+    const hadAny = await env.DB.prepare('SELECT 1 AS x FROM known_devices WHERE user_id = ?1 LIMIT 1').bind(user.id).first();
+    await env.DB.prepare('INSERT OR IGNORE INTO known_devices (user_id, ua_hash, label, first_seen, last_seen) VALUES (?1, ?2, ?3, ?4, ?4)')
+      .bind(user.id, hash, label, now).run();
+    if (!alert || !hadAny) return; // the first device we record is not "new"
+    if (!(await getPreferences(env, user.id)).loginAlerts) return;
+    const country = request.cf && typeof request.cf.country === 'string' ? request.cf.country : null;
+    await sendLater(env, ctx, { to: user.email, userId: user.id, template: 'login_alert', data: { name: user.fullName, device: label, time: now, location: country } });
+  } catch (err) {
+    console.error('device check failed:', err && err.message);
+  }
 }
 
 /* ---------- routes ---------- */
-export async function signup(request, env) {
+export async function signup(request, env, ctx) {
   const body = await readJson(request);
   const fields = {};
   const name = cleanName(body.fullName); if (name.error) fields.fullName = name.error;
@@ -66,14 +126,16 @@ export async function signup(request, env) {
   const cookie = await createSession(env, id, body.remember !== false);
   const user = { id, fullName: name.value, email: email.value, phoneNumber: phone.value, emailVerified: false, createdAt: now, lastLoginAt: now };
 
+  await noteDevice(env, ctx, request, user, { alert: false });
   let verificationSent = false;
   if (emailEnabled(env)) {
-    try { await sendVerificationEmail(env, request, user); verificationSent = true; } catch { /* the account still works; they can resend from the profile */ }
+    await sendLater(env, ctx, { to: user.email, userId: id, template: 'welcome', data: { name: user.fullName } });
+    try { await sendVerificationEmail(env, request, user, null, ctx); verificationSent = true; } catch { /* the account still works; they can resend from the profile */ }
   }
   return json({ user, verificationSent }, 201, { 'Set-Cookie': cookie });
 }
 
-export async function login(request, env) {
+export async function login(request, env, ctx) {
   const body = await readJson(request);
   const email = cleanEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
@@ -101,7 +163,9 @@ export async function login(request, env) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?1 AND expires_at <= ?2').bind(row.id, now),
   ]);
   const cookie = await createSession(env, row.id, body.remember !== false);
-  return json({ user: publicUser({ ...row, last_login_at: now }) }, 200, { 'Set-Cookie': cookie });
+  const user = publicUser({ ...row, last_login_at: now });
+  await noteDevice(env, ctx, request, user);
+  return json({ user }, 200, { 'Set-Cookie': cookie });
 }
 
 export async function logout(request, env) {
@@ -142,26 +206,24 @@ export async function forgotPassword(request, env, ctx) {
       env.DB.prepare('INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5)')
         .bind(uuid(), user.id, await sha256Hex(token), new Date(Date.now() + HOUR).toISOString(), now),
     ]);
-    const link = `${appUrl(env, request)}/#reset=${token}`;
+    const link = `${siteUrl(env)}/reset-password#token=${token}`;
     // sent in the background so the response takes the same time whether or not the account exists
-    const send = sendEmail(env, {
-      to: email.value,
-      subject: 'Reset your TypeCraft password',
-      text: `Hi ${user.full_name},\n\nSomeone (hopefully you) asked to reset the password for your TypeCraft account. To choose a new password, open this link:\n\n${link}\n\nThe link works once and expires in 1 hour. If you didn't ask for this, ignore this email; your password stays the same.`,
+    const send = sendTemplate(env, ctx, {
+      to: email.value, userId: user.id, template: 'password_reset', data: { name: user.full_name, link, minutes: 60 },
     }).catch(() => {});
     if (ctx && ctx.waitUntil) ctx.waitUntil(send); else await send;
   }
   return json({ message });
 }
 
-export async function resetPassword(request, env) {
+export async function resetPassword(request, env, ctx) {
   const body = await readJson(request);
   const token = typeof body.token === 'string' ? body.token : '';
   const invalid = new HttpError(400, 'invalid_token', 'This reset link is invalid, already used, or expired. Request a new one.');
   if (!token || token.length > 100) throw invalid;
 
   const row = await env.DB.prepare(
-    `SELECT t.id AS token_id, t.expires_at, t.used_at, u.id, u.email FROM password_reset_tokens t
+    `SELECT t.id AS token_id, t.expires_at, t.used_at, u.id, u.email, u.full_name FROM password_reset_tokens t
        JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?1`
   ).bind(await sha256Hex(token)).first();
   if (!row || row.used_at || Date.parse(row.expires_at) <= Date.now()) throw invalid;
@@ -184,10 +246,11 @@ export async function resetPassword(request, env) {
     env.DB.prepare('UPDATE password_reset_tokens SET used_at = ?2 WHERE user_id = ?1 AND used_at IS NULL').bind(row.id, now),
     env.DB.prepare('DELETE FROM rate_limits WHERE key = ?1').bind(`login-fail:${row.email}`),
   ]);
+  await sendLater(env, ctx, { to: row.email, userId: row.id, template: 'password_changed', data: { name: row.full_name, time: now } });
   return json({ message: 'Your password has been changed. Sign in with your new password.' }, 200, { 'Set-Cookie': clearSessionCookie() });
 }
 
-export async function changePassword(request, env) {
+export async function changePassword(request, env, ctx) {
   const { user } = await requireSession(env, request);
   const body = await readJson(request);
   if (!(await hitLimit(env, `pw-change:${user.id}`, 10, 3600))) throw tooMany(60);
@@ -209,10 +272,11 @@ export async function changePassword(request, env) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?1').bind(user.id), // signs out every other device
   ]);
   const cookie = await createSession(env, user.id, true); // and keeps this one signed in, with a new session id
+  await sendLater(env, ctx, { to: user.email, userId: user.id, template: 'password_changed', data: { name: user.fullName, time: now } });
   return json({ message: 'Password changed. Other devices have been signed out.' }, 200, { 'Set-Cookie': cookie });
 }
 
-export async function verifyEmail(request, env) {
+export async function verifyEmail(request, env, ctx) {
   const body = await readJson(request);
   const token = typeof body.token === 'string' ? body.token : '';
   const invalid = new HttpError(400, 'invalid_token', 'This confirmation link is invalid, already used, or expired.');
@@ -229,6 +293,7 @@ export async function verifyEmail(request, env) {
     await env.DB.prepare('UPDATE users SET email_verified = 1, updated_at = ?2 WHERE id = ?1').bind(row.user_id, now).run();
     return json({ message: 'Email confirmed.' });
   }
+  const before = await env.DB.prepare('SELECT email, full_name FROM users WHERE id = ?1').bind(row.user_id).first();
   try {
     await env.DB.batch([
       env.DB.prepare('UPDATE users SET email = ?2, email_verified = 1, updated_at = ?3 WHERE id = ?1').bind(row.user_id, row.new_email, now),
@@ -238,13 +303,100 @@ export async function verifyEmail(request, env) {
     if (/UNIQUE/i.test(String(e && e.message))) throw new HttpError(409, 'email_taken', 'Another account started using that email in the meantime.');
     throw e;
   }
+  // tell the old address, in case someone else made the change
+  if (before && before.email !== row.new_email) {
+    await sendLater(env, ctx, { to: before.email, userId: row.user_id, template: 'email_changed', data: { name: before.full_name, oldEmail: before.email, newEmail: row.new_email, time: now } });
+  }
   return json({ message: `Your email is now ${row.new_email}.` });
 }
 
-export async function resendVerification(request, env) {
+export async function resendVerification(request, env, ctx) {
   const { user } = await requireSession(env, request);
   if (user.emailVerified) return json({ message: 'Your email is already confirmed.' });
   if (!(await hitLimit(env, `verify-send:${user.id}`, 3, 3600))) throw tooMany(60);
-  await sendVerificationEmail(env, request, user);
+  await sendVerificationEmail(env, request, user, null, ctx);
   return json({ message: `We've sent a confirmation link to ${user.email}.` });
+}
+
+/* ---------- one-time codes by email ---------- */
+const OTP_REQUEST_PURPOSES = ['login', 'verify_email'];
+
+function otpPurpose(value) {
+  const p = value == null ? 'login' : value;
+  if (!OTP_REQUEST_PURPOSES.includes(p)) throw fieldError({ purpose: 'Unknown purpose.' });
+  return p;
+}
+
+/** POST /api/auth/otp/request {email, purpose} → the same answer whether or not the account exists. */
+export async function requestOtp(request, env, ctx) {
+  const body = await readJson(request, 4096);
+  const email = cleanEmail(body.email);
+  if (email.error) throw fieldError({ email: email.error });
+  const purpose = otpPurpose(body.purpose);
+  if (!emailEnabled(env)) throw new HttpError(503, 'email_not_configured', "Email codes aren't set up for this site yet.");
+  if (!otpEnabled(env)) throw new HttpError(503, 'otp_not_configured', "Email codes aren't set up for this site yet.");
+  if (!(await hitLimit(env, `otp-ip:${clientIp(request)}`, 20, 3600))) throw tooMany(60);
+  // one request a minute per address, known or not, so the cooldown reveals nothing
+  if (!(await hitLimit(env, `otp-cool:${purpose}:${email.value}`, 1, 60))) {
+    throw new HttpError(429, 'otp_cooldown', 'Please wait a minute before asking for another code.');
+  }
+  const message = purpose === 'login'
+    ? "If an account uses that email, we've sent it a 6-digit sign-in code. It expires in 10 minutes."
+    : "If that email belongs to an account that still needs confirming, we've sent it a 6-digit code. It expires in 10 minutes.";
+  const row = await env.DB.prepare(
+    "SELECT id, full_name, email, phone_number, email_verified, created_at, last_login_at FROM users WHERE email = ?1 AND account_status = 'active'"
+  ).bind(email.value).first();
+  if (row && (purpose === 'login' || !row.email_verified)) {
+    const work = (async () => {
+      if (purpose === 'verify_email') return sendVerificationEmail(env, request, publicUser(row), null, ctx);
+      const otp = await createOtp(env, { email: row.email, userId: row.id, purpose: 'login' });
+      if (otp.code) await sendTemplate(env, ctx, { to: row.email, userId: row.id, template: 'otp_login', data: { name: row.full_name, code: otp.code, minutes: 10 } });
+    })().catch((err) => console.error('otp send failed:', err && err.code));
+    // in the background so known and unknown addresses take the same time
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work); else await work;
+  }
+  return json({ message, cooldownSeconds: 60 });
+}
+
+/** POST /api/auth/otp/verify {email, code, purpose, remember} → login: session cookie + { user }; verify_email: confirmed. */
+export async function verifyOtpCode(request, env, ctx) {
+  const body = await readJson(request, 4096);
+  const email = cleanEmail(body.email);
+  const code = typeof body.code === 'string' || typeof body.code === 'number' ? String(body.code).replace(/\s+/g, '') : '';
+  const fields = {};
+  if (email.error) fields.email = email.error;
+  if (!/^\d{6}$/.test(code)) fields.code = 'Enter the 6-digit code from the email.';
+  if (Object.keys(fields).length) throw fieldError(fields);
+  const purpose = otpPurpose(body.purpose);
+  if (!otpEnabled(env)) throw new HttpError(503, 'otp_not_configured', "Email codes aren't set up for this site yet.");
+  if (!(await hitLimit(env, `otp-verify-ip:${clientIp(request)}`, 30, 900))) throw tooMany(15);
+
+  const result = await verifyOtp(env, { email: email.value, purpose, code });
+  if (!result.ok) {
+    if (result.reason === 'expired') throw new HttpError(400, 'code_expired', 'That code has expired. Ask for a new one.');
+    if (result.reason === 'burned') throw new HttpError(400, 'code_burned', 'Too many wrong tries, so that code no longer works. Ask for a new one.');
+    throw new HttpError(400, 'invalid_code', "That code isn't right. Check the latest email and try again.");
+  }
+  const row = await env.DB.prepare(
+    'SELECT id, full_name, email, phone_number, email_verified, created_at, last_login_at, account_status FROM users WHERE id = ?1'
+  ).bind(result.userId).first();
+  if (!row || row.email !== result.email) throw new HttpError(400, 'invalid_code', "That code isn't right. Check the latest email and try again.");
+  if (row.account_status !== 'active') throw new HttpError(403, 'account_disabled', 'This account has been disabled.');
+  const now = nowIso();
+
+  if (purpose === 'verify_email') {
+    await env.DB.prepare('UPDATE users SET email_verified = 1, updated_at = ?2 WHERE id = ?1').bind(row.id, now).run();
+    return json({ message: 'Email confirmed.', user: publicUser({ ...row, email_verified: 1 }) });
+  }
+  await endSession(env, request);
+  // a code from the inbox proves the address, so it counts as confirmed too
+  await env.DB.batch([
+    env.DB.prepare('UPDATE users SET last_login_at = ?2, email_verified = 1 WHERE id = ?1').bind(row.id, now),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?1 AND expires_at <= ?2').bind(row.id, now),
+    env.DB.prepare('DELETE FROM rate_limits WHERE key = ?1').bind(`login-fail:${row.email}`),
+  ]);
+  const cookie = await createSession(env, row.id, body.remember !== false);
+  const user = publicUser({ ...row, email_verified: 1, last_login_at: now });
+  await noteDevice(env, ctx, request, user);
+  return json({ user }, 200, { 'Set-Cookie': cookie });
 }

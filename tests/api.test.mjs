@@ -43,7 +43,10 @@ let evt = 0; const eventId = () => `evt-${Date.now()}-${++evt}`;
 async function complete(c, lessonId, stars = 3, extra = {}) {
   return c('POST', '/api/user/progress/lesson-complete', { lessonId, eventId: eventId(), stars, wpm: 40, accuracy: 97, errors: 2, seconds: 60, ...extra });
 }
-const lastLink = (kind) => { const m = outbox[outbox.length - 1].text.match(new RegExp(`#${kind}=([\\w-]+)`)); return m && m[1]; };
+// links in emails: ${SITE_URL}/reset-password#token=… and ${SITE_URL}/verify-email#token=… (the newest such email)
+const LINK_PATHS = { reset: 'reset-password', verify: 'verify-email' };
+const lastMailWith = (kind) => [...outbox].reverse().find((m) => new RegExp(`/${LINK_PATHS[kind]}#token=`).test(m.text));
+const lastLink = (kind) => { const mail = lastMailWith(kind); const m = mail && mail.text.match(new RegExp(`/${LINK_PATHS[kind]}#token=([\\w-]+)`)); return m && m[1]; };
 
 /* ---------------- authentication ---------------- */
 test('signup creates an account and signs you in', async () => {
@@ -145,6 +148,7 @@ test('change password: needs the current one, signs out other devices, keeps thi
 
 /* ---------------- forgot / reset password ---------------- */
 test('forgot password: same answer for known and unknown emails; email only sent for real accounts', async () => {
+  await Promise.all(srv.pending); // background emails from earlier tests
   const before = outbox.length;
   const known = await client('10.0.2.1')('POST', '/api/auth/forgot-password', { email: 'alice@example.com' });
   await Promise.all(srv.pending);
@@ -215,7 +219,7 @@ test('email change only happens after the new address confirms it', async () => 
   const req = await p('POST', '/api/user/email-change', { newEmail: 'new@example.com', password: pw });
   assert.equal(req.status, 200);
   assert.equal((await p('GET', '/api/user/profile')).body.user.email, 'old@example.com');
-  assert.deepEqual(outbox[outbox.length - 1].to, ['new@example.com']);
+  assert.deepEqual(lastMailWith('verify').to, ['new@example.com']);
   const token = lastLink('verify');
   assert.equal((await client()('POST', '/api/auth/verify-email', { token })).status, 200);
   const after = (await p('GET', '/api/user/profile')).body.user;

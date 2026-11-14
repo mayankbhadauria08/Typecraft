@@ -27,7 +27,7 @@ export async function updateProfile(request, env) {
 }
 
 /** The new address only replaces the old one after its confirmation link is opened. */
-export async function requestEmailChange(request, env) {
+export async function requestEmailChange(request, env, ctx) {
   const { user } = await requireSession(env, request);
   const body = await readJson(request);
   const email = cleanEmail(body.newEmail);
@@ -39,7 +39,7 @@ export async function requestEmailChange(request, env) {
   if (!(await hitLimit(env, `email-change:${user.id}`, 5, 3600))) throw tooMany(60);
   const taken = await env.DB.prepare('SELECT 1 FROM users WHERE email = ?1').bind(email.value).first();
   if (taken) throw fieldError({ newEmail: 'Another account already uses that email.' });
-  await sendVerificationEmail(env, request, user, email.value);
+  await sendVerificationEmail(env, request, user, email.value, ctx);
   return json({ message: `We've sent a confirmation link to ${email.value}. Your email changes once you open it.` });
 }
 
@@ -59,6 +59,12 @@ export async function deleteAccount(request, env) {
   // foreign keys cascade these, but deleting them explicitly doesn't depend on that setting
   await env.DB.batch([
     ...USER_TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE user_id = ?1`).bind(user.id)),
+    // email part (migration 0003): codes, devices and preferences go; email/contact logs keep no link to the account
+    env.DB.prepare('DELETE FROM otp_verifications WHERE user_id = ?1 OR email = ?2').bind(user.id, user.email),
+    env.DB.prepare('DELETE FROM known_devices WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('DELETE FROM email_preferences WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('UPDATE email_logs SET user_id = NULL WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('UPDATE contact_messages SET user_id = NULL WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM rate_limits WHERE key = ?1').bind(`login-fail:${user.email}`),
     env.DB.prepare('DELETE FROM users WHERE id = ?1').bind(user.id),
   ]);
