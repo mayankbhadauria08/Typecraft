@@ -203,8 +203,11 @@ test('verify: good signature + Razorpay confirms capture → paid, subscription,
   // the learner's pages
   const st = (await c('GET', `/api/checkout/orders/${order.orderId}`)).body;
   assert.equal(st.status, 'paid'); assert.equal(st.packageName, 'Pro'); assert.equal(st.invoiceNumber, verify.body.invoiceNumber);
+  assert.equal(st.packageId, 'pro', 'the failure page retries with packageId');
   const orders = (await c('GET', '/api/me/orders')).body.orders;
   assert.equal(orders[0].status, 'paid'); assert.equal(orders[0].method, 'upi');
+  assert.equal(orders[0].razorpayPaymentId, payment.id, '/account/payments shows the Razorpay payment id');
+  assert.equal(orders[0].orderId, order.orderId);
   const inv = (await c('GET', `/api/me/invoices/${verify.body.invoiceNumber}`)).body.invoice;
   assert.equal(inv.amountPaise, 19900); assert.equal(inv.billedTo.email, c.user.email);
   assert.equal(inv.seller.name, 'TypeCraft'); assert.equal(inv.tax.gstin, null);
@@ -464,6 +467,9 @@ test('admin endpoints answer 404 to learners and signed-out visitors, and work f
 
   const users = (await owner('GET', `/api/admin/users?q=${encodeURIComponent(learner.user.email)}`)).body;
   assert.equal(users.total, 1); assert.equal(users.items[0].id, learner.user.id); assert.equal(users.items[0].plan, 'Free');
+  const detail = (await owner('GET', `/api/admin/users/${learner.user.id}`)).body;
+  assert.equal(detail.user.role, null, 'the user drawer reads user.role'); assert.equal(detail.entitlements.plan, 'free');
+  assert.ok(Array.isArray(detail.subscriptions) && Array.isArray(detail.orders));
   const pays = (await owner('GET', '/api/admin/payments?status=paid')).body;
   assert.ok(pays.items.length >= 1 && pays.items.every((p) => p.status === 'paid'));
   const rev = (await owner('GET', '/api/admin/revenue')).body;
