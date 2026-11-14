@@ -1,4 +1,4 @@
-/* /payment/pending?order=<id>. Polls GET /api/checkout/orders/:id {status, packageName, amountPaise} every 5 s for up to 5 minutes. */
+/* /payment/pending?order=<id>. Polls GET /api/checkout/orders/:id {orderId, status, packageName, amountPaise, currency} every 5 s for up to 5 minutes. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
@@ -12,7 +12,7 @@
     K.mount(card,
       h('div', { role: 'status', style: 'display:flex;gap:.75rem;align-items:center' }, h('div', { class: 'skeleton', style: 'width:14px;height:14px;border-radius:50%' }),
         h('p', { style: 'margin:0', text: `Still waiting for confirmation… (${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')})` })),
-      o ? h('p', { class: 'muted', text: `${o.packageName || 'Plan'} · ${K.money(K.pick(o, 'amountPaise', 'amount_paise'), o.currency)}` }) : null,
+      o ? h('p', { class: 'muted', text: `${o.packageName || 'Plan'} · ${K.money(o.amountPaise, o.currency)}` }) : null,
       h('p', { class: 'muted', text: 'You can keep this page open; it updates by itself. Please do not pay again for the same plan.' }));
   }
   function gaveUp() {
@@ -31,8 +31,7 @@
     clearTimeout(timer);
     const res = await K.api('GET', `/api/checkout/orders/${encodeURIComponent(orderId)}`);
     const o = res.ok ? res.data : null;
-    if (o && o.status === 'paid') return location.replace(`/payment/success?order=${encodeURIComponent(orderId)}`);
-    if (o && (o.status === 'failed' || o.status === 'cancelled')) return location.replace(`/payment/failure?order=${encodeURIComponent(orderId)}`);
+    if (o && K.orderPage(o.status) !== 'pending') return location.replace(K.orderUrl(o.status, orderId));
     if (!res.ok && res.status === 404) return K.empty(card, { icon: 'info', title: 'Order not found', text: 'We could not find this order on your account.', action: { href: '/account/payments', label: 'Your payments' } });
     if (Date.now() - started >= LIMIT) return gaveUp();
     waiting(o);

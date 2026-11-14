@@ -1,10 +1,11 @@
-/* /admin/settings. Data: GET /api/admin/settings → {seller:{name, legalName, address, email, phone, gstin}, support:{email, hours, replyDays},
-   payments:{enabled, testMode, keysConfigured?}, signups:{open}}; PUT /api/admin/settings with the same shape (testMode is sent back unchanged). */
+/* /admin/settings (owner/admin). Data: GET /api/admin/settings → {settings:{seller:{name, legalName, address, email, phone, gstin},
+   support:{email, hours, replyDays}, payments:{enabled, testMode}, signups:{open}}, paymentsConfigured, webhookConfigured};
+   PUT /api/admin/settings {seller, support, payments, signups} (only known fields; testMode is sent back unchanged) → {settings}. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
   const form = $('#as-form');
-  let loaded = null, role = null;
+  let loaded = null, role = null, configured = { payments: true, webhook: true };
   const canWrite = () => role === 'owner' || role === 'admin';
 
   function legend(t) { return h('legend', { class: 'card-head' }, h('h2', { text: t })); }
@@ -36,7 +37,8 @@
       input('support.replyDays', 'Reply within (working days)', sup.replyDays, { type: 'number', min: 1 }));
     K.mount($('#as-payments'), legend('Payments'),
       h('p', null, 'Mode: ', pay.testMode ? K.badge('pending', 'Test mode') : K.badge('active', 'Live'), ' ',
-        pay.keysConfigured === false ? K.badge('failed', 'Razorpay keys missing') : null),
+        configured.payments ? null : K.badge('failed', 'Razorpay keys missing'), ' ',
+        configured.webhook ? null : K.badge('pending', 'Webhook secret missing')),
       h('p', { class: 'muted', text: pay.testMode ? 'Test mode: no real money moves. It follows the Razorpay keys installed as secrets (rzp_test_… or rzp_live_…); switch keys to go live.' : 'Live: real payments are being taken.' }),
       check('payments.enabled', 'Accept payments', pay.enabled !== false, 'When off, checkout shows “payments paused” and nobody is charged. Existing plans keep working.'));
     K.mount($('#as-signups'), legend('Sign-ups'),
@@ -48,7 +50,7 @@
   function values() {
     const v = (n) => form.elements[n].value.trim();
     return {
-      seller: { name: v('seller.name'), legalName: v('seller.legalName'), address: v('seller.address'), email: v('seller.email'), phone: v('seller.phone'), gstin: v('seller.gstin') || null },
+      seller: { name: v('seller.name'), legalName: v('seller.legalName'), address: v('seller.address'), email: v('seller.email'), phone: v('seller.phone'), gstin: v('seller.gstin').toUpperCase() || null },
       support: { email: v('support.email'), hours: v('support.hours'), replyDays: Number(v('support.replyDays')) || 2 },
       payments: { ...(loaded.payments || {}), enabled: form.elements['payments.enabled'].checked },
       signups: { open: form.elements['signups.open'].checked },
@@ -78,16 +80,17 @@
     const res = await K.api('PUT', '/api/admin/settings', s);
     K.busy(btn, false);
     if (!res.ok) return K.formFail(form, res);
-    loaded = (res.data && res.data.seller ? res.data : null) || s;
+    loaded = res.data.settings;
     render(loaded);
     K.toast('Settings saved.', 'ok');
   });
 
   async function load() {
-    const [res, me] = await Promise.all([K.api('GET', '/api/admin/settings'), K.me()]);
-    role = me && me.role;
+    const [res, r] = await Promise.all([K.api('GET', '/api/admin/settings'), K.role()]);
+    role = r;
     if (!res.ok) return K.error($('#as-alert'), res, load);
-    loaded = res.data.settings || res.data;
+    loaded = res.data.settings;
+    configured = { payments: res.data.paymentsConfigured, webhook: res.data.webhookConfigured };
     render(loaded);
   }
   load();

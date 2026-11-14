@@ -6,7 +6,8 @@
   const K = window.TCK, h = K.h, $ = K.$;
   const orderId = K.qs('order');
   const go = (page) => location.replace(`/payment/${page}?order=${encodeURIComponent(orderId)}`);
-  const route = (status) => (status === 'paid' ? go('success') : status === 'failed' || status === 'cancelled' ? go('failure') : go('pending'));
+  // verify answers paid|pending|failed; the order endpoint can also say partially_refunded/refunded (see K.orderUrl)
+  const route = (status) => location.replace(K.orderUrl(status, orderId));
 
   async function run() {
     if (!orderId) {

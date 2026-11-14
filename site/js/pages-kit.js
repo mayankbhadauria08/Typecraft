@@ -52,19 +52,6 @@
   };
 
   /* ---------- data helpers ---------- */
-  /** First value that is not undefined/null among keys (camelCase first, snake_case fallback). */
-  K.pick = function (o, ...keys) {
-    if (!o) return undefined;
-    for (const k of keys) if (o[k] !== undefined && o[k] !== null) return o[k];
-    return undefined;
-  };
-  /** First array found under the given keys (or the data itself when it is an array). */
-  K.list = function (data, ...keys) {
-    if (Array.isArray(data)) return data;
-    if (!data) return [];
-    for (const k of keys) if (Array.isArray(data[k])) return data[k];
-    return [];
-  };
   K.money = (paise, currency) => {
     const n = Number(paise) || 0;
     if (window.TC && TC.money && (!currency || currency === 'INR')) return TC.money(n);
@@ -307,25 +294,26 @@
   };
 
   /* ---------- shared normalisers ---------- */
-  /** Daily rows → [{date, wpm, accuracy, minutes, runs}] from GET /api/me/analytics (daily) or GET /api/user/history (days). */
-  K.dailySeries = function (data) {
-    const rows = K.list(data, 'daily', 'series', 'days');
-    return rows.map((d) => {
-      const sec = K.pick(d, 'seconds');
-      return {
-        date: K.pick(d, 'date', 'day'),
-        wpm: K.pick(d, 'wpm', 'avgWpm', 'bestWpm', 'best_wpm'),
-        accuracy: K.pick(d, 'accuracy', 'avgAccuracy', 'avg_accuracy'),
-        minutes: K.pick(d, 'minutes') ?? (sec != null ? Math.round(sec / 60) : null),
-        runs: K.pick(d, 'runs', 'sessions'),
-      };
-    }).filter((d) => d.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+  /** Daily rows → [{date, wpm, accuracy, minutes, runs}] from GET /api/me/analytics (basic.daily) or GET /api/user/history (days):
+      both send {date, minutes, runs, bestWpm, avgAccuracy, xp}. */
+  K.dailySeries = (rows) => (rows || []).map((d) => ({ date: d.date, wpm: d.bestWpm || null, accuracy: d.avgAccuracy, minutes: d.minutes, runs: d.runs }))
+    .filter((d) => d.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+  /** Tests from GET /api/me/tests: {id, duration, wpm, rawWpm, accuracy, errors, chars, textKind, day, createdAt}. */
+  K.tests = (data) => ((data && data.tests) || []);
+  /** Letter pair from the app's "a>b" key, with the space made visible. */
+  K.pair = (p) => String(p).split('>').map((c) => (c === ' ' ? '␣' : c)).join('');
+  /** The signed-in staff role: TC.me().role, else GET /api/admin/me. */
+  K.role = async function () {
+    const me = await K.me();
+    if (me && me.role !== undefined) return me.role;
+    const r = await K.api('GET', '/api/admin/me');
+    return r.ok ? r.data.role : null;
   };
-  /** Tests from GET /api/me/tests → [{id, at, day, duration, wpm, rawWpm, accuracy, errors, chars, textKind}]. */
-  K.tests = (data) => K.list(data, 'tests', 'items').map((t) => ({
-    id: t.id, at: K.pick(t, 'createdAt', 'created_at', 'at'), day: K.pick(t, 'day') || String(K.pick(t, 'createdAt', 'created_at', 'at') || '').slice(0, 10),
-    duration: t.duration, wpm: t.wpm, rawWpm: K.pick(t, 'rawWpm', 'raw_wpm'), accuracy: t.accuracy, errors: t.errors, chars: t.chars, textKind: K.pick(t, 'textKind', 'text_kind') || 'words',
-  }));
+  /** Where a checkout order's server status sends the learner. 'paid' and part-refunded orders were paid (success);
+      a fully refunded order is shown in the payment history; failed/cancelled → failure; anything else is still pending. */
+  K.orderPage = (status) => (status === 'paid' || status === 'partially_refunded' ? 'success'
+    : status === 'refunded' ? 'payments' : status === 'failed' || status === 'cancelled' ? 'failure' : 'pending');
+  K.orderUrl = (status, orderId) => (K.orderPage(status) === 'payments' ? '/account/payments' : `/payment/${K.orderPage(status)}?order=${encodeURIComponent(orderId)}`);
   /** Human length of a validity period in days. */
   K.validity = (days) => (days == null ? 'Never expires' : days % 30 === 0 ? `${days / 30} month${days === 30 ? '' : 's'}` : `${days} days`);
   K.duration = (s) => (s >= 60 ? `${s / 60} min` : `${s} s`);

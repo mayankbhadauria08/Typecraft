@@ -1,5 +1,5 @@
 /* /account/plans. Data: TC.me().entitlements {plan,planName,expiresAt,features,limits,subscriptions},
-   GET /api/me/subscriptions {subscriptions:[{id,packageId,packageName,status,startsAt,expiresAt,source}]},
+   GET /api/me/subscriptions {subscriptions:[{id,packageId,packageName,orderId,source,status,upcoming,startsAt,expiresAt}], entitlements},
    GET /api/packages {packages:[{id,name,description,pricePaise,validityDays,features:[{key,label}],highlight}], features:[{key,label,description}]}. */
 (function () {
   'use strict';
@@ -42,10 +42,9 @@
   function subs(list) {
     const el = $('#pl-subs');
     if (!list.length) return K.empty(el, { icon: 'calendar', title: 'No paid periods yet', text: 'When you buy a plan, each period is listed here with its dates.', action: { href: '/pricing', label: 'Compare plans' } });
-    const now = Date.now();
     K.mount(el, K.table([
       { label: 'Plan', value: (s) => s.packageName || s.packageId },
-      { label: 'Status', value: (s) => (s.status === 'active' && Date.parse(s.startsAt) > now ? K.badge('pending', 'Starts later') : K.badge(s.status)) },
+      { label: 'Status', value: (s) => (s.upcoming ? K.badge('pending', 'Starts later') : K.badge(s.status)) },
       { label: 'Starts', value: (s) => K.date(s.startsAt) },
       { label: 'Ends', value: (s) => (s.expiresAt ? K.date(s.expiresAt) : 'Never') },
       { label: 'How', value: (s) => SOURCE[s.source] || s.source || '—' },
@@ -71,13 +70,12 @@
 
   async function load() {
     const [me, subsRes, pkgRes] = await Promise.all([K.me(), K.api('GET', '/api/me/subscriptions'), K.api('GET', '/api/packages')]);
-    const ent = me && me.entitlements;
+    const ent = subsRes.ok ? subsRes.data.entitlements : me && me.entitlements;
     current(ent);
-    const pkgs = pkgRes.ok ? K.list(pkgRes.data, 'packages') : [];
-    const catalogue = pkgRes.ok ? K.list(pkgRes.data, 'features') : [];
+    const pkgs = pkgRes.ok ? pkgRes.data.packages : [];
+    const catalogue = pkgRes.ok ? pkgRes.data.features : [];
     features(ent, catalogue);
-    if (subsRes.ok) subs(K.list(subsRes.data, 'subscriptions'));
-    else if (ent && ent.subscriptions) subs(ent.subscriptions);
+    if (subsRes.ok) subs(subsRes.data.subscriptions);
     else K.error($('#pl-subs'), subsRes, load);
     if (pkgRes.ok) buy(ent, pkgs); else K.error($('#pl-buy'), pkgRes, load);
   }
