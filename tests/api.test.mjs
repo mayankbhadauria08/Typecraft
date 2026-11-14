@@ -462,7 +462,7 @@ test('plan gate: on Free, the old lesson-complete route saves the first five les
   assert.equal((await c('POST', '/api/auth/signup', signupBody('gate-free@example.com'))).status, 201);
   const save = (lessonId) => c('POST', '/api/user/progress/lesson-complete', { lessonId, eventId: eventId(), stars: 3, wpm: 30, accuracy: 96, errors: 1, seconds: 60 });
   assert.equal((await save('l1')).status, 200);
-  const locked = await save('l28');
+  const locked = await save('l20');
   assert.equal(locked.status, 402);
   assert.equal(locked.body.error.code, 'plan_required');
 });
