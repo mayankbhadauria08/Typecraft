@@ -10,7 +10,7 @@
     "directory": ".",
     "binding": "ASSETS",
     // /admin is the owner-only health page: the Worker checks OWNER_EMAILS before serving admin.html
-    "run_worker_first": ["/api/*", "/admin", "/admin.html", "/admin/", "/", "/index.html", "/login", "/login.html"],
+    "run_worker_first": true, // every request reaches src/index.js first: pages, /api, then static files via env.ASSETS
     // files are served at their exact paths (the Worker asks for /index.html and /login.html)
     "html_handling": "none"
   },

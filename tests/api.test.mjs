@@ -429,31 +429,33 @@ test('the setup SQL can be run twice without harm', async () => {
   assert.equal((await db.prepare('SELECT count FROM rate_limits WHERE key = ?1').bind('k').first()).count, 1);
 });
 
-/* ---------------- the sign-in gate ---------------- */
-test('signed out, every way to the app gets the sign-in page; signed in, the app', async () => {
+/* ---------------- the sign-in gate (the app at /app) ---------------- */
+test('signed out, the app at /app sends you to sign in; signed in, the app; "/" is the public home', async () => {
   const anon = async (p) => { const r = await realFetch(base + p, { redirect: 'manual' }); return { status: r.status, loc: r.headers.get('location'), cache: r.headers.get('cache-control'), body: await r.text() }; };
   const home = await anon('/');
   assert.equal(home.status, 200);
-  assert.match(home.body, /<title>Sign in · TypeCraft<\/title>/);
   assert.ok(!home.body.includes('js/app.js'), 'the app must not be sent to a signed-out browser');
-  assert.match(home.cache, /no-store/);
-  assert.equal((await anon('/index.html')).status, 302);
-  assert.match((await anon('/login')).body, /Sign in · TypeCraft/);
+  const app0 = await anon('/app');
+  assert.equal(app0.status, 302);
+  assert.equal(new URL(app0.loc, base).pathname, '/login');
+  assert.equal((await anon('/index.html')).status, 301);
+  assert.match((await anon('/login')).body, /<h1/);
 
   const a = client('10.0.9.1');
   await a('POST', '/api/auth/signup', signupBody('gate@example.com'));
-  const app = await realFetch(base + '/', { headers: { Cookie: a.cookie() } });
+  const app = await realFetch(base + '/app', { headers: { Cookie: a.cookie() } });
   assert.match(await app.text(), /js\/app\.js/);
+  assert.match(app.headers.get('cache-control'), /no-store/);
   const loginWhileIn = await realFetch(base + '/login', { headers: { Cookie: a.cookie() }, redirect: 'manual' });
-  assert.equal(loginWhileIn.status, 302); assert.equal(new URL(loginWhileIn.headers.get('location')).pathname, '/');
+  assert.equal(loginWhileIn.status, 302); assert.equal(new URL(loginWhileIn.headers.get('location')).pathname, '/dashboard');
   await a('POST', '/api/auth/logout', {});
-  const after = await realFetch(base + '/', { headers: { Cookie: a.cookie() || '' } });
-  assert.match(await after.text(), /Sign in · TypeCraft/);
+  const after = await realFetch(base + '/app', { headers: { Cookie: a.cookie() || '' }, redirect: 'manual' });
+  assert.equal(after.status, 302);
 });
 
-test('without a database the app is served as before (guest mode)', async () => {
+test('without a database the trainer at /app is served as a guest app', async () => {
   const { default: worker } = await import('../src/index.js');
-  const res = await worker.fetch(new Request(`${base}/`), { ASSETS: env.ASSETS }, {});
+  const res = await worker.fetch(new Request(`${base}/app`), { ASSETS: env.ASSETS }, {});
   assert.match(await res.text(), /js\/app\.js/);
 });
 
