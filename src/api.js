@@ -7,6 +7,7 @@ import { uuid } from './crypto.js';
 import { cleanState } from './progress.js';
 import { META, RULES, loadStored, rowsToState, ensureUser, processEvents, countRejects } from './pipeline.js';
 import { entitlementsFor, eventAllowed } from './entitlements.js';
+import { takeCustomEvents } from './content.js'; // app part: lessonId 'custom'
 
 const DAY_MS = 86400000;
 const ID_RE = /^[\w:.-]{8,100}$/;
@@ -102,8 +103,11 @@ export async function postEvents(request, env) {
   const body = await readJson(request, 512 * 1024);
   if (!Array.isArray(body.events)) throw fieldError({ events: 'Send the events as a list.' });
   if (body.events.length > 100) throw new HttpError(400, 'too_many_events', 'Send at most 100 events at a time.');
-  const g = await gateEvents(env, user.id, body.events);
-  const r = await processEvents(env, user.id, g.allowed);
+  // lessonId 'custom' (custom practice, practice packs) is checked by content.js (practice.custom or
+  // exercises.premium); every other lesson and game by the plan gate
+  const custom = await takeCustomEvents(env, user.id, body.events);
+  const g = await gateEvents(env, user.id, custom.rest);
+  const r = await custom.finish(await processEvents(env, user.id, g.allowed));
   const state = await buildState(env, user.id, todayOf(body.today));
   return json({ ...state, sync: { accepted: r.accepted, duplicates: r.duplicates, rejected: [...g.rejected, ...r.rejected] }, awarded: r.awarded });
 }
