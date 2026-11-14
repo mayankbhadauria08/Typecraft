@@ -36,7 +36,7 @@
     const body = $('#set-prefs-body');
     const res = await K.api('GET', '/api/me/email-preferences');
     if (!res.ok) return K.error(body, res, loadPrefs);
-    const p = res.data.preferences || res.data;
+    const p = res.data.preferences;
     K.mount(body, PREFS.map(([key, label, hint]) => h('div', { class: 'check' },
       h('input', { type: 'checkbox', id: `pref-${key}`, name: key, checked: p[key] !== false }),
       h('label', { for: `pref-${key}` }, h('span', { text: label }), h('br'), h('span', { class: 'hint muted', text: hint })))));

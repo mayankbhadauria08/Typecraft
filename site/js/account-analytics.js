@@ -1,13 +1,12 @@
-/* /account/analytics. Data: GET /api/me/analytics?days=N → { daily:[{date,wpm,accuracy,minutes}],
-   keyHeatmap?:{key:{attempts,errors}} | [{key,attempts,errors}], slowPairs?:[{pair,avgMs,count}], errorClasses?:{adjacent,…},
-   insights?:[{title,text}|string] } (advanced fields only with analytics.advanced, insights only with insights);
-   fallbacks: GET /api/user/history (daily), GET /api/user/state stats (keyStats, bigramLatency, errorClasses); GET /api/me/tests. */
+/* /account/analytics. Data: GET /api/me/analytics?days=N → {basic:{from, to, days, daily:[{date, minutes, runs, bestWpm, avgAccuracy, xp}],
+   tests:[{date, count, avgWpm, bestWpm, avgAccuracy}]}, advanced:{keyHeatmap:[{key, attempts, errors, accuracy}], slowPairs:[{pair, count, avgMs}],
+   errorClasses:{adjacent, transposition, omission, other}} | null, insights:{weakKeys, slowPairs, mainErrorType, plan:[string]} | null,
+   locked:[feature keys], upgradeUrl}. Free gets basic for the last limits.historyDays (7) days only; advanced and insights are null when locked. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
   const ROWS = ['1234567890-=', 'qwertyuiop[]', "asdfghjkl;'", 'zxcvbnm,./'];
   const CLASS_LABEL = { adjacent: 'Neighbouring key', transposition: 'Swapped letters', omission: 'Missed letter', other: 'Other' };
-  let ent = null, stateCache = null;
 
   function locked(el, { title, text, feature }) {
     return K.mount(el, h('div', { class: 'card empty' },
@@ -16,11 +15,6 @@
       h('p', { class: 'muted', text }),
       h('a', { class: 'btn btn-primary btn-sm', href: `/pricing#${encodeURIComponent(feature)}`, text: 'See plans that include it' })));
   }
-  async function state() {
-    if (!stateCache) stateCache = await K.api('GET', `/api/user/state?today=${K.today()}`);
-    return stateCache.ok ? stateCache.data : null;
-  }
-
   function summary(series, tests) {
     const w = series.filter((d) => d.wpm != null), a = series.filter((d) => d.accuracy != null);
     const avg = (arr, k) => (arr.length ? arr.reduce((s, d) => s + Number(d[k]), 0) / arr.length : null);
@@ -31,7 +25,7 @@
       stat('Average speed', avg(w, 'wpm') != null ? `${K.num(avg(w, 'wpm'))} WPM` : '—', change != null ? `${change >= 0 ? '+' : ''}${K.num(change, 1)} WPM vs first half` : 'Needs a few days of practice'),
       stat('Average accuracy', avg(a, 'accuracy') != null ? `${K.num(avg(a, 'accuracy'), 1)}%` : '—', 'Across practice days'),
       stat('Days practised', `${series.filter((d) => d.minutes || d.runs).length}`, `${series.reduce((s, d) => s + (d.minutes || 0), 0)} minutes`),
-      stat('Typing tests', `${tests.length}`, tests.length ? `best ${K.num(Math.max(...tests.map((t) => +t.wpm || 0)))} WPM` : 'None yet'));
+      stat('Typing tests', `${tests.reduce((n, t) => n + t.count, 0)}`, tests.length ? `best ${K.num(Math.max(...tests.map((t) => t.bestWpm)))} WPM` : 'None yet'));
   }
 
   function heatmap(keys) {
@@ -58,36 +52,18 @@
       worst.length ? h('p', { class: 'muted' }, 'Most mistakes: ', worst.map((r, i) => [i ? ', ' : '', h('span', { class: 'kbd', text: r.label }), ` ${K.num(r.value, 1)}%`])) : null];
   }
 
-  function normKeys(v) {
-    if (!v) return null;
-    if (Array.isArray(v)) return Object.fromEntries(v.map((r) => [r.key || r.k, { attempts: r.attempts, errors: r.errors }]));
-    return v;
-  }
-  function normPairs(v) {
-    if (!v) return null;
-    if (Array.isArray(v)) return v.map((p) => ({ pair: p.pair, avgMs: K.pick(p, 'avgMs', 'avg_ms', 'ms'), count: p.count }));
-    return Object.entries(v).filter(([, p]) => p.count >= 5).map(([pair, p]) => ({ pair, avgMs: p.totalMs / p.count, count: p.count }));
-  }
-
-  async function advanced(data) {
+  function advanced(data) {
     const el = $('#an-adv');
-    if (!K.has(ent, 'analytics.advanced')) {
+    if (data.locked.includes('analytics.advanced')) {
       return locked(el, { feature: 'analytics.advanced', title: 'Advanced analytics is part of Pro, Premium and Lifetime',
         text: 'See every key coloured by how often you miss it, your slowest letter pairs and what kind of mistakes you make. Your statistics are being collected now, so they are ready the moment you upgrade.' });
     }
-    const src = (data && (data.advanced || data)) || {};
-    let keys = normKeys(K.pick(src, 'keyHeatmap', 'keys', 'keyStats'));
-    let pairs = normPairs(K.pick(src, 'slowPairs', 'bigrams', 'bigramLatency'));
-    let classes = K.pick(src, 'errorClasses', 'error_classes');
-    if (!keys || !pairs || !classes) {
-      const st = await state();
-      const s = (st && st.stats) || {};
-      keys = keys || s.keyStats || {};
-      pairs = pairs || normPairs(s.bigramLatency || {});
-      classes = classes || s.errorClasses || {};
-    }
+    const adv = data && data.advanced;
+    if (!adv) return K.error(el, 'Advanced analytics could not be loaded.', load);
+    const keys = Object.fromEntries(adv.keyHeatmap.map((k) => [k.key, k]));
+    const classes = adv.errorClasses;
     const anyKeys = Object.values(keys).some((s) => (s.attempts || 0) >= 10);
-    const slow = (pairs || []).filter((p) => p.avgMs != null).sort((a, b) => b.avgMs - a.avgMs).slice(0, 10);
+    const slow = adv.slowPairs.slice(0, 10);
     const cls = Object.entries(classes || {}).map(([k, n]) => ({ label: CLASS_LABEL[k] || k, value: Number(n) || 0 })).filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
     const heatCard = h('article', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Key heatmap' })));
     if (anyKeys) K.append(heatCard, heatmap(keys));
@@ -95,44 +71,52 @@
     const pairCard = h('article', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Slowest letter pairs' })), h('div'));
     const classCard = h('article', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Kinds of mistakes' })), h('div'));
     K.mount(el, heatCard, h('div', { class: 'grid grid-2 section' }, pairCard, classCard));
-    K.bars(pairCard.lastChild, slow.map((p) => ({ label: p.pair.replace(/ /g, '␣'), value: Math.round(p.avgMs) })), { label: 'Average milliseconds between the two keys', format: (v) => `${K.num(v)} ms`, emptyTitle: 'Not enough pairs yet', emptyText: 'Each pair needs 5 or more presses.' });
+    K.bars(pairCard.lastChild, slow.map((p) => ({ label: K.pair(p.pair), value: Math.round(p.avgMs) })), { label: 'Average milliseconds between the two keys', format: (v) => `${K.num(v)} ms`, emptyTitle: 'Not enough pairs yet', emptyText: 'Each pair needs 3 or more presses.' });
     K.bars(classCard.lastChild, cls, { label: 'Mistakes by kind', emptyTitle: 'No mistakes recorded yet' });
   }
 
   function insights(data) {
     const el = $('#an-ins');
-    if (!K.has(ent, 'insights')) {
+    if (data.locked.includes('insights')) {
       return locked(el, { feature: 'insights', title: 'Personal insights come with Premium and Lifetime',
         text: 'A short weekly plan built from your mistakes and speed: which keys to drill, which lessons to repeat and how long to practise.' });
     }
-    const list = K.list(data && data.insights, 'items').map((i) => (typeof i === 'string' ? { text: i } : i));
-    if (!list.length) return K.empty(el, { icon: 'info', title: 'No insights yet', text: 'Practise on a few more days and your weekly plan appears here.' });
-    K.mount(el, h('div', { class: 'grid grid-2' }, list.map((i) => h('article', { class: 'card' },
-      i.title ? h('h3', { text: i.title }) : null, h('p', { text: i.text || i.body || '' }),
-      i.action && i.action.href && String(i.action.href).startsWith('/') ? h('a', { class: 'btn btn-ghost btn-sm', href: i.action.href, text: i.action.label || 'Open' }) : null))));
+    const ins = data && data.insights;
+    if (!ins) return K.error(el, 'Insights could not be loaded.', load);
+    const cards = [];
+    if (ins.weakKeys.length) cards.push(h('article', { class: 'card' }, h('h3', { text: 'Keys to drill' }),
+      h('p', null, ins.weakKeys.map((k, i) => [i ? ' ' : '', h('span', { class: 'kbd', text: k.key }), h('span', { class: 'muted', text: ` ${K.num(k.accuracy, 1)}%` })]))));
+    if (ins.slowPairs.length) cards.push(h('article', { class: 'card' }, h('h3', { text: 'Pairs to smooth out' }),
+      h('p', null, ins.slowPairs.map((p, i) => [i ? ', ' : '', h('span', { class: 'kbd', text: K.pair(p.pair) }), h('span', { class: 'muted', text: ` ${K.num(p.avgMs)} ms` })]))));
+    K.mount(el,
+      h('article', { class: 'card' }, h('h3', { text: 'Your plan for this week' }), h('ul', null, ins.plan.map((t) => h('li', { text: t })))),
+      cards.length ? h('div', { class: 'grid grid-2 section' }, cards) : null);
   }
 
   async function load() {
     const days = Number($('#an-range').value);
-    const to = K.today();
-    ['#an-wpm', '#an-acc', '#an-min', '#an-tests'].forEach((s) => K.mount($(s), h('div', { class: 'skeleton', style: 'height:180px' })));
-    const [me, an, testsRes] = await Promise.all([K.me(), K.api('GET', `/api/me/analytics?days=${days}`), K.api('GET', '/api/me/tests?limit=200')]);
-    ent = me && me.entitlements;
-    let series = an.ok ? K.dailySeries(an.data) : [];
-    if (!series.length) {
-      const hist = await K.api('GET', `/api/user/history?from=${K.addDays(to, -(days - 1))}&to=${to}`);
-      if (hist.ok) series = K.dailySeries(hist.data);
-      else if (!an.ok) K.mount($('#an-alert'), K.alert('bad', K.errMsg(an, 'We could not load your analytics.')));
+    K.mount($('#an-alert'));
+    ['#an-wpm', '#an-acc', '#an-min', '#an-tests'].forEach((sel) => K.mount($(sel), h('div', { class: 'skeleton', style: 'height:180px' })));
+    const an = await K.api('GET', `/api/me/analytics?days=${days}&today=${K.today()}`);
+    if (!an.ok) {
+      K.mount($('#an-alert'), K.alert('bad', K.errMsg(an, 'We could not load your analytics.')));
+      ['#an-stats', '#an-wpm', '#an-acc', '#an-min', '#an-tests', '#an-adv', '#an-ins'].forEach((sel) => K.mount($(sel)));
+      return;
     }
-    const since = K.addDays(to, -(days - 1));
-    const tests = testsRes.ok ? K.tests(testsRes.data).filter((t) => String(t.day) >= since).reverse() : [];
+    const b = an.data.basic;
+    if (an.data.locked.includes('analytics.basic')) {
+      K.mount($('#an-alert'), K.alert('info', `The Free plan shows your last ${b.days} days. Starter and above show up to a year of trends.`, ' ',
+        h('a', { href: '/pricing', class: 'btn btn-primary btn-sm', text: 'See plans' })));
+    }
+    const series = K.dailySeries(b.daily);
+    const tests = b.tests;
     summary(series, tests);
-    K.line($('#an-wpm'), series.map((d) => ({ label: d.date, value: d.wpm })), { label: 'Words per minute by day', format: (v) => K.num(v) });
+    K.line($('#an-wpm'), series.map((d) => ({ label: d.date, value: d.wpm })), { label: 'Best words per minute by day', format: (v) => K.num(v) });
     K.line($('#an-acc'), series.map((d) => ({ label: d.date, value: d.accuracy })), { label: 'Accuracy by day', format: (v) => `${K.num(v)}%`, max: 100 });
     K.columns($('#an-min'), series.map((d) => ({ label: d.date, value: d.minutes || 0 })), { label: 'Minutes practised by day', format: (v) => K.num(v) });
-    K.line($('#an-tests'), tests.map((t) => ({ label: t.at || t.day, value: t.wpm })), { label: 'Typing test speed', format: (v) => K.num(v), emptyTitle: 'Take two tests to see a trend', emptyText: 'Typing tests measure your speed on fresh text.' });
-    await advanced(an.ok ? an.data : null);
-    insights(an.ok ? an.data : null);
+    K.line($('#an-tests'), tests.map((t) => ({ label: t.date, value: t.avgWpm })), { label: 'Average typing test speed by day', format: (v) => K.num(v), emptyTitle: 'Take tests on two days to see a trend', emptyText: 'Typing tests measure your speed on fresh text.' });
+    advanced(an.data);
+    insights(an.data);
   }
   $('#an-range').addEventListener('change', load);
   load();

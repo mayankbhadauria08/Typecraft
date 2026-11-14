@@ -470,13 +470,15 @@ export async function getMyOrders(request, env) {
   const rows = (await env.DB.prepare(
     `SELECT o.*, p.name AS package_name, i.number AS invoice_number,
             (SELECT method FROM payments WHERE order_id = o.id ORDER BY (status = 'captured') DESC, created_at DESC LIMIT 1) AS method,
+            (SELECT razorpay_payment_id FROM payments WHERE order_id = o.id AND status IN ('captured', 'refunded', 'partially_refunded') LIMIT 1) AS rzp_payment,
             (SELECT COALESCE(SUM(amount_paise), 0) FROM refunds WHERE order_id = o.id AND status = 'processed') AS refunded
        FROM orders o JOIN packages p ON p.id = o.package_id LEFT JOIN invoices i ON i.order_id = o.id
       WHERE o.user_id = ?1 ORDER BY o.created_at DESC LIMIT 200`
   ).bind(user.id).all()).results;
   return json({ orders: rows.map((o) => ({ orderId: o.id, packageId: o.package_id, packageName: o.package_name, amountPaise: o.amount_paise, currency: o.currency,
     status: o.status, method: o.method || null, createdAt: o.created_at, paidAt: o.paid_at, invoiceNumber: o.invoice_number || null,
-    refundedPaise: o.refunded, failureReason: o.status === 'failed' ? o.failure_reason : null })) });
+    refundedPaise: o.refunded, failureReason: o.status === 'failed' ? o.failure_reason : null,
+    razorpayPaymentId: o.rzp_payment || null })) });  // shown on /account/payments so a learner can quote it to support
 }
 
 export async function getMyInvoices(request, env) {

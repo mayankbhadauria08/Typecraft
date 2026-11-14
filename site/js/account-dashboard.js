@@ -1,4 +1,5 @@
-/* /dashboard. Data: TC.me() (user, entitlements), GET /api/user/state, GET /api/me/analytics, GET /api/user/history, GET /api/me/tests. */
+/* /dashboard. Data: TC.me() (user, entitlements), GET /api/user/state (today, totals, position, quests, streak, rank),
+   GET /api/me/analytics?days=30 (basic.daily[{date,minutes,runs,bestWpm,avgAccuracy}]), GET /api/me/tests?limit=6 (tests[]). */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
@@ -70,7 +71,7 @@
     const el = $('#dash-recent');
     const items = [];
     series.filter((d) => d.minutes || d.runs).slice(-6).forEach((d) => items.push({ at: d.date, text: `Practised ${d.minutes || 0} min`, sub: [d.runs ? `${d.runs} runs` : null, d.wpm != null ? `best ${K.num(d.wpm)} WPM` : null].filter(Boolean).join(' · ') }));
-    tests.slice(0, 6).forEach((t) => items.push({ at: t.at || t.day, text: `${K.duration(t.duration)} typing test`, sub: `${K.num(t.wpm)} WPM · ${K.num(t.accuracy, 1)}%` }));
+    tests.slice(0, 6).forEach((t) => items.push({ at: t.createdAt, text: `${K.duration(t.duration)} typing test`, sub: `${K.num(t.wpm)} WPM · ${K.num(t.accuracy, 1)}%` }));
     items.sort((a, b) => (String(a.at) < String(b.at) ? 1 : -1));
     if (!items.length) return K.empty(el, { icon: 'clock', title: 'No activity yet', text: 'Your lessons, games and tests will show up here.', action: { href: '/app', label: 'Start a lesson' } });
     K.mount(el, h('ul', { class: 'tck-list', style: 'list-style:none;padding:0;margin:0;display:grid;gap:.6rem' }, items.slice(0, 6).map((i) =>
@@ -82,18 +83,14 @@
   async function load() {
     const day = K.today();
     const [me, stateRes, anRes, testsRes] = await Promise.all([
-      K.me(), K.api('GET', `/api/user/state?today=${day}`), K.api('GET', '/api/me/analytics?days=30'), K.api('GET', '/api/me/tests?limit=6'),
+      K.me(), K.api('GET', `/api/user/state?today=${day}`), K.api('GET', `/api/me/analytics?days=30&today=${day}`), K.api('GET', '/api/me/tests?limit=6'),
     ]);
     if (me && me.user) {
       $('#dash-greeting').textContent = greeting(me.user.fullName);
       if (!me.user.emailVerified) K.mount($('#dash-alert'), K.alert('info', 'Please confirm your email so we can send receipts and password resets.', ' ', h('a', { href: '/account/profile', text: 'Confirm email' })));
     }
     planCard(me && me.entitlements);
-    let series = anRes.ok ? K.dailySeries(anRes.data) : [];
-    if (!series.length) {
-      const hist = await K.api('GET', `/api/user/history?from=${K.addDays(day, -29)}&to=${day}`);
-      if (hist.ok) series = K.dailySeries(hist.data);
-    }
+    const series = anRes.ok ? K.dailySeries(anRes.data.basic.daily) : [];
     const tests = testsRes.ok ? K.tests(testsRes.data) : [];
     if (!stateRes.ok) {
       K.error($('#dash-today'), stateRes, load);

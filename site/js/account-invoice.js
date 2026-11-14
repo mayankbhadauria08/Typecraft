@@ -1,6 +1,6 @@
-/* /account/invoices/:number (printable). Data: GET /api/me/invoices/:number → {invoice:{number, issuedAt, amountPaise, currency,
-   billedName, billedEmail, seller:{name, legalName, address, email, phone, gstin}, lines:[{description, amountPaise}],
-   orderId, razorpayPaymentId?, paymentMethod?, packageName?, periodStart?, periodEnd?}} (fields also accepted at the top level). */
+/* /account/invoices/:number (printable). Data: GET /api/me/invoices/:number → {invoice:{number, orderId, issuedAt, amountPaise, currency,
+   billedTo:{name, email, gstin}, seller:{name, legalName, address, email, phone, gstin}, lines:[{description, quantity, amountPaise}],
+   subtotalPaise, tax:{gstin, ratePercent, amountPaise, note}, totalPaise, status, paidAt, paymentMethod, paymentReference, refundedPaise}}. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
@@ -17,35 +17,34 @@
       if (res.status === 404) return K.empty($('#inv-body'), { icon: 'file', title: 'Invoice not found', text: 'Check the number, or open it from your invoices list.', action: { href: '/account/invoices', label: 'All invoices' } });
       return K.error($('#inv-body'), res, load);
     }
-    const inv = res.data.invoice || res.data;
-    let seller = inv.seller || {};
-    if (typeof seller === 'string') { try { seller = JSON.parse(seller); } catch { seller = {}; } }
-    let items = inv.lines || [];
-    if (typeof items === 'string') { try { items = JSON.parse(items); } catch { items = []; } }
-    const cur = inv.currency || 'INR';
-    const total = K.pick(inv, 'amountPaise', 'amount_paise');
-    const issued = K.pick(inv, 'issuedAt', 'issued_at');
-    const payId = K.pick(inv, 'razorpayPaymentId', 'razorpay_payment_id', 'paymentId');
-    const method = K.pick(inv, 'paymentMethod', 'method');
+    const inv = res.data.invoice;
+    const seller = inv.seller || {};
+    const billed = inv.billedTo || {};
+    const tax = inv.tax || {};
+    const money = (p) => K.money(p, inv.currency);
+    const status = inv.status === 'refunded' ? K.badge('refunded', 'Refunded') : inv.status === 'partially_refunded' ? K.badge('partially_refunded') : K.badge('paid', 'Paid');
 
     K.mount($('#inv-seller'), lines(seller.legalName || seller.name, seller.address, seller.email, seller.phone, seller.gstin ? `GSTIN: ${seller.gstin}` : null));
     K.mount($('#inv-dates'),
-      h('dt', { text: 'Date' }), h('dd', { text: K.date(issued) }),
-      h('dt', { text: 'Order' }), h('dd', { text: K.pick(inv, 'orderId', 'order_id') || '—' }));
+      h('dt', { text: 'Date' }), h('dd', { text: K.date(inv.issuedAt) }),
+      h('dt', { text: 'Order' }), h('dd', { text: inv.orderId }));
     K.mount($('#inv-body'),
       h('div', { class: 'inv-parties' },
-        h('div', null, h('p', { class: 'inv-label', text: 'Billed to' }), lines(K.pick(inv, 'billedName', 'billed_name'), K.pick(inv, 'billedEmail', 'billed_email'))),
-        h('div', null, h('p', { class: 'inv-label', text: 'Status' }), h('p', null, K.badge('paid', 'Paid')), payId ? h('p', { class: 'mono', text: payId }) : null)),
+        h('div', null, h('p', { class: 'inv-label', text: 'Billed to' }), lines(billed.name, billed.email, billed.gstin ? `GSTIN: ${billed.gstin}` : null)),
+        h('div', null, h('p', { class: 'inv-label', text: 'Status' }), h('p', null, status), inv.paymentReference ? h('p', { class: 'mono', text: inv.paymentReference }) : null)),
       h('div', { class: 'table-wrap' }, h('table', { class: 'table' },
         h('caption', { class: 'sr-only', text: 'Invoice lines' }),
-        h('thead', null, h('tr', null, h('th', { scope: 'col', text: 'Description' }), h('th', { scope: 'col', class: 'num', text: 'Amount' }))),
-        h('tbody', null, items.map((l) => h('tr', null, h('td', { text: l.description || '' }), h('td', { class: 'num mono', text: K.money(K.pick(l, 'amountPaise', 'amount_paise'), cur) })))),
-        h('tfoot', null, h('tr', { class: 'inv-total' }, h('th', { scope: 'row', text: 'Total' }), h('td', { class: 'num mono', text: K.money(total, cur) }))))),
-      h('p', { class: 'inv-paid' }, h('strong', { text: 'Paid via Razorpay' }), method ? ` (${method})` : '', issued ? ` on ${K.date(issued)}.` : '.'),
+        h('thead', null, h('tr', null, h('th', { scope: 'col', text: 'Description' }), h('th', { scope: 'col', class: 'num', text: 'Qty' }), h('th', { scope: 'col', class: 'num', text: 'Amount' }))),
+        h('tbody', null, (inv.lines || []).map((l) => h('tr', null, h('td', { text: l.description }), h('td', { class: 'num mono', text: String(l.quantity ?? 1) }), h('td', { class: 'num mono', text: money(l.amountPaise) })))),
+        h('tfoot', null,
+          h('tr', null, h('th', { scope: 'row', colspan: 2, text: 'Subtotal' }), h('td', { class: 'num mono', text: money(inv.subtotalPaise) })),
+          h('tr', null, h('th', { scope: 'row', colspan: 2, text: tax.ratePercent ? `GST ${tax.ratePercent}%` : 'GST' }), h('td', { class: 'num mono', text: money(tax.amountPaise || 0) })),
+          h('tr', { class: 'inv-total' }, h('th', { scope: 'row', colspan: 2, text: 'Total' }), h('td', { class: 'num mono', text: money(inv.totalPaise) }))))),
+      h('p', { class: 'inv-paid' }, h('strong', { text: 'Paid via Razorpay' }), inv.paymentMethod ? ` (${inv.paymentMethod})` : '', inv.paidAt ? ` on ${K.date(inv.paidAt)}.` : '.'),
+      inv.refundedPaise ? h('p', { text: `${money(inv.refundedPaise)} of this payment has been refunded.` }) : null,
       seller.gstin ? null : h('p', { class: 'muted', text: 'The seller is not registered for GST, so no GST is charged.' }),
       h('p', { class: 'inv-foot', text: `Questions about this invoice? Write to ${seller.email || 'hello@typecrafttyping.com'} and quote ${number}.` }));
-    const btn = $('#inv-print');
-    btn.disabled = false;
+    $('#inv-print').disabled = false;
   }
   $('#inv-print').addEventListener('click', () => window.print());
   load();

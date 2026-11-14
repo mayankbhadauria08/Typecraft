@@ -1,10 +1,9 @@
-/* /admin/revenue. Data: GET /api/admin/revenue?from&to → {from, to, totals:{grossPaise, refundsPaise, netPaise, orders},
-   daily:[{date, grossPaise|revenuePaise, refundsPaise, netPaise, orders}], byPackage:[{packageId, packageName, orders, grossPaise}],
-   refunds:[{id, orderId, userEmail, amountPaise, status, reason, createdAt}]}. */
+/* /admin/revenue (owner/admin). Data: GET /api/admin/revenue?from&to → {from, to, currency, daily:[{date, orders, grossPaise, refundsPaise, netPaise}]
+   (every day of the range), byPackage:[{packageId, name, orders, grossPaise, refundsPaise, netPaise}],
+   totals:{orders, grossPaise, refundsPaise, netPaise, refunds (count), avgOrderPaise}}. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
-  const P = (o, ...k) => K.pick(o, ...k);
   const form = $('#ar-range');
   const utcToday = () => new Date().toISOString().slice(0, 10);
 
@@ -24,40 +23,35 @@
     if (!res.ok) { K.error($('#ar-kpis'), res, load); ['#ar-daily', '#ar-pkg', '#ar-ref'].forEach((s) => K.mount($(s))); return; }
     const d = res.data;
     const t = d.totals || {};
-    const daily = K.list(d, 'daily', 'series');
-    const gross = P(t, 'grossPaise', 'revenuePaise') ?? daily.reduce((s, x) => s + (P(x, 'grossPaise', 'revenuePaise') || 0), 0);
-    const refunds = P(t, 'refundsPaise') ?? daily.reduce((s, x) => s + (P(x, 'refundsPaise') || 0), 0);
-    const net = P(t, 'netPaise') ?? gross - refunds;
-    const orders = P(t, 'orders', 'paidOrders');
+    const daily = d.daily;
+    const gross = t.grossPaise, refunds = t.refundsPaise, net = t.netPaise, orders = t.orders;
     K.mount($('#ar-kpis'),
       stat('Gross revenue', K.money(gross), `${K.shortDay(from)} – ${K.shortDay(to)}`),
-      stat('Refunds', K.money(refunds), refunds ? `${K.num((refunds / (gross || 1)) * 100, 1)}% of gross` : 'None'),
+      stat('Refunds', K.money(refunds), refunds ? `${K.num(t.refunds)} refund${t.refunds === 1 ? '' : 's'} · ${K.num((refunds / (gross || 1)) * 100, 1)}% of gross` : 'None'),
       stat('Net', K.money(net), 'Before Razorpay fees'),
-      stat('Paid orders', orders != null ? K.num(orders) : '—', orders ? `average ${K.money(Math.round(gross / orders))}` : null));
-    // fill missing days with zero so the chart shows real gaps
-    const byDay = Object.fromEntries(daily.map((x) => [P(x, 'date', 'day'), P(x, 'grossPaise', 'revenuePaise') || 0]));
-    const points = [];
-    for (let day = from, i = 0; day <= to && i < 800; day = K.addDays(day, 1), i++) points.push({ label: day, value: byDay[day] || 0 });
+      stat('Paid orders', K.num(orders), orders ? `average ${K.money(t.avgOrderPaise)}` : null));
+    const points = daily.map((x) => ({ label: x.date, value: x.grossPaise }));
     K.columns($('#ar-daily'), points, { label: 'Gross revenue by day', format: (v) => K.money(v), emptyTitle: 'No revenue in this period' });
-    const pk = K.list(d, 'byPackage', 'packages');
+    const pk = d.byPackage;
     K.mount($('#ar-pkg'), pk.length
       ? [h('div'), K.table([
-        { label: 'Package', value: (r) => P(r, 'packageName', 'packageId') },
+        { label: 'Package', value: (r) => r.name },
         { label: 'Orders', num: true, value: (r) => K.num(r.orders) },
-        { label: 'Gross', num: true, value: (r) => K.money(P(r, 'grossPaise', 'revenuePaise')) },
+        { label: 'Gross', num: true, value: (r) => K.money(r.grossPaise) },
+        { label: 'Refunds', num: true, value: (r) => K.money(r.refundsPaise) },
+        { label: 'Net', num: true, value: (r) => K.money(r.netPaise) },
       ], pk)]
       : null);
-    if (pk.length) K.bars($('#ar-pkg').firstChild, pk.map((r) => ({ label: P(r, 'packageName', 'packageId'), value: P(r, 'grossPaise', 'revenuePaise') || 0 })), { label: 'Gross by package', format: (v) => K.money(v) });
+    if (pk.length) K.bars($('#ar-pkg').firstChild, pk.map((r) => ({ label: r.name, value: r.grossPaise })), { label: 'Gross by package', format: (v) => K.money(v) });
     else K.empty($('#ar-pkg'), { icon: 'chart', title: 'No sales in this period' });
-    const refs = K.list(d, 'refunds');
-    if (!refs.length) K.empty($('#ar-ref'), { icon: 'info', title: 'No refunds in this period' });
+    const refDays = daily.filter((x) => x.refundsPaise > 0).reverse();
+    if (!refDays.length) K.empty($('#ar-ref'), { icon: 'info', title: 'No refunds in this period' });
     else K.mount($('#ar-ref'), K.table([
-      { label: 'Date', value: (r) => K.date(P(r, 'createdAt', 'processedAt')) },
-      { label: 'Order', value: (r) => h('a', { class: 'mono', href: `/admin/payments?q=${encodeURIComponent(P(r, 'orderId') || '')}`, text: P(r, 'orderId') || '—' }) },
-      { label: 'Amount', num: true, value: (r) => K.money(P(r, 'amountPaise', 'amount_paise')) },
-      { label: 'Status', value: (r) => K.badge(r.status) },
-      { label: 'Reason', value: (r) => r.reason || '—' },
-    ], refs));
+      { label: 'Date', value: (r) => K.date(`${r.date}T00:00:00Z`) },
+      { label: 'Refunded', num: true, value: (r) => K.money(r.refundsPaise) },
+      { label: 'Gross that day', num: true, value: (r) => K.money(r.grossPaise) },
+      { label: 'Net that day', num: true, value: (r) => K.money(r.netPaise) },
+    ], refDays, { caption: 'Refunds by day' }), h('p', { class: 'muted' }, 'Individual refunds are listed under ', h('a', { href: '/admin/payments?status=refunded', text: 'Payments' }), '.'));
   }
 
   form.addEventListener('submit', (e) => { e.preventDefault(); load(); });
