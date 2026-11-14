@@ -192,7 +192,7 @@ export const TEMPLATES = {
 
   otp_login(d, site) {
     const minutes = d.minutes || 10;
-    const subject = `${d.code} is your TypeCraft sign-in code`;
+    const subject = 'Your TypeCraft sign-in code'; // never the code itself: subjects are kept in email_logs
     return layout(site, { subject, preheader: `Expires in ${minutes} minutes.`, blocks: [
       P(hi(d)),
       P('Use this code to sign in to TypeCraft:'),

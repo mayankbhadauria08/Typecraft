@@ -546,7 +546,7 @@ export async function adminAnnouncement(request, env, ctx) {
     return json({ test: true, status: r.status, to: user.email });
   }
   if (!(await hitLimit(env, `announce:${user.id}`, 5, 3600))) throw tooMany(60);
-  const recipients = (await env.DB.prepare(audienceSql(audience)).bind(nowIso()).all()).results;
+  const recipients = (await env.DB.prepare(audienceSql(audience)).bind(...(audience === 'all' ? [] : [nowIso()])).all()).results;
   const now = nowIso();
   const stmts = recipients.map((r) => env.DB.prepare(
     `INSERT INTO email_logs (id, user_id, to_email, template, category, subject, payload, status, provider, attempts, created_at, updated_at)
