@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="css/games.css">
 <link rel="stylesheet" href="css/rewards.css">
 <link rel="stylesheet" href="css/typewriter.css">
+<link rel="stylesheet" href="css/plan.css">
 </head>
 <body>
 <canvas id="bgfx" hidden aria-hidden="true"></canvas>
@@ -38,15 +39,20 @@
           <div class="theme-menu hidden" id="themeMenu" role="group" aria-label="Background theme"></div>
         </div>
         <button id="navSettings" class="nav-btn icon-btn" title="Settings"><svg class="nb-svg" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg><span class="nav-label">Settings</span></button>
+        <a class="plan-chip" id="planChip" href="/account/plans" hidden></a>
         <span class="sync-status" id="syncStatus" role="status" aria-live="polite"></span>
         <div class="account-wrap" id="accountWrap" hidden>
           <button id="accountBtn" class="nav-btn account-btn" aria-haspopup="true" aria-expanded="false"></button>
           <div class="account-menu hidden" id="accountMenu" role="menu">
             <div class="am-head"><div class="am-name" id="amName"></div><div class="am-email" id="amEmail"></div></div>
+            <a href="/dashboard" role="menuitem" class="am-link">Dashboard</a>
             <button data-acct="learning" role="menuitem">My learning</button>
             <button data-acct="profile" role="menuitem">My profile</button>
             <button data-acct="settings" role="menuitem">Account settings</button>
             <button data-acct="password" role="menuitem">Change password</button>
+            <div class="am-sep"></div>
+            <a href="/account/plans" role="menuitem" class="am-link" id="amPlans">Plans</a>
+            <a href="/account/settings" role="menuitem" class="am-link">Settings</a>
             <div class="am-sep"></div>
             <button id="signOutBtn" role="menuitem">Sign out</button>
           </div>
@@ -68,6 +74,8 @@
       <div id="questsPanel" class="quests-slot"></div>
       <div id="coachPanel" class="coach-panel"></div>
       <div id="reviewPanel" class="review-panel"></div>
+      <section id="packsPanel" class="plan-panel glass" aria-labelledby="packsTitle" hidden></section>
+      <section id="customPanel" class="plan-panel glass" aria-labelledby="customTitle" hidden></section>
       <div class="course-map" id="courseMap" aria-label="Course map"></div>
       <div class="config-bar" id="tierFilter"></div>
       <div id="cardDashboard" class="card-dashboard"></div>
@@ -309,6 +317,10 @@
           <button class="btn secondary" id="importNoBtn">Not now</button>
         </div>
       </div>
+    </div>
+    <!-- ============ UPGRADE SHEET (plans: js/app.js section 16) ============ -->
+    <div class="overlay plan-overlay hidden" id="upgradeSheet" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle">
+      <div class="results-card plan-sheet" id="upgradeBody"></div>
     </div>
     <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
