@@ -379,7 +379,7 @@ test('admin email list and retry: 404 for learners, list for support, retry for 
   assert.ok(list.body.emails.length > 0 && list.body.emails.every((e) => e.status === 'failed'));
   assert.ok(list.body.emails.every((e) => !('payload' in e)));
   const failedWelcome = list.body.emails.find((e) => e.template === 'welcome' && e.retryable);
-  assert.equal((await support('POST', `/api/admin/emails/${failedWelcome.id}/retry`, {})).status, 404);
+  assert.equal((await support('POST', `/api/admin/emails/${failedWelcome.id}/retry`, {})).status, 403);
 
   const owner = await signup('boss@example.com');
   const search = await owner('GET', '/api/admin/emails?q=retry%40example');
