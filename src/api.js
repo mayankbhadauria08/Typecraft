@@ -6,6 +6,7 @@ import { requireSession, hitLimit, tooMany } from './session.js';
 import { uuid } from './crypto.js';
 import { cleanState } from './progress.js';
 import { META, RULES, loadStored, rowsToState, ensureUser, processEvents } from './pipeline.js';
+import { takeCustomEvents } from './content.js'; // app part: lessonId 'custom'
 
 const DAY_MS = 86400000;
 const ID_RE = /^[\w:.-]{8,100}$/;
@@ -88,7 +89,9 @@ export async function postEvents(request, env) {
   const body = await readJson(request, 512 * 1024);
   if (!Array.isArray(body.events)) throw fieldError({ events: 'Send the events as a list.' });
   if (body.events.length > 100) throw new HttpError(400, 'too_many_events', 'Send at most 100 events at a time.');
-  const r = await processEvents(env, user.id, body.events);
+  // app part: lessonId 'custom' (custom practice, practice packs) needs practice.custom or exercises.premium
+  const custom = await takeCustomEvents(env, user.id, body.events);
+  const r = await custom.finish(await processEvents(env, user.id, custom.rest));
   const state = await buildState(env, user.id, todayOf(body.today));
   return json({ ...state, sync: { accepted: r.accepted, duplicates: r.duplicates, rejected: r.rejected }, awarded: r.awarded });
 }
