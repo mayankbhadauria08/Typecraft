@@ -272,3 +272,31 @@ Vars (wrangler.jsonc `vars`, not secret): `SITE_URL=https://typecrafttyping.in`,
 `EMAIL_FROM=TypeCraft <hello@typecrafttyping.com>`, `EMAIL_REPLY_TO=hello@typecrafttyping.com`.
 `RAZORPAY_KEY_ID` is public by design (sent to checkout) but still set as a secret so test
 and live keys can be swapped without a code change.
+
+## 11. Shared UI vocabulary (site part builds it; every page uses only this)
+
+Layouts (chosen by `meta.layout`): `site` (top nav + footer, public pages), `auth` (centred card,
+small header), `account` (top bar + left side nav: Dashboard, Practice (/app), History, Analytics,
+Plans, Payments, Invoices, Profile, Settings; becomes a top scroller on mobile), `admin` (same
+shell, nav: Overview, Users, Packages, Payments, Revenue, Emails, Settings), `bare` (no chrome:
+invoice print view, payment processing).
+
+CSS classes in `site/site.css` (pages add their own small `<style>` only if needed):
+`.container` `.narrow` · `.page-head` (h1 + `.lede` + actions) · `.section` · `.grid` `.grid-2`
+`.grid-3` `.grid-4` · `.card` `.card-head` `.card-foot` · `.btn` `.btn-primary` `.btn-ghost`
+`.btn-danger` `.btn-sm` `.btn-block` `[aria-busy=true]` · `.field` (label, input/select/textarea,
+`.hint`, `.err`) `.field-row` `.check` · `.table-wrap` `.table` (th, td, `.num`) ·
+`.badge` `.badge-ok` `.badge-warn` `.badge-bad` `.badge-muted` `.badge-brand` · `.stat`
+(`.stat-label` `.stat-value` `.stat-sub`) · `.tabs` (buttons with `aria-selected`) · `.empty`
+(icon, title, text, action) · `.skeleton` · `.alert` `.alert-ok` `.alert-bad` `.alert-info` ·
+`.price` · `.plan-card` `.plan-card.recommended` · `.chart` (inline SVG charts) · `.kbd` ·
+`.muted` `.mono` `.sr-only`.
+
+`site/site.js` → global `TC`:
+`TC.api(method, path, body?) → {ok, status, data, error}` (JSON, same-origin, never throws),
+`TC.me() → Promise<{user, entitlements, role} | null>` (cached per page),
+`TC.toast(text, kind?)`, `TC.formValues(form)`, `TC.formErrors(form, fields|null, message?)`,
+`TC.busy(button, on)`, `TC.money(paise) → '₹199'`, `TC.date(iso) / TC.dateTime(iso)`,
+`TC.qs(name)` (query param), `TC.icon(name) → svg string`, `TC.esc(text)` (HTML-escape),
+`TC.chart.line(el, series, opts)` / `TC.chart.bars(el, rows, opts)` (small SVG charts),
+`TC.paginate(el, {page, pages, onPage})`. Pages never use `innerHTML` with unescaped data.
