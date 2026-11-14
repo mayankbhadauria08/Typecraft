@@ -34,6 +34,12 @@
 
   // nightly (02:47 India time): clean-up of expired sessions and links, then the
   // rebuild of every learner's totals from their saved events (src/pipeline.js)
-  "triggers": { "crons": ["17 21 * * *"] },
+  "triggers": { "crons": ["17 21 * * *", "*/10 * * * *"] },
+  // not secret: the public address and the email sender (secrets are set in Cloudflare, see docs/SAAS-CONTRACTS.md §10)
+  "vars": {
+    "SITE_URL": "https://typecrafttyping.in",
+    "EMAIL_FROM": "TypeCraft <hello@typecrafttyping.com>",
+    "EMAIL_REPLY_TO": "hello@typecrafttyping.com"
+  },
   "observability": { "enabled": true }
 }

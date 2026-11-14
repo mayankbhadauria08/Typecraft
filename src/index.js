@@ -1,15 +1,22 @@
 // TypeCraft Worker: serves index.html as a static asset and handles /api/* for
 // accounts and progress. Static files never reach this code (see wrangler.jsonc).
 import { HttpError, json, errorResponse, assertSameOriginWrite } from './http.js';
-import { getSession } from './session.js';
 import * as auth from './auth.js';
 import * as account from './account.js';
 import * as progress from './progress.js';
 import * as api from './api.js';
 import * as admin from './admin.js';
 import { rebuildAll } from './pipeline.js';
+// SaaS modules: each exports ROUTES ({'METHOD /path': handler}), PATTERNS ([method, regex, names, handler])
+// and optionally cron(env, ctx, kind). See docs/SAAS-CONTRACTS.md.
+import * as billing from './billing.js';
+import * as adminApi from './admin-api.js';
+import * as mail from './mail.js';
+import * as content from './content.js';
+import * as site from './site.js';
+const MODULES = [billing, adminApi, mail, content];
 
-const ROUTES = {
+const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,
   'POST /api/auth/signup': auth.signup,
   'POST /api/auth/login': auth.login,
@@ -47,8 +54,10 @@ const ROUTES = {
   'POST /api/user/reset': api.postReset,
   'GET /api/admin/health': admin.getHealth,
 };
+const ROUTES = Object.assign({}, CORE_ROUTES, ...MODULES.map((m) => m.ROUTES || {}));
 // routes with a parameter in the path
 const PATTERNS = [
+  ...MODULES.flatMap((m) => m.PATTERNS || []),
   ['GET', /^\/api\/user\/lessons\/([\w-]{1,20})$/, ['id'], api.getLesson],
   ['GET', /^\/api\/user\/ghosts\/([\w:.-]{1,40})$/, ['key'], api.getGhost],
 ];
@@ -68,48 +77,17 @@ async function handleApi(request, env, ctx) {
     throw new HttpError(known ? 405 : 404, known ? 'method_not_allowed' : 'not_found', known ? 'Method not allowed.' : 'Not found.');
   }
   if (!env.DB) throw new HttpError(503, 'database_not_configured', "Accounts aren't available yet: the site's database isn't connected.");
-  if (request.method !== 'GET') assertSameOriginWrite(request);
+  // webhooks come from payment/email providers, not from this site's pages: they check their own signatures
+  if (request.method !== 'GET' && !pathname.startsWith('/api/webhooks/')) assertSameOriginWrite(request);
   return handler(request, env, ctx, params);
-}
-
-// The app is only sent to signed-in browsers: everyone else gets the sign-in page.
-const APP_PATHS = new Set(['/', '/index.html']);
-const LOGIN_PATHS = new Set(['/login', '/login.html']);
-const PAGE_HEADERS = {
-  'Cache-Control': 'no-store, private', // a page depends on who is signed in, so no cache may keep it
-  'Vary': 'Cookie',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'same-origin',
-};
-async function asset(env, request, path, extraHeaders = {}) {
-  const res = await env.ASSETS.fetch(new Request(new URL(path, request.url), { method: 'GET', headers: request.headers }));
-  const headers = new Headers(res.headers);
-  for (const [k, v] of Object.entries({ ...PAGE_HEADERS, ...extraHeaders })) headers.set(k, v);
-  return new Response(res.body, { status: res.status, headers });
-}
-function redirect(request, path) {
-  return new Response(null, { status: 302, headers: { Location: new URL(path, request.url).toString(), 'Cache-Control': 'no-store' } });
-}
-async function servePage(request, env) {
-  const { pathname } = new URL(request.url);
-  if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
-  // no database connected: no accounts, so the app works as a guest-only app
-  if (!env.DB) return LOGIN_PATHS.has(pathname) ? redirect(request, '/') : asset(env, request, '/index.html');
-  let session = null;
-  try { session = await getSession(env, request); } catch { session = null; } // tables missing: treated as signed out
-  const renew = session && session.setCookie ? { 'Set-Cookie': session.setCookie } : {};
-  if (LOGIN_PATHS.has(pathname)) return session ? redirect(request, '/') : asset(env, request, '/login.html');
-  if (pathname === '/index.html') return redirect(request, '/');
-  // "/" keeps its address either way, so links like /#reset=… reach whichever page is shown
-  return session ? asset(env, request, '/index.html', { ...renew, 'X-TC-Page': 'app' }) : asset(env, request, '/login.html');
 }
 
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
-    if (APP_PATHS.has(pathname) || LOGIN_PATHS.has(pathname)) return servePage(request, env);
-    if (pathname === '/admin' || pathname === '/admin.html' || pathname === '/admin/') return admin.serveAdminPage(request, env);
+    // host rules (www → apex, canonical domain) and every HTML page go through src/site.js
+    const early = await site.beforeAll(request, env, ctx);
+    if (early) return early;
     if (pathname.startsWith('/api/')) {
       try {
         return await handleApi(request, env, ctx);
@@ -120,6 +98,8 @@ export default {
         return errorResponse(err);
       }
     }
+    const page = await site.servePage(request, env, ctx);
+    if (page) return page;
     return env.ASSETS.fetch(request);
   },
 
@@ -137,6 +117,12 @@ export default {
       env.DB.prepare('DELETE FROM email_tokens WHERE expires_at <= ?1').bind(weekAgo),
       env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?1').bind(Math.floor(Date.now() / 1000) - 24 * 3600),
     ]);
+    // every 10 minutes: email retries, payment reconciliation; daily: expiries and reminders
+    for (const m of MODULES) {
+      if (typeof m.cron !== 'function') continue;
+      try { await m.cron(env, ctx, event.cron); } catch (err) { console.error('cron failed:', err && err.message); }
+    }
+    if (event.cron !== '17 21 * * *') return; // the rest is the nightly job
     try {
       const r = await rebuildAll(env);
       console.log('nightly rebuild:', JSON.stringify(r));
