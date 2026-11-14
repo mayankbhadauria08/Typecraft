@@ -970,6 +970,7 @@ function playGame(id){
 }
 document.getElementById('funSelectView').addEventListener('click', (e) => { const b = e.target.closest('[data-game]'); if(b) playGame(b.dataset.game); });
 document.getElementById('arcadeBackBtn').addEventListener('click', openFunMode);
+document.getElementById('funModeBtn').addEventListener('click', openFunMode);   // the Arcade button in the top bar
 document.getElementById('funSelectView').addEventListener('pointermove', (e) => {
   if(Settings.effects !== 'full' || (e.pointerType && e.pointerType !== 'mouse')) return;
   const card = e.target.closest('.tcg-card'); if(!card) return;
