@@ -31,11 +31,17 @@ function client() {
   };
   return c;
 }
+// These checks cover lessons and games beyond Free (first five lessons, Daily Challenge),
+// so each learner gets an admin-granted Lifetime plan; the plan gate is tested in billing.test.mjs.
 async function signup(email) {
   const c = client();
   const r = await c('POST', '/api/auth/signup', { fullName: 'Learner', email, phoneNumber: '+91 98765 43210', password: pw, confirmPassword: pw });
   assert.equal(r.status, 201);
   c.user = r.body.user;
+  const t = new Date().toISOString();
+  await env.DB.prepare(`INSERT INTO user_subscriptions (id, user_id, package_id, status, source, features, limits, starts_at, expires_at, created_at, updated_at)
+                        SELECT ?1, ?2, id, 'active', 'admin', features, limits, ?3, NULL, ?3, ?3 FROM packages WHERE id = 'lifetime'`)
+    .bind(`sub-${c.user.id}`, c.user.id, t).run();
   return c;
 }
 async function signin(email) {
