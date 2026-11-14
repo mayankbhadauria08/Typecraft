@@ -56,7 +56,7 @@ export function startServer(env, port = 8788) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.argv[2] || 8788);
-  const env = makeEnv();
+  const env = makeEnv(process.env.OWNER_EMAILS ? { OWNER_EMAILS: process.env.OWNER_EMAILS } : {});
   // optional: capture "sent" emails instead of calling Resend
   if (process.env.CAPTURE_EMAIL) {
     env.RESEND_API_KEY = 'test'; env.EMAIL_FROM = 'TypeCraft <test@example.com>';
