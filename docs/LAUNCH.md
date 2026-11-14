@@ -21,7 +21,16 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
    `refund.processed`, `refund.failed`. Put the same secret in Cloudflare as `RAZORPAY_WEBHOOK_SECRET`.
 5. **[You] `SESSION_SECRET`** (Secret): any random 40+ characters (e.g. a password-manager
    generated string). Turns on email sign-in codes and signed unsubscribe links.
-6. **[You] Resend** (resend.com, sign up with hello@typecrafttyping.com) → Domains → add
+6. **[You] Email through Google Workspace (simplest; no Resend needed):** sign in to Google as
+   hello@typecrafttyping.com → myaccount.google.com → Security → turn on 2-Step Verification →
+   "App passwords" → create one named TypeCraft (16 letters). In Cloudflare add the Secrets
+   `SMTP_USER` = `hello@typecrafttyping.com` and `SMTP_PASS` = the 16-letter app password.
+   (If "App passwords" is missing, the Workspace admin must allow 2-Step Verification:
+   admin.google.com → Security → Authentication → 2-step verification → Allow.) Also turn on
+   DKIM for typecrafttyping.com in admin.google.com → Apps → Gmail → Authenticate email, add the
+   TXT record it shows at GoDaddy, and add DMARC: TXT `_dmarc` = `v=DMARC1; p=none; rua=mailto:hello@typecrafttyping.com`.
+   Google Workspace sends up to about 2,000 emails a day this way.
+   **Or [You] Resend** (resend.com, sign up with hello@typecrafttyping.com) → Domains → add
    `typecrafttyping.com`. Resend shows 3–4 records (an MX + TXT on a `send` subdomain, a DKIM TXT
    `resend._domainkey`). Add them in **GoDaddy DNS for typecrafttyping.com**. They don't touch your
    Google Workspace records (Google's MX and the root SPF stay as they are). Then add a DMARC
@@ -46,7 +55,8 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
 | `RAZORPAY_KEY_ID` | Cloudflare secret | for payments | `rzp_test_…` now, `rzp_live_…` later |
 | `RAZORPAY_KEY_SECRET` | Cloudflare secret | for payments | from Razorpay → API Keys |
 | `RAZORPAY_WEBHOOK_SECRET` | Cloudflare secret | for payments | the secret typed in the Razorpay webhook |
-| `RESEND_API_KEY` | Cloudflare secret | for email | Resend → API Keys |
+| `SMTP_USER` / `SMTP_PASS` | Cloudflare secrets | for email (option A) | hello@typecrafttyping.com + Google app password |
+| `RESEND_API_KEY` | Cloudflare secret | for email (option B) | Resend → API Keys |
 | `SESSION_SECRET` | Cloudflare secret | for codes | random 40+ characters |
 | `OWNER_EMAILS` | Cloudflare secret | set ✓ | mayankbhadauria08@gmail.com |
 | `RESEND_WEBHOOK_SECRET` | Cloudflare secret | optional | Resend webhook (delivered/bounced) |

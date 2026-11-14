@@ -102,7 +102,7 @@ export function tooMany(minutes) {
 // Emails are sent by src/mail.js (sendTemplate). EMAIL_FROM has a default there, so the
 // API key alone decides whether email works.
 export function emailEnabled(env) {
-  return !!env.RESEND_API_KEY;
+  return !!(env.RESEND_API_KEY || (env.SMTP_USER && env.SMTP_PASS));
 }
 
 export function appUrl(env, request) {

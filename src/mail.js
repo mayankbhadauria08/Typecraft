@@ -8,6 +8,7 @@
 //                                        → cancelled (per-recipient rate limit)
 // OTP, password reset and verification emails are never retried and their codes/links are
 // never stored: the person asks for a new one instead.
+import { sendSmtp, smtpConfigured } from './smtp.js';
 import { HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail, nowIso } from './http.js';
 import { uuid } from './crypto.js';
 import { getSession, requireSession, hitLimit, tooMany, emailEnabled } from './session.js';
@@ -105,6 +106,22 @@ async function renderFor(env, template, data, userId) {
 }
 
 /* ---------- provider ---------- */
+// SMTP (e.g. Google Workspace + app password: SMTP_USER/SMTP_PASS) wins when set; else Resend.
+export function providerOf(env) { return smtpConfigured(env) ? 'smtp' : (env.RESEND_API_KEY ? 'resend' : null); }
+const configured = (env) => !!providerOf(env);
+let smtpConnect = null; // tests replace Cloudflare's connect()
+export function _setSmtpConnect(fn) { smtpConnect = fn; }
+async function deliver(env, args) {
+  if (providerOf(env) === 'smtp') {
+    const { to, replyTo, rendered, unsubscribe } = args;
+    return sendSmtp(env, {
+      from: env.EMAIL_FROM || DEFAULT_FROM, to, replyTo: replyTo || env.EMAIL_REPLY_TO || DEFAULT_REPLY_TO,
+      subject: rendered.subject, text: rendered.text, html: rendered.html,
+      headers: unsubscribe ? { 'List-Unsubscribe': `<${unsubscribe}>` } : {},
+    }, smtpConnect ? { connectFn: smtpConnect } : {});
+  }
+  return callResend(env, args);
+}
 async function callResend(env, { id, attempt: n, to, replyTo, rendered, template, unsubscribe }) {
   const body = {
     from: env.EMAIL_FROM || DEFAULT_FROM,
@@ -152,7 +169,7 @@ async function attempt(env, row, rendered, replyTo, unsubscribe, { manual = fals
   ).bind(row.id, row.status, row.attempts, now).run();
   if (!claim.meta || claim.meta.changes !== 1) return 'skipped';
   const attempts = row.attempts + 1;
-  const r = await callResend(env, { id: row.id, attempt: attempts, to: row.to_email, replyTo, rendered, template: row.template, unsubscribe });
+  const r = await deliver(env, { id: row.id, attempt: attempts, to: row.to_email, replyTo, rendered, template: row.template, unsubscribe });
   if (r.ok) {
     await setRow(env, row.id, { status: 'sent', provider_id: r.providerId, sent_at: nowIso(), last_error: null, next_attempt_at: null });
     return 'sent';
@@ -182,10 +199,10 @@ export async function sendTemplate(env, ctx, { to, userId = null, template, data
     const payload = JSON.stringify({ data: storedData(template, data), replyTo: replyTo || undefined });
     await env.DB.prepare(
       `INSERT INTO email_logs (id, user_id, to_email, template, category, subject, payload, status, provider, attempts, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'queued', 'resend', 0, ?8, ?8)`
-    ).bind(id, userId || null, email.value, template, cat, rendered.subject, payload, now).run();
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'queued', ?9, 0, ?8, ?8)`
+    ).bind(id, userId || null, email.value, template, cat, rendered.subject, payload, now, providerOf(env) || 'none').run();
 
-    if (!env.RESEND_API_KEY) {
+    if (!configured(env)) {
       await setRow(env, id, { status: 'failed', last_error: 'not_configured' });
       return { id, status: 'failed' };
     }
@@ -221,7 +238,7 @@ export function sendLater(env, ctx, args) {
 /** Re-sends a logged email from its stored payload (never for sensitive templates). */
 async function resendRow(env, row, opts = {}) {
   if (SENSITIVE.has(row.template)) return 'skipped';
-  if (!env.RESEND_API_KEY) return 'skipped';
+  if (!configured(env)) return 'skipped';
   let payload = {};
   try { payload = JSON.parse(row.payload || '{}'); } catch { payload = {}; }
   let rendered, unsubscribe;
@@ -265,7 +282,7 @@ export async function processQueue(env, { cap = RETRY_BATCH + ANNOUNCE_BATCH, on
   ).bind(...(onlyAnnouncements ? [] : [now, stale])).all()).results;
   const counts = { sent: 0, failed: 0, skipped: 0, limited: 0 };
   for (const row of rows) {
-    if (!env.RESEND_API_KEY) break;
+    if (!configured(env)) break;
     if (!(await hitLimit(env, 'mail:global', GLOBAL_LIMIT, GLOBAL_WINDOW))) { counts.limited++; break; }
     const r = await resendRow(env, row);
     counts[r] = (counts[r] || 0) + 1;
