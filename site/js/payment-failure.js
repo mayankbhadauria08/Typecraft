@@ -1,34 +1,25 @@
-/* /payment/failure?order=<id>. GET /api/checkout/orders/:id {status, packageName, packageId?, amountPaise, failureReason?};
-   GET /api/packages to find the plan id for "Try again" when the order has no packageId. */
+/* /payment/failure?order=<id>. GET /api/checkout/orders/:id → {orderId, status, packageId, packageName, amountPaise, currency, createdAt, paidAt, failureReason?}. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
   const orderId = K.qs('order');
   const card = $('#pf-card');
 
-  async function retryHref(o) {
-    let id = K.pick(o || {}, 'packageId', 'package_id');
-    if (!id && o && o.packageName) {
-      const res = await K.api('GET', '/api/packages');
-      const p = res.ok ? K.list(res.data, 'packages').find((x) => x.name === o.packageName) : null;
-      id = p && p.id;
-    }
-    return id ? `/checkout?plan=${encodeURIComponent(id)}&retry=1` : '/pricing';
-  }
+  const retryHref = (o) => (o ? `/checkout?plan=${encodeURIComponent(o.packageId)}&retry=1` : '/pricing');
 
   async function load() {
     let o = null;
     if (orderId) {
       const res = await K.api('GET', `/api/checkout/orders/${encodeURIComponent(orderId)}`);
       if (res.ok) o = res.data;
-      if (o && o.status === 'paid') { location.replace(`/payment/success?order=${encodeURIComponent(orderId)}`); return; }
-      if (o && (o.status === 'pending' || o.status === 'attempted')) { location.replace(`/payment/pending?order=${encodeURIComponent(orderId)}`); return; }
+      // created/attempted after a failure callback still show this page; paid, pending or refunded orders go to their own page
+      if (o && ['success', 'payments'].includes(K.orderPage(o.status)) || (o && o.status === 'pending')) { location.replace(K.orderUrl(o.status, orderId)); return; }
     }
-    const reason = o && K.pick(o, 'failureReason', 'failure_reason');
-    const href = await retryHref(o);
+    const reason = o && o.failureReason;
+    const href = retryHref(o);
     K.mount(card,
       K.alert('bad', reason ? `Reason given by the bank or Razorpay: ${reason}` : 'The payment was declined or cancelled before it finished.'),
-      o ? h('p', null, h('span', { class: 'muted', text: 'Plan: ' }), o.packageName || '—', h('span', { class: 'muted', text: ' · Amount: ' }), K.money(K.pick(o, 'amountPaise', 'amount_paise'), o.currency)) : null,
+      o ? h('p', null, h('span', { class: 'muted', text: 'Plan: ' }), o.packageName || '—', h('span', { class: 'muted', text: ' · Amount: ' }), K.money(o.amountPaise, o.currency)) : null,
       h('h2', { text: 'Was money taken?' }),
       h('p', { text: 'Usually nothing is charged when a payment fails. If your bank shows a debit, it is a temporary hold: it is refunded to you automatically, normally within 5–7 working days. If it is not, contact us with the order id below and we will sort it out.' }),
       orderId ? h('p', null, h('span', { class: 'muted', text: 'Order id: ' }), h('span', { class: 'mono', text: orderId })) : null,

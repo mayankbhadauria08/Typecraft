@@ -29,7 +29,7 @@
     return rzpLoading;
   }
 
-  function render(ent, catalogue) {
+  function render(ent) {
     const price = K.money(pkg.pricePaise, pkg.currency);
     document.title = `Checkout: ${pkg.name} · TypeCraft`;
     const active = ent && ent.plan && ent.plan !== 'free';
@@ -50,13 +50,13 @@
         h('dt', { class: 'muted', text: 'Starts' }), h('dd', { style: 'margin:0', text: starts }),
         h('dt', { class: 'muted', text: 'Renewal' }), h('dd', { style: 'margin:0', text: 'No automatic renewal. You choose whether to buy again.' }),
         h('dt', { class: 'muted', text: 'Total' }), h('dd', { style: 'margin:0' }, h('span', { class: 'price mono', text: price }), h('span', { class: 'muted', text: ' incl. all charges' }))));
-    const labels = Object.fromEntries((catalogue || []).map((f) => [f.key, f]));
-    const feats = (pkg.features || []).map((f) => (typeof f === 'string' ? labels[f] || { key: f, label: f } : f));
+    const feats = pkg.features;
     const have = new Set((ent && ent.features) || []);
-    K.mount($('#co-features'), feats.length
-      ? h('ul', { style: 'list-style:none;padding:0;margin:0;display:grid;gap:.5rem' }, feats.map((f) => h('li', { style: 'display:flex;gap:.5rem' }, K.icon('check'),
-        h('span', null, h('span', { text: f.label }), have.has(f.key) ? h('span', { class: 'muted', text: ' (you have this now)' }) : null))))
-      : h('p', { class: 'muted', text: 'See the pricing page for what this plan includes.' }));
+    const allOwned = feats.every((f) => have.has(f.key));
+    K.mount($('#co-features'),
+      h('ul', { style: 'list-style:none;padding:0;margin:0;display:grid;gap:.5rem' }, feats.map((f) => h('li', { style: 'display:flex;gap:.5rem' }, K.icon('check'),
+        h('span', null, h('span', { text: f.label }), !allOwned && have.has(f.key) ? h('span', { class: 'muted', text: ' (you have this now)' }) : null)))),
+      allOwned ? h('p', { class: 'muted', text: 'You already have all of these: this purchase extends how long you keep them.' }) : null);
     if (lifetimeOwned) {
       msg('info', `You already have ${ent.planName || 'a plan'} that never expires, so you don't need to buy anything.`, ' ', h('a', { href: '/account/plans', text: 'Your plan' }));
       payBtn.textContent = 'Already included';
@@ -124,10 +124,10 @@
     if (!planId) return stop('Choose a plan first.');
     const [pkgRes, me] = await Promise.all([K.api('GET', '/api/packages'), K.me()]);
     if (!pkgRes.ok) { K.error($('#co-summary'), pkgRes, load); K.mount($('#co-features')); return; }
-    pkg = K.list(pkgRes.data, 'packages').find((p) => p.id === planId) || null;
+    pkg = pkgRes.data.packages.find((p) => p.id === planId) || null;
     if (!pkg) return stop("That plan isn't available. Please choose one of the current plans.");
     if (!(pkg.pricePaise > 0)) return stop('The Free plan needs no payment: it is already part of your account.', { href: '/dashboard', label: 'Go to dashboard' });
-    render(me && me.entitlements, K.list(pkgRes.data, 'features'));
+    render(me && me.entitlements);
     if (K.qs('retry')) msg('info', 'Your previous attempt did not go through and nothing was activated. You can try again below.');
   }
   payBtn.addEventListener('click', pay);

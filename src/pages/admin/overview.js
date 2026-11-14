@@ -19,7 +19,7 @@ export const body = `
 </section>
 <section class="section grid grid-2">
   <article class="card" aria-labelledby="ad-rev-h"><div class="card-head"><h2 id="ad-rev-h">Revenue, last 30 days</h2><a class="btn btn-ghost btn-sm" href="/admin/revenue">Details</a></div><div id="ad-rev"><div class="skeleton" style="height:180px"></div></div></article>
-  <article class="card" aria-labelledby="ad-sign-h"><div class="card-head"><h2 id="ad-sign-h">Sign-ups, last 30 days</h2><a class="btn btn-ghost btn-sm" href="/admin/users">Users</a></div><div id="ad-sign"><div class="skeleton" style="height:180px"></div></div></article>
+  <article class="card" aria-labelledby="ad-plans-h"><div class="card-head"><h2 id="ad-plans-h">Active plans by package</h2><a class="btn btn-ghost btn-sm" href="/admin/packages">Packages</a></div><div id="ad-plans"><div class="skeleton" style="height:180px"></div></div></article>
 </section>
 <section class="section" aria-labelledby="ad-health-h">
   <h2 id="ad-health-h">App health</h2>

@@ -4,7 +4,6 @@
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
-  const P = (o, ...k) => K.pick(o, ...k);
   let pkgs = [], catalogue = [], current = null, role = null;
   const canWrite = () => role === 'owner' || role === 'admin';
   const keysOf = (f) => (Array.isArray(f) ? f.map((x) => (typeof x === 'string' ? x : x.key)) : []);
@@ -50,7 +49,7 @@
     const lim = typeof p.limits === 'string' ? JSON.parse(p.limits || '{}') : p.limits || {};
     const have = new Set(keysOf(p.features));
     const isFree = p.id === 'free';
-    const price = P(p, 'pricePaise', 'price_paise') || 0;
+    const price = p.pricePaise || 0;
     const ro = !canWrite();
     K.mount($('#ap-fields'),
       ro ? K.alert('info', 'Your role can view packages but not change them.') : null,
@@ -59,7 +58,7 @@
       field('ap-desc', 'Description', h('textarea', { name: 'description', rows: 3, maxlength: 300, value: p.description || '' })),
       h('div', { class: 'field-row' },
         field('ap-price', 'Price (₹)', h('input', { name: 'price', type: 'number', min: isFree ? 0 : 1, max: 100000, step: '0.01', inputmode: 'decimal', value: (price / 100).toString(), disabled: isFree }), isFree ? 'Free stays ₹0.' : 'Saved in paise. Includes all charges.'),
-        field('ap-valid', 'Validity (days)', h('input', { name: 'validityDays', type: 'number', min: 1, max: 3650, inputmode: 'numeric', value: P(p, 'validityDays', 'validity_days') ?? '', disabled: isFree }), 'Empty = never expires.')),
+        field('ap-valid', 'Validity (days)', h('input', { name: 'validityDays', type: 'number', min: 1, max: 3650, inputmode: 'numeric', value: p.validityDays ?? '', disabled: isFree }), 'Empty = never expires.')),
       h('fieldset', { class: 'field' }, h('legend', { text: 'Features' }),
         catalogue.map((f) => h('div', { class: 'check' }, h('input', { type: 'checkbox', name: 'feature', id: `ap-f-${f.key}`, value: f.key, checked: have.has(f.key) }),
           h('label', { for: `ap-f-${f.key}` }, h('span', { text: f.label }), ' ', h('span', { class: 'muted mono', text: f.key }))))),
@@ -71,7 +70,7 @@
       h('div', { class: 'field-row' },
         h('div', { class: 'check' }, h('input', { type: 'checkbox', name: 'highlight', id: 'ap-hl', checked: !!p.highlight }), h('label', { for: 'ap-hl', text: 'Recommended (highlighted)' })),
         h('div', { class: 'check' }, h('input', { type: 'checkbox', name: 'active', id: 'ap-active', checked: p.active !== false && p.active !== 0, disabled: isFree }), h('label', { for: 'ap-active', text: 'On sale (active)' }))),
-      field('ap-order', 'Display order', h('input', { name: 'displayOrder', type: 'number', min: 0, max: 100, value: P(p, 'displayOrder', 'display_order') ?? 0 }), 'Lower shows first.'),
+      field('ap-order', 'Display order', h('input', { name: 'displayOrder', type: 'number', min: 0, max: 100, value: p.displayOrder ?? 0 }), 'Lower shows first.'),
       h('div', { class: 'card-foot field-row' },
         h('button', { type: 'submit', class: 'btn btn-primary', text: 'Save package…', disabled: ro }),
         h('button', { type: 'button', class: 'btn btn-ghost', text: 'Undo changes', onclick: () => renderForm() })));
@@ -92,10 +91,10 @@
     if (v.validityDays != null && !(Number.isInteger(v.validityDays) && v.validityDays >= 1)) f.validityDays = 'Whole days, 1 or more, or empty.';
     if (Object.keys(f).length) return K.formErrors(form, f);
     if (current.id === 'free') { v.pricePaise = 0; v.validityDays = null; v.active = true; }
-    const oldPrice = P(current, 'pricePaise', 'price_paise') || 0;
+    const oldPrice = current.pricePaise || 0;
     const changes = [];
     if (v.pricePaise !== oldPrice) changes.push(`price ${K.money(oldPrice)} → ${K.money(v.pricePaise)}`);
-    if ((P(current, 'validityDays', 'validity_days') ?? null) !== v.validityDays) changes.push(`validity → ${K.validity(v.validityDays)}`);
+    if ((current.validityDays ?? null) !== v.validityDays) changes.push(`validity → ${K.validity(v.validityDays)}`);
     const wasActive = current.active !== false && current.active !== 0;
     if (wasActive !== v.active) changes.push(v.active ? 'put on sale' : 'taken off sale');
     const ok = await K.confirm({ title: `Save ${v.name}?`, danger: wasActive && !v.active, confirmLabel: 'Save package',
@@ -114,12 +113,11 @@
   });
 
   async function load() {
-    const [res, me] = await Promise.all([K.api('GET', '/api/admin/packages'), K.me()]);
-    role = me && me.role;
+    const [res, r] = await Promise.all([K.api('GET', '/api/admin/packages'), K.role()]);
+    role = r;
     if (!res.ok) { K.mount($('#ap-tabs')); return K.error($('#ap-fields'), res, load); }
-    pkgs = K.list(res.data, 'packages').slice().sort((a, b) => (P(a, 'displayOrder', 'display_order') || 0) - (P(b, 'displayOrder', 'display_order') || 0));
-    catalogue = K.list(res.data, 'features');
-    if (!catalogue.length) { const pub = await K.api('GET', '/api/packages'); if (pub.ok) catalogue = K.list(pub.data, 'features'); }
+    pkgs = res.data.packages.slice().sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    catalogue = res.data.features;
     if (!pkgs.length) { K.mount($('#ap-tabs')); return K.empty($('#ap-fields'), { title: 'No packages', text: 'Run the database migration to seed the plans.' }); }
     current = pkgs.find((p) => p.id === K.qs('id')) || pkgs.find((p) => p.highlight) || pkgs[0];
     tabs(); renderForm();

@@ -1,11 +1,12 @@
-/* /admin/users. Data: GET /api/admin/users?q&page → {users:[{id, fullName, email, emailVerified, status, plan|planName, role, createdAt, lastLoginAt}], page, pages, total};
-   GET /api/admin/users/:id → {user:{…, status, role}, entitlements?, subscriptions:[{id, packageId, packageName, status, startsAt, expiresAt, source}],
-   orders:[{id, packageName, amountPaise, status, createdAt, razorpayPaymentId}]}; POST /api/admin/users/:id {status?, grant:{packageId, days?}?, revoke?, role?};
-   GET /api/admin/packages for the grant list. TC.me().role decides what is shown (support: read-only; owner: roles). */
+/* /admin/users. Data: GET /api/admin/users?q&page → {items:[{id, fullName, email, emailVerified, status, role, plan (name), createdAt, lastLoginAt}], page, pages, total};
+   GET /api/admin/users/:id → {user:{id, fullName, email, phoneNumber, emailVerified, status, createdAt, lastLoginAt, role}, entitlements,
+   subscriptions:[{id, packageId, packageName, orderId, status, source, startsAt, expiresAt}], orders:[{orderId, packageName, amountPaise, status, createdAt,
+   paidAt, invoiceNumber, failureReason}], progress:{xp, streak, bestStreak, tests, bestTestWpm}};
+   POST /api/admin/users/:id {status:'active'|'disabled'} | {grant:{packageId, days?}} | {revoke:subscriptionId} | {role:'owner'|'admin'|'support'|null}
+   → the same shape as GET. GET /api/admin/packages for the grant list. Role from K.role(): support read-only, owner changes roles. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
-  const P = (o, ...k) => K.pick(o, ...k);
   const drawer = $('#au-drawer');
   let role = null, page = 1, q = '', packages = null;
   const canWrite = () => role === 'owner' || role === 'admin';
@@ -15,25 +16,25 @@
     K.skeleton(el, 6);
     const res = await K.api('GET', `/api/admin/users?q=${encodeURIComponent(q)}&page=${page}`);
     if (!res.ok) return K.error(el, res, list);
-    const users = K.list(res.data, 'users', 'items');
+    const users = res.data.items;
     if (!users.length) { K.pager($('#au-pager'), { page: 1, pages: 1, onPage() {} }); return K.empty(el, { icon: 'search', title: q ? 'No users match' : 'No users yet', text: q ? 'Try part of the email or name.' : null }); }
     K.mount(el,
-      res.data.total != null ? h('p', { class: 'muted', text: `${K.num(res.data.total)} user${res.data.total === 1 ? '' : 's'}${q ? ` matching “${q}”` : ''}` }) : null,
+      h('p', { class: 'muted', text: `${K.num(res.data.total)} user${res.data.total === 1 ? '' : 's'}${q ? ` matching “${q}”` : ''}` }),
       K.table([
-        { label: 'Name', value: (u) => [h('strong', { text: P(u, 'fullName', 'full_name') || '—' }), P(u, 'role') ? [' ', K.badge('new', P(u, 'role'))] : null] },
+        { label: 'Name', value: (u) => [h('strong', { text: u.fullName || '—' }), u.role ? [' ', K.badge('new', u.role)] : null] },
         { label: 'Email', value: (u) => [u.email, u.emailVerified === false ? [' ', K.badge('pending', 'unverified')] : null] },
-        { label: 'Plan', value: (u) => P(u, 'planName', 'plan') || 'Free' },
+        { label: 'Plan', value: (u) => u.plan },
         { label: 'Status', value: (u) => K.badge(u.status === 'disabled' ? 'disabled' : 'active', u.status === 'disabled' ? 'Disabled' : 'Active') },
-        { label: 'Joined', value: (u) => K.date(P(u, 'createdAt', 'created_at')) },
+        { label: 'Joined', value: (u) => K.date(u.createdAt) },
       ], users, { caption: 'Users', onRow: (u) => open(u.id) }));
-    K.pager($('#au-pager'), { page: res.data.page || page, pages: res.data.pages || 1, onPage: (p) => { page = p; list(); } });
+    K.pager($('#au-pager'), { page: res.data.page, pages: res.data.pages, onPage: (p) => { page = p; list(); } });
   }
 
   async function act(id, body, done) {
     const res = await K.api('POST', `/api/admin/users/${encodeURIComponent(id)}`, body);
     if (!res.ok) { K.toast(K.errMsg(res), 'bad'); return false; }
     K.toast(done, 'ok');
-    open(id);
+    render(id, res.data);
     list();
     return true;
   }
@@ -41,9 +42,9 @@
   async function grantForm(u) {
     if (!packages) {
       const res = await K.api('GET', '/api/admin/packages');
-      packages = res.ok ? K.list(res.data, 'packages').filter((p) => p.id !== 'free') : [];
+      packages = res.ok ? res.data.packages.filter((p) => p.id !== 'free') : [];
     }
-    const sel = h('select', { id: 'au-g-pkg', name: 'packageId' }, packages.map((p) => h('option', { value: p.id, text: `${p.name} (${K.validity(P(p, 'validityDays', 'validity_days'))})` })));
+    const sel = h('select', { id: 'au-g-pkg', name: 'packageId' }, packages.map((p) => h('option', { value: p.id, text: `${p.name} (${K.validity(p.validityDays)})` })));
     const days = h('input', { id: 'au-g-days', name: 'days', type: 'number', min: 1, max: 3650, placeholder: 'Package default', inputmode: 'numeric' });
     const btn = h('button', { type: 'submit', class: 'btn btn-primary btn-sm', text: 'Grant…' });
     const form = h('form', { class: 'card', novalidate: true },
@@ -58,7 +59,7 @@
       if (!pkg) return;
       const d = days.value ? Math.round(Number(days.value)) : null;
       if (days.value && !(d >= 1 && d <= 3650)) return K.toast('Days must be between 1 and 3650.', 'bad');
-      const ok = await K.confirm({ title: `Grant ${pkg.name} to ${u.email}?`, text: `${d ? `${d} days` : K.validity(P(pkg, 'validityDays', 'validity_days'))} of ${pkg.name}, free of charge. This is recorded in the audit log.`, confirmLabel: 'Grant plan' });
+      const ok = await K.confirm({ title: `Grant ${pkg.name} to ${u.email}?`, text: `${d ? `${d} days` : K.validity(pkg.validityDays)} of ${pkg.name}, free of charge. This is recorded in the audit log.`, confirmLabel: 'Grant plan' });
       if (!ok) return;
       K.busy(btn, true);
       await act(u.id, { grant: d ? { packageId: pkg.id, days: d } : { packageId: pkg.id } }, `${pkg.name} granted.`);
@@ -73,47 +74,54 @@
     K.skeleton(body, 8);
     const res = await K.api('GET', `/api/admin/users/${encodeURIComponent(id)}`);
     if (!res.ok) return K.error(body, res, () => open(id));
-    const u = res.data.user || {};
-    const subs = K.list(res.data, 'subscriptions');
-    const orders = K.list(res.data, 'orders');
-    const ent = res.data.entitlements;
-    const urole = P(res.data, 'role') ?? u.role ?? null;
+    render(id, res.data);
+  }
+
+  async function render(id, data) {
+    const body = $('#au-d-body');
+    const u = data.user;
+    const subs = data.subscriptions;
+    const orders = data.orders;
+    const ent = data.entitlements;
+    const pr = data.progress || {};
+    const urole = u.role;
     const disabled = u.status === 'disabled';
-    $('#au-d-title').textContent = P(u, 'fullName', 'full_name') || u.email || 'User';
+    $('#au-d-title').textContent = u.fullName || u.email || 'User';
     const kids = [
       h('dl', { class: 'adm-dl' },
         h('dt', { text: 'Email' }), h('dd', null, u.email, ' ', u.emailVerified ? K.badge('active', 'verified') : K.badge('pending', 'unverified')),
-        h('dt', { text: 'Phone' }), h('dd', { text: P(u, 'phoneNumber', 'phone_number') || '—' }),
+        h('dt', { text: 'Phone' }), h('dd', { text: u.phoneNumber || '—' }),
         h('dt', { text: 'Status' }), h('dd', null, K.badge(disabled ? 'disabled' : 'active', disabled ? 'Disabled' : 'Active')),
         h('dt', { text: 'Role' }), h('dd', { text: urole || 'Learner' }),
-        h('dt', { text: 'Plan' }), h('dd', { text: ent ? `${ent.planName || ent.plan}${ent.expiresAt ? ` until ${K.date(ent.expiresAt)}` : ''}` : P(u, 'planName', 'plan') || '—' }),
-        h('dt', { text: 'Joined' }), h('dd', { text: K.dateTime(P(u, 'createdAt', 'created_at')) }),
-        h('dt', { text: 'Last sign-in' }), h('dd', { text: K.dateTime(P(u, 'lastLoginAt', 'last_login_at')) }),
-        h('dt', { text: 'User id' }), h('dd', { class: 'mono', text: u.id || id })),
+        h('dt', { text: 'Plan' }), h('dd', { text: `${ent.planName}${ent.expiresAt ? ` until ${K.date(ent.expiresAt)}` : ent.plan !== 'free' ? ', never expires' : ''}` }),
+        h('dt', { text: 'Joined' }), h('dd', { text: K.dateTime(u.createdAt) }),
+        h('dt', { text: 'Last sign-in' }), h('dd', { text: K.dateTime(u.lastLoginAt) }),
+        h('dt', { text: 'Progress' }), h('dd', { text: `${K.num(pr.xp)} XP · streak ${K.num(pr.streak)} (best ${K.num(pr.bestStreak)}) · ${K.num(pr.tests)} tests, best ${K.num(pr.bestTestWpm)} WPM` }),
+        h('dt', { text: 'User id' }), h('dd', { class: 'mono', text: u.id })),
       h('h3', { text: 'Plan periods' }),
       subs.length ? K.table([
-        { label: 'Plan', value: (s) => P(s, 'packageName', 'packageId') },
+        { label: 'Plan', value: (s) => s.packageName },
         { label: 'Status', value: (s) => K.badge(s.status) },
         { label: 'Dates', value: (s) => `${K.date(s.startsAt)} – ${s.expiresAt ? K.date(s.expiresAt) : 'never'}` },
         { label: 'Source', value: (s) => s.source || '—' },
         { label: '', value: (s) => (canWrite() && s.status === 'active' ? h('button', { type: 'button', class: 'btn btn-danger btn-sm', text: 'Revoke…', onclick: async (e) => {
-          const ok = await K.confirm({ title: 'Revoke this plan period?', danger: true, confirmLabel: 'Revoke', text: `${P(s, 'packageName', 'packageId')} (${K.date(s.startsAt)} – ${s.expiresAt ? K.date(s.expiresAt) : 'never'}) stops now. This does not refund any payment; refund it from Payments if needed.` });
+          const ok = await K.confirm({ title: 'Revoke this plan period?', danger: true, confirmLabel: 'Revoke', text: `${s.packageName} (${K.date(s.startsAt)} – ${s.expiresAt ? K.date(s.expiresAt) : 'never'}) stops now. This does not refund any payment; refund it from Payments if needed.` });
           if (!ok) return;
           K.busy(e.target, true);
-          await act(u.id || id, { revoke: s.id }, 'Plan period revoked.');
+          await act(u.id, { revoke: s.id }, 'Plan period revoked.');
         } }) : null) },
       ], subs) : h('p', { class: 'muted', text: 'No plan periods. On Free.' }),
       h('h3', { text: 'Orders' }),
       orders.length ? K.table([
-        { label: 'Date', value: (o) => K.date(P(o, 'createdAt', 'created_at')) },
-        { label: 'Plan', value: (o) => P(o, 'packageName', 'packageId') },
-        { label: 'Amount', num: true, value: (o) => K.money(P(o, 'amountPaise', 'amount_paise'), o.currency) },
+        { label: 'Date', value: (o) => K.date(o.createdAt) },
+        { label: 'Plan', value: (o) => o.packageName },
+        { label: 'Amount', num: true, value: (o) => K.money(o.amountPaise, o.currency) },
         { label: 'Status', value: (o) => K.badge(o.status) },
-        { label: 'Payment', value: (o) => h('a', { class: 'mono', href: `/admin/payments?q=${encodeURIComponent(P(o, 'razorpayPaymentId', 'id') || '')}`, text: P(o, 'razorpayPaymentId', 'id') || '—' }) },
+        { label: 'Order', value: (o) => h('a', { class: 'mono', href: `/admin/payments?q=${encodeURIComponent(o.orderId)}`, text: o.orderId }) },
       ], orders) : h('p', { class: 'muted', text: 'No orders.' }),
     ];
     if (canWrite()) {
-      kids.push(await grantForm(u.id ? u : { ...u, id }));
+      kids.push(await grantForm(u));
       const toggle = h('button', { type: 'button', class: disabled ? 'btn btn-primary btn-sm' : 'btn btn-danger btn-sm', text: disabled ? 'Enable account…' : 'Disable account…' });
       toggle.addEventListener('click', async () => {
         const ok = await K.confirm(disabled
@@ -121,7 +129,7 @@
           : { title: 'Disable this account?', danger: true, confirmLabel: 'Disable', text: `${u.email} is signed out everywhere and cannot sign in until enabled again. Their data and plans are kept.` });
         if (!ok) return;
         K.busy(toggle, true);
-        await act(u.id || id, { status: disabled ? 'active' : 'disabled' }, disabled ? 'Account enabled.' : 'Account disabled.');
+        await act(u.id, { status: disabled ? 'active' : 'disabled' }, disabled ? 'Account enabled.' : 'Account disabled.');
       });
       kids.push(h('div', { class: 'card section' }, h('h3', { text: 'Account access' }), toggle));
     }
@@ -136,7 +144,7 @@
           text: `${u.email} becomes: ${sel.options[sel.selectedIndex].text}.` });
         if (!ok) return;
         K.busy(btn, true);
-        await act(u.id || id, { role: v }, 'Role changed.');
+        await act(u.id, { role: v }, 'Role changed.');
       });
       kids.push(h('div', { class: 'card section' }, h('h3', { text: 'Role' }), h('div', { class: 'field' }, h('label', { for: 'au-role', text: 'Admin role' }), sel), btn));
     }
@@ -147,5 +155,5 @@
   drawer.addEventListener('click', (e) => { if (e.target === drawer) drawer.close(); });
   $('#au-search').addEventListener('submit', (e) => { e.preventDefault(); q = $('#au-q').value.trim(); page = 1; list(); });
   q = K.qs('q') || ''; $('#au-q').value = q;
-  K.me().then((me) => { role = me && me.role; list(); const id = K.qs('id'); if (id) open(id); });
+  K.role().then((r) => { role = r; list(); const id = K.qs('id'); if (id) open(id); });
 })();

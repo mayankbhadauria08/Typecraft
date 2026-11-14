@@ -27,7 +27,7 @@
     K.skeleton(panel, 6);
     const res = cache[key] || (cache[key] = await K.api('GET', `/api/user/history?from=${from}&to=${to}`));
     if (!res.ok) { delete cache[key]; return K.error(panel, res, render); }
-    const days = K.list(res.data, 'days').filter((d) => d.runs || d.minutes || d.seconds || d.xp).sort((a, b) => (a.date < b.date ? 1 : -1));
+    const days = res.data.days.filter((d) => d.runs || d.minutes || d.seconds || d.xp).sort((a, b) => (a.date < b.date ? 1 : -1));
     if (!days.length) return K.empty(panel, { icon: 'clock', title: 'No practice in this period', text: 'Lessons and games you play are counted here by day.', action: { href: '/app', label: 'Practise now' } });
     const total = days.reduce((s, d) => s + (d.minutes || 0), 0);
     K.mount(panel,
@@ -55,7 +55,7 @@
     K.mount(panel,
       h('p', { class: 'muted', text: `${tests.length} test${tests.length === 1 ? '' : 's'} · best ${K.num(best)} WPM` }),
       K.table([
-        { label: 'When', value: (t) => K.dateTime(t.at || t.day) },
+        { label: 'When', value: (t) => K.dateTime(t.createdAt) },
         { label: 'Length', value: (t) => K.duration(t.duration) },
         { label: 'Text', value: (t) => t.textKind },
         { label: 'WPM', num: true, value: (t) => K.num(t.wpm) },
