@@ -11,6 +11,7 @@ import {
 } from './session.js';
 import { sendTemplate, sendLater, siteUrl, getPreferences } from './mail.js';
 import { createOtp, verifyOtp, otpEnabled } from './otp.js';
+import { endAdminSessionsFor } from './console/session.js';
 
 const HOUR = 60 * 60 * 1000;
 const WRONG_LOGIN = 'Email or password is incorrect.';
@@ -176,6 +177,7 @@ export async function logout(request, env) {
 export async function logoutEverywhere(request, env) {
   const { user } = await requireSession(env, request);
   await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?1').bind(user.id).run();
+  await endAdminSessionsFor(env, user.id, 'signed_out_everywhere'); // "everywhere" includes the admin console
   return json({}, 200, { 'Set-Cookie': clearSessionCookie() });
 }
 
@@ -246,6 +248,7 @@ export async function resetPassword(request, env, ctx) {
     env.DB.prepare('UPDATE password_reset_tokens SET used_at = ?2 WHERE user_id = ?1 AND used_at IS NULL').bind(row.id, now),
     env.DB.prepare('DELETE FROM rate_limits WHERE key = ?1').bind(`login-fail:${row.email}`),
   ]);
+  await endAdminSessionsFor(env, row.id, 'password_changed'); // admin console sign-ins end with the old password
   await sendLater(env, ctx, { to: row.email, userId: row.id, template: 'password_changed', data: { name: row.full_name, time: now } });
   return json({ message: 'Your password has been changed. Sign in with your new password.' }, 200, { 'Set-Cookie': clearSessionCookie() });
 }
@@ -272,6 +275,7 @@ export async function changePassword(request, env, ctx) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?1').bind(user.id), // signs out every other device
   ]);
   const cookie = await createSession(env, user.id, true); // and keeps this one signed in, with a new session id
+  await endAdminSessionsFor(env, user.id, 'password_changed');
   await sendLater(env, ctx, { to: user.email, userId: user.id, template: 'password_changed', data: { name: user.fullName, time: now } });
   return json({ message: 'Password changed. Other devices have been signed out.' }, 200, { 'Set-Cookie': cookie });
 }
