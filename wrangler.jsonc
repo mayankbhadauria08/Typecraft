@@ -1,6 +1,6 @@
 // Cloudflare Worker configuration for TypeCraft (see SETUP.md).
-// index.html (the app) is only sent to signed-in browsers; everyone else gets
-// login.html. /api/*, /admin and the pages run the Worker code in src/.
+// index.html (the app) is only sent to signed-in browsers. /api/*, /admin, /console and the
+// pages run the Worker code in src/.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "typecraft",
@@ -9,8 +9,11 @@
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
-    // /admin is the owner-only health page: the Worker checks OWNER_EMAILS before serving admin.html
-    "run_worker_first": true, // every request reaches src/index.js first: pages, /api, then static files via env.ASSETS
+    // Pages, /api and every .html file reach src/index.js first (sign-in checks, redirects, headers).
+    // The folders after "!" hold only public files (styles, scripts, icons): Cloudflare serves those
+    // directly, which is free and does not count towards the Workers request limit.
+    // Anything not listed here stays behind the Worker, so a new file is protected until it is added.
+    "run_worker_first": ["/*", "!/css/*", "!/js/*", "!/shared/*", "!/icons/*", "!/site/*", "!/manifest.webmanifest"],
     // files are served at their exact paths (the Worker asks for /index.html and /login.html)
     "html_handling": "none"
   },

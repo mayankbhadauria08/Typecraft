@@ -656,3 +656,20 @@ test('the console is not advertised to crawlers, stays out of the service worker
     assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), `${f}: no HTML injection points`);
   }
 });
+test('static routing: everything goes through the Worker except the public folders', () => {
+  const cfg = readFileSync(path.join(root, 'wrangler.jsonc'), 'utf8');
+  const list = JSON.parse(cfg.match(/"run_worker_first":\s*(\[[^\]]*\])/)[1]);
+  assert.equal(list[0], '/*', 'everything goes through the Worker unless listed');
+  const skipped = list.slice(1);
+  assert.deepEqual(skipped.sort(), ['!/css/*', '!/icons/*', '!/js/*', '!/manifest.webmanifest', '!/shared/*', '!/site/*']);
+  assert.ok(!skipped.some((p) => /html|admin|console|api|src|migrations/.test(p)));
+  // nothing private lives in the folders that skip the Worker: only styles, scripts, icons
+  const ignore = readFileSync(path.join(root, '.assetsignore'), 'utf8');
+  for (const dir of ['src', 'migrations', 'tests', 'docs']) assert.match(ignore, new RegExp(`^${dir}$`, 'm'));
+  // and no page hides in them: an .html file there would be served without the sign-in check
+  const files = ['css', 'js', 'shared', 'icons', 'site'].flatMap((dir) => readdirSync(path.join(root, dir), { recursive: true }).map(String));
+  assert.ok(files.length > 30);
+  for (const f of files.filter((x) => x.includes('.'))) assert.match(f, /\.(css|js|svg|png|webp|ico|woff2)$/, f);
+  const headers = readFileSync(path.join(root, '_headers'), 'utf8');
+  assert.match(headers, /workers\.dev\/\*\n\s+X-Robots-Tag: noindex/);
+});
