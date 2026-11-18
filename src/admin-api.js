@@ -8,7 +8,8 @@ import { roleOf, ROLES } from './roles.js';
 import { requirePermission, assertCan } from './console/session.js';
 import { isOwner, healthNumbers } from './admin.js';
 import { entitlementsFor } from './entitlements.js';
-import { audit, getSetting, refund, packageView } from './billing.js';
+import { audit, getSetting, refund } from './billing.js';
+import { storedPackageView as packageView } from './package-view.js';
 import { packageFields, checkPackage, featureKeys, saveStatements, highlightTakenFrom } from './package-rules.js';
 
 const PAGE_SIZE = 25;

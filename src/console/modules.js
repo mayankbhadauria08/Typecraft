@@ -28,7 +28,7 @@ export const LAYERS = [
       { key: 'levels', label: 'Levels', icon: 'trend', phase: 3 },
       { key: 'lessons', label: 'Lessons', icon: 'keyboard', phase: 3 },
       { key: 'exercises', label: 'Exercises', icon: 'target', phase: 3 },
-      { key: 'access-rules', label: 'Unlock conditions', icon: 'lock', phase: 3 },
+      { key: 'access-rules', label: 'Unlock conditions', icon: 'lock', path: '/unlock', permission: 'unlock.view' },
       { key: 'progress', label: 'Student progress', icon: 'history', phase: 3 },
       { key: 'analytics', label: 'Learning analytics', icon: 'chart', phase: 3 },
     ],

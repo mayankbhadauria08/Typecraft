@@ -4,7 +4,7 @@
 // background with the TypeCraft teal accent. Every value from `data` is escaped.
 //
 // data keys per template (all optional unless marked *):
-//   welcome                       { name }
+//   welcome                       { name, freeLessons (what Free includes, in words) }
 //   verify_email                  { name, link*, code (6 digits), newEmail (set for an email change) }
 //   otp_login                     { name, code*, minutes = 10 }
 //   admin_otp                     { name, code*, minutes = 10, device }   (admin console sign-in)
@@ -209,7 +209,8 @@ export const TEMPLATES = {
       P('Welcome to TypeCraft. Your account is ready, and your progress is saved to it on every device you sign in on.'),
       P('Start with the home row: the first lesson takes about five minutes, and a few minutes a day is all it takes to build real speed.'),
       Button('Start your first lesson', `${site.siteUrl}/app`),
-      Small('Free includes the first five lessons, the Daily Challenge and typing tests. You can see every plan at any time on the pricing page.'),
+      Small(d.freeLessons ? `Free includes ${d.freeLessons}, the Daily Challenge and typing tests. You can see every plan at any time on the pricing page.`
+        : 'You can see every plan, and what each includes, at any time on the pricing page.'),
     ] });
   },
 

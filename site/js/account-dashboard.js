@@ -18,7 +18,9 @@
     const left = K.daysLeft(ent.expiresAt);
     const kids = [h('p', null, h('span', { class: free ? 'badge badge-muted' : 'badge badge-brand', text: ent.planName || (free ? 'Free' : ent.plan) }))];
     if (free) {
-      kids.push(h('p', { class: 'muted', text: 'Free includes the first five lessons, the Daily Challenge and 3 typing tests a day.' }));
+      const tests = ent.limits && ent.limits.dailyTests != null ? `${ent.limits.dailyTests} typing test${ent.limits.dailyTests === 1 ? '' : 's'} a day` : 'typing tests';
+      const words = ent.lessonsWords && ent.lessonsWords.text;
+      kids.push(h('p', { class: 'muted', text: words ? `Free includes ${words}, the Daily Challenge and ${tests}.` : `Free includes some lessons, the Daily Challenge and ${tests}.` }));
       kids.push(h('div', { class: 'card-foot' }, h('a', { class: 'btn btn-primary', href: '/pricing', text: 'See plans' })));
     } else if (!ent.expiresAt) {
       kids.push(h('p', { class: 'muted', text: 'Your plan never expires.' }));

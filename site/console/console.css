@@ -711,3 +711,39 @@ td.empty-cell .btn { margin-left: 10px; }
   .detail-actions .btn { flex: 1 1 auto; }
   .pager { justify-content: space-between; }
 }
+
+/* ---------- Unlock conditions, and the lessons of a package ---------- */
+.show-fold { display: none; }
+.cell-wrap { white-space: normal; overflow-wrap: anywhere; }
+.row-total th, .row-total td { border-top: 1px solid var(--line-strong); font-weight: 500; }
+td .none { color: var(--ink-3); }
+.lesson-pick { margin-top: 18px; }
+.lesson-levels { margin: 6px 0 4px 26px; border-left: 1px solid var(--line); padding-left: 16px; }
+.lesson-level + .lesson-level { margin-top: 4px; }
+.lesson-level > .tick { margin-top: 10px; }
+.lesson-more { margin: 4px 0 0 26px; font-size: 13px; }
+.lesson-more > summary { width: fit-content; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.lesson-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lesson-singles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 18px; padding-bottom: 6px; }
+.lesson-singles .tick { margin-top: 8px; font-size: 13px; }
+.lesson-summary { margin-top: 10px; font-size: 14px; font-weight: 500; }
+.unlock-levels { margin-top: 20px; border-top: 1px solid var(--line); }
+.unlock-level { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.unlock-level-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px 16px; }
+.unlock-level-head .cell-main, .unlock-level-head .cell-sub { display: block; }
+.unlock-lessons { margin-top: 6px; }
+.unlock-lessons > summary { width: fit-content; color: var(--accent); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.unlock-lessons > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.unlock-lessons .table-panel { margin-top: 8px; }
+.rule-order { margin: 0; padding-left: 20px; max-width: 76ch; color: var(--ink-2, inherit); }
+.rule-order li { margin: 6px 0; }
+@media (max-width: 640px) {
+  .fold .show-fold { display: block; }
+  .lesson-levels { margin-left: 8px; padding-left: 12px; }
+  .lesson-more { margin-left: 0; }
+  .unlock-level-head { grid-template-columns: minmax(0, 1fr) auto; }
+  .unlock-level-head .badge { grid-column: 1; grid-row: 2; justify-self: start; }
+}
+#plansBody tbody th { padding: 9px 14px; border-top: 1px solid var(--line); font-weight: 400; text-align: left; vertical-align: top; }
+@media (max-width: 640px) { #plansBody tbody th { min-width: 150px; padding-left: 12px; padding-right: 12px; } }
+.progress-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }

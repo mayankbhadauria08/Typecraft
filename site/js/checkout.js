@@ -52,6 +52,9 @@
         h('dt', { class: 'muted', text: 'Total' }), h('dd', { style: 'margin:0' }, h('span', { class: 'price mono', text: price }), h('span', { class: 'muted', text: ' incl. all charges' }))));
     const feats = pkg.features;
     const have = new Set((ent && ent.features) || []);
+    // the lessons line counts as had when the plan already gives the same lessons, or every lesson
+    const words = ent && ent.lessonsWords;
+    if (words && pkg.lessons && (words.all || words.text === pkg.lessons.text)) have.add('lessons');
     const allOwned = feats.every((f) => have.has(f.key));
     K.mount($('#co-features'),
       h('ul', { style: 'list-style:none;padding:0;margin:0;display:grid;gap:.5rem' }, feats.map((f) => h('li', { style: 'display:flex;gap:.5rem' }, K.icon('check'),

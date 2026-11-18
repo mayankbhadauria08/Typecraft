@@ -1,5 +1,6 @@
 // Sign up, sign in (password or emailed code), sign out, password reset and change,
 // email confirmation (link or code) and new-device sign-in alerts.
+import { freeLessons } from './package-view.js';
 import {
   HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail, cleanPhone, checkPassword,
   clearSessionCookie, nowIso,
@@ -130,7 +131,7 @@ export async function signup(request, env, ctx) {
   await noteDevice(env, ctx, request, user, { alert: false });
   let verificationSent = false;
   if (emailEnabled(env)) {
-    await sendLater(env, ctx, { to: user.email, userId: id, template: 'welcome', data: { name: user.fullName } });
+    await sendLater(env, ctx, { to: user.email, userId: id, template: 'welcome', data: { name: user.fullName, freeLessons: (await freeLessons(env)).text } });
     try { await sendVerificationEmail(env, request, user, null, ctx); verificationSent = true; } catch { /* the account still works; they can resend from the profile */ }
   }
   return json({ user, verificationSent }, 201, { 'Set-Cookie': cookie });

@@ -1,6 +1,6 @@
 // Learning progress: lesson status, finished runs, analytics state and guest-progress import.
 // Every query is scoped to the signed-in user's id taken from the session, never from the request body.
-import { entitlementsFor, lessonAllowed, overrideOf } from './entitlements.js';
+import { entitlementsFor, lessonAllowed, lessonClosed } from './entitlements.js';
 import { planResponse } from './billing.js';
 import { HttpError, json, readJson, fieldError, nowIso } from './http.js';
 import { requireSession } from './session.js';
@@ -165,7 +165,8 @@ export async function completeLesson(request, env) {
   // the plan gate (docs/SAAS-CONTRACTS.md §3) applies to this older route too
   const ent = await entitlementsFor(env, user.id);
   if (!lessonAllowed(ent, lessonId)) {
-    if (overrideOf(ent, 'lessons', lessonId) === 'deny') throw new HttpError(403, 'closed', 'This lesson is closed on your account.');
+    const closed = lessonClosed(ent, lessonId);
+    if (closed) throw new HttpError(403, 'closed', closed === 'all' ? 'This lesson is closed for now.' : 'This lesson is closed on your account.');
     return planResponse('plan_required', 'This lesson is part of the paid plans. See the plans to keep going.', 'lessons.all');
   }
   const eventId = eventIdOf(body.eventId);

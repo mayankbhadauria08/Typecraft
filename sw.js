@@ -1,10 +1,10 @@
 /* TypeCraft service worker: caches the app's own files so lessons and games work
    offline. Never caches anything under /api. A new version waits until the page
    asks it to take over ("Update ready, reload"). Bump VERSION with each release. */
-const VERSION = 'typecraft-next-5';
+const VERSION = 'typecraft-next-6';
 const FILES = ['manifest.webmanifest', 'icons/icon.svg',
   'css/app.css', 'css/next.css', 'css/games.css', 'css/rewards.css', 'css/typewriter.css', 'css/plan.css',
-  'shared/course-meta.js', 'shared/rewards-rules.js', 'js/course.js', 'js/rewards-ui.js', 'js/typewriter.js', 'js/app.js',
+  'shared/course-meta.js', 'shared/lesson-access.js', 'shared/rewards-rules.js', 'js/course.js', 'js/rewards-ui.js', 'js/typewriter.js', 'js/app.js',
   'js/games/core.js', 'js/games/storm.js', 'js/games/beat.js', 'js/games/tug.js', 'js/games/ghost.js', 'js/games/pop.js',
   'js/games/tower.js', 'js/games/safe.js', 'js/games/boss.js', 'js/games/daily.js'];
 self.addEventListener('install', (e) => {

@@ -44,6 +44,10 @@ export const PERMISSIONS = [
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
   P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
 
+  // ----- Layer 2: learning operations -----
+  P('unlock.view', 'learning', 'Unlock conditions', 'See unlock conditions', 'Which lessons each plan includes, lessons and levels closed or open for everyone, and when each level opens.', 1, 1),
+  P('unlock.manage', 'learning', 'Unlock conditions', 'Change unlock conditions', 'Close or open a lesson or level for everyone, and set when each level opens. Asks for your password again.', 0, 0, { sensitive: true }),
+
   // ----- Layer 3: business growth -----
   P('revenue.view', 'growth', 'Business reports', 'See revenue reports', 'Revenue by day and by package, refunds and net totals.', 1, 0),
   P('emails.view', 'growth', 'Email', 'See the email log', 'Emails sent to customers and whether they were delivered.', 1, 1),

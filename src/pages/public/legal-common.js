@@ -9,7 +9,7 @@
 //     not legal advice.
 export const UPDATED = '15 November 2026';
 export const REFUND_DAYS = 7;
-export const REFUND_LESSON_LIMIT = 10;      // lessons completed beyond the free five
+export const REFUND_LESSON_LIMIT = 10;      // lessons completed beyond the ones the Free plan includes
 export const SHUTDOWN_NOTICE_DAYS = 30;
 export const CITY = '<span class="placeholder">[Your city]</span>';
 

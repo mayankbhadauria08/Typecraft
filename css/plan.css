@@ -6,6 +6,8 @@
 .plan-tag{display:inline-flex;align-items:center;gap:0;padding:3px 9px;border-radius:999px;font:500 10.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;
   color:var(--brass);background:var(--brass-soft);border:1px solid color-mix(in srgb,var(--brass) 40%,transparent);white-space:nowrap}
 .plan-tag .plan-lock-svg{margin-right:5px}
+/* a level that opens by progress: a hint, not something to buy */
+.plan-tag.plan-tag-progress{background:transparent;border:1px dashed currentColor;color:var(--sub)}
 
 /* locked lesson cards: still readable, clearly not yours yet */
 .lesson-card.is-locked{border-style:dashed}
@@ -114,3 +116,6 @@
   .plan-panel-head{flex-direction:column}
   .lesson-card.is-locked .plan-tag{top:8px;right:8px;padding:2px 7px}
 }
+/* under a level's heading while it has not opened yet by progress */
+.tier-lock{display:flex;align-items:center;gap:6px;margin:-4px 0 12px;color:var(--sub);font-size:13px}
+.tier-lock .plan-lock-svg{flex:none}

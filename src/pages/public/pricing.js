@@ -7,7 +7,7 @@ import { FAQ, faqList } from './faq-data.js';
 export const meta = {
   path: '/pricing',
   title: 'Pricing and plans',
-  description: 'Start free with the first 5 lessons. Paid plans are one-time payments in rupees, from one month to lifetime, with no automatic renewal. Payments by Razorpay.',
+  description: 'Start free with {{free.lessons}}. Paid plans are one-time payments in rupees, from one month to lifetime, with no automatic renewal. Payments by Razorpay.',
 };
 
 export default `
@@ -15,7 +15,7 @@ export default `
   <header class="page-head" style="text-align:center;align-items:center">
     <span class="eyebrow">Pricing</span>
     <h1>Pay once. Learn at your pace.</h1>
-    <p class="lede">Start free with the first five lessons. When you want the whole course, pick a plan for the time you need. Every plan is a single payment: <b>nothing renews automatically</b>.</p>
+    <p class="lede">Start free with {{free.lessons}}. When you want the whole course, pick a plan for the time you need. Every plan is a single payment: <b>nothing renews automatically</b>.</p>
   </header>
 
   <div id="planNotice" aria-live="polite"></div>
@@ -53,7 +53,7 @@ export default `
 <section class="section">
   <div class="container">
     <div class="cta-band">
-      <div><h2>Not ready to pay? Start free.</h2><p>The first five lessons, the placement test, review drills, the Daily Challenge and three typing tests a day are free, for as long as you like.</p></div>
+      <div><h2>Not ready to pay? Start free.</h2><p>{{free.Lessons}}, the placement test, review drills, the Daily Challenge and three typing tests a day are free, for as long as you like.</p></div>
       <div class="actions"><a class="btn btn-primary btn-lg" href="/signup" data-auth-swap>Start free ${icon('arrowRight')}</a></div>
     </div>
   </div>

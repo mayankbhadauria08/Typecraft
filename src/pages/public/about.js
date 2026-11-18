@@ -35,7 +35,7 @@ export default `
 <section class="section">
   <div class="container">
     <div class="cta-band">
-      <div><h2>See it for yourself</h2><p>The first five lessons are free. Try them, and decide afterwards whether TypeCraft is for you.</p></div>
+      <div><h2>See it for yourself</h2><p>You can start free with {{free.lessons}}. Try them, and decide afterwards whether TypeCraft is for you.</p></div>
       <div class="actions"><a class="btn btn-primary btn-lg" href="/signup" data-auth-swap>Start free ${icon('arrowRight')}</a><a class="btn btn-ghost btn-lg" href="/contact">Contact us</a></div>
     </div>
   </div>

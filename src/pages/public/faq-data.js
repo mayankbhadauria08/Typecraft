@@ -20,7 +20,7 @@ export const FAQ = {
   ],
   plans: [
     ['What do I get for free?',
-      'The first 5 lessons of the course, the placement test, the review drill, the Daily Challenge in the arcade, and 3 typing tests a day with 7 days of history. No card is needed and the free plan doesn\'t expire.'],
+      '{{free.Lessons}}, the placement test, the review drill, the Daily Challenge in the arcade, and 3 typing tests a day with 7 days of history. No card is needed and the free plan doesn\'t expire.'],
     ['What changes when I buy a plan?',
       'Every plan unlocks all 78 lessons and all 8 arcade games. Higher plans add unlimited typing tests, advanced analytics, custom practice, premium exercise packs, insights and certificates. The <a href="/pricing">pricing page</a> lists exactly what each plan includes.'],
     ['Is it a subscription? Will I be charged again automatically?',
