@@ -7,6 +7,7 @@
 //   welcome                       { name }
 //   verify_email                  { name, link*, code (6 digits), newEmail (set for an email change) }
 //   otp_login                     { name, code*, minutes = 10 }
+//   admin_otp                     { name, code*, minutes = 10, device }   (admin console sign-in)
 //   login_alert                   { name, device*, time (ISO), location }
 //   password_reset                { name, link*, minutes = 60 }
 //   password_changed              { name, time (ISO) }
@@ -131,6 +132,7 @@ const HEADS = {
   welcome: ['Welcome', 'Welcome to TypeCraft'],
   verify_email: ['Account', 'Confirm your email'],
   otp_login: ['Sign in', 'Your sign-in code'],
+  admin_otp: ['Admin sign-in', 'Your admin sign-in code'],
   login_alert: ['Security', 'New sign-in to your account'],
   password_reset: ['Security', 'Reset your password'],
   password_changed: ['Security', 'Your password was changed'],
@@ -237,6 +239,19 @@ export const TEMPLATES = {
       Code(d.code, 'Enter this code'),
       Small(`It expires in ${minutes} minutes and works once. Never share it: TypeCraft staff will never ask you for it.`),
       Small("If you didn't try to sign in, you can ignore this email; nobody can sign in without the code."),
+    ] });
+  },
+
+  admin_otp(d, site) {
+    const minutes = d.minutes || 10;
+    const subject = 'Your TypeCraft admin sign-in code'; // never the code itself: subjects are kept in email_logs
+    return layout(site, { subject, preheader: `Expires in ${minutes} minutes.`, blocks: [
+      P(hi(d)),
+      P('Someone entered your password on the TypeCraft admin sign-in page. Use this code to finish signing in:'),
+      Code(d.code, 'Admin sign-in code'),
+      ...(d.device ? [Rows([['Device', d.device]])] : []),
+      Small(`It expires in ${minutes} minutes and works once. Never share it: nobody at TypeCraft will ask you for it.`),
+      Small("If this wasn't you, your password is known to someone else: change it now. Without this code nobody can open the admin."),
     ] });
   },
 

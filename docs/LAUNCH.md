@@ -39,6 +39,18 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
     replace the two key secrets with the `rzp_live_…` pair and add a Live-mode webhook with the same
     URL. Nothing else changes.
 
+## 1b. The new admin console (Phase 1)
+
+Lives at `/console` beside the current `/admin`. Full notes: `docs/ADMIN-CONSOLE.md`.
+
+1. **[Claude] Database**: apply `migrations/0005_admin_console.sql` to the live D1 (adds two
+   tables only; restore bookmark first). Until then `/console/login` says the console isn't
+   switched on and nothing else changes.
+2. **[You] Merge the Phase 1 PR.** Check the build on `main` is green (the PR also changes how
+   static files are served, `docs/ADMIN-CONSOLE.md` §8).
+3. Sign in at `/console/login` with your TypeCraft email and password. With `SESSION_SECRET` and
+   email sending set up, it also asks for a code sent to your email; until then it is password only.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |
@@ -50,6 +62,7 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
 | `SESSION_SECRET` | Cloudflare secret | for codes | random 40+ characters |
 | `OWNER_EMAILS` | Cloudflare secret | set ✓ | mayankbhadauria08@gmail.com |
 | `RESEND_WEBHOOK_SECRET` | Cloudflare secret | optional | Resend webhook (delivered/bounced) |
+| `ADMIN_EMAIL_CODE` | Cloudflare variable | optional | `off` = admin sign-in without the emailed code (only if email is down) |
 | `SITE_URL` | wrangler.jsonc var | set ✓ | https://typecrafttyping.in |
 | `EMAIL_FROM` / `EMAIL_REPLY_TO` | wrangler.jsonc vars | set ✓ | TypeCraft <hello@typecrafttyping.com> |
 

@@ -1,16 +1,15 @@
-// Admin API — docs/SAAS-CONTRACTS.md §5 (admin list) and §7 (roles).
+// Admin API — docs/SAAS-CONTRACTS.md §5 (admin list) and docs/ADMIN-CONSOLE.md §4 (permissions).
 // Staff = owner (OWNER_EMAILS) / admin / support (admin_users). Everyone else gets 404.
-// support: read-only users and payments. admin/owner: everything; only owner changes roles.
-// Every write is recorded in audit_logs.
+// Each handler names the permission it needs (src/console/permissions.js); what Admin and
+// Support may do is set in the console's Roles and permissions page. Every write is recorded in audit_logs.
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
 import { uuid } from './crypto.js';
-import { requireRole, roleOf, ROLES } from './roles.js';
+import { roleOf, ROLES } from './roles.js';
+import { requirePermission, assertCan } from './console/session.js';
 import { isOwner, healthNumbers } from './admin.js';
 import { entitlementsFor } from './entitlements.js';
 import { audit, getSetting, refund, packageView } from './billing.js';
 
-const STAFF = ['owner', 'admin', 'support'];
-const MANAGERS = ['owner', 'admin'];
 const PAGE_SIZE = 25;
 const DAY_MS = 86400000;
 const parse = (text, def) => { try { const v = JSON.parse(text); return v == null ? def : v; } catch { return def; } };
@@ -21,13 +20,13 @@ const like = (s) => `%${String(s).replace(/[\\%_]/g, (c) => '\\' + c)}%`;
 
 /* ---------------- GET /api/admin/me ---------------- */
 export async function getMe(request, env) {
-  const { user, role } = await requireRole(env, request, STAFF);
+  const { user, role } = await requirePermission(env, request);
   return json({ user, role });
 }
 
 /* ---------------- GET /api/admin/overview ---------------- */
 export async function getOverview(request, env) {
-  await requireRole(env, request, STAFF);
+  await requirePermission(env, request, 'dashboard.view');
   const DB = env.DB;
   const now = nowIso();
   const ago = (d) => new Date(Date.now() - d * DAY_MS).toISOString();
@@ -72,7 +71,7 @@ export async function getOverview(request, env) {
 
 /* ---------------- users ---------------- */
 export async function getUsers(request, env) {
-  await requireRole(env, request, STAFF);
+  await requirePermission(env, request, 'customers.view');
   const q = new URL(request.url).searchParams;
   const page = pageOf(q);
   const term = (q.get('q') || '').trim().slice(0, 100).toLowerCase();
@@ -121,12 +120,13 @@ async function userDetail(env, u) {
 }
 
 export async function getUser(request, env, ctx, params) {
-  await requireRole(env, request, STAFF);
+  await requirePermission(env, request, 'customers.view');
   return json(await userDetail(env, await userRow(env, params.id)));
 }
 
 export async function postUser(request, env, ctx, params) {
-  const { user: actor, role: actorRole } = await requireRole(env, request, MANAGERS);
+  const who = await requirePermission(env, request); // each change below names its own permission
+  const { user: actor, role: actorRole } = who;
   const u = await userRow(env, params.id);
   const body = await readJson(request);
   const DB = env.DB;
@@ -136,7 +136,7 @@ export async function postUser(request, env, ctx, params) {
   const done = [];
 
   if (body.role !== undefined) {
-    if (actorRole !== 'owner') throw new HttpError(403, 'forbidden', 'Only the owner can change roles.');
+    await assertCan(env, who, 'admins.manage'); // Super Admin only
     const role = body.role === null || body.role === 'none' || body.role === '' ? null : body.role;
     if (role !== null && !ROLES.includes(role)) throw fieldError({ role: 'Role must be owner, admin, support or none.' });
     if (isOwner(env, u.email)) throw fieldError({ role: 'This account is an owner through OWNER_EMAILS; change that setting instead.' });
@@ -147,6 +147,7 @@ export async function postUser(request, env, ctx, params) {
     done.push('role');
   }
   if (body.status !== undefined) {
+    await assertCan(env, who, 'customers.manage');
     if (!['active', 'disabled'].includes(body.status)) throw fieldError({ status: 'Status must be active or disabled.' });
     if (u.id === actor.id) throw fieldError({ status: "You can't change your own account status." });
     if (targetRole === 'owner' || (targetRole && actorRole !== 'owner')) throw new HttpError(403, 'forbidden', 'Only the owner can disable staff accounts, and owners cannot be disabled here.');
@@ -157,6 +158,7 @@ export async function postUser(request, env, ctx, params) {
     done.push('status');
   }
   if (body.grant !== undefined) {
+    await assertCan(env, who, 'subscriptions.manage');
     const g = body.grant;
     if (!g || typeof g !== 'object' || typeof g.packageId !== 'string') throw fieldError({ grant: 'Choose a plan to grant.' });
     const pkg = await DB.prepare('SELECT * FROM packages WHERE id = ?1').bind(g.packageId).first();
@@ -171,6 +173,7 @@ export async function postUser(request, env, ctx, params) {
     done.push('grant');
   }
   if (body.revoke !== undefined) {
+    await assertCan(env, who, 'subscriptions.manage');
     if (typeof body.revoke !== 'string') throw fieldError({ revoke: 'Choose a subscription to revoke.' });
     const r = await DB.prepare("UPDATE user_subscriptions SET status = 'revoked', updated_at = ?3 WHERE id = ?1 AND user_id = ?2 AND status = 'active'").bind(body.revoke, u.id, now).run();
     if (r.meta.changes !== 1) throw fieldError({ revoke: 'That subscription is not active for this user.' });
@@ -183,7 +186,7 @@ export async function postUser(request, env, ctx, params) {
 
 /* ---------------- packages ---------------- */
 export async function getAdminPackages(request, env) {
-  await requireRole(env, request, STAFF);
+  await requirePermission(env, request, 'packages.view');
   const [pk, ft] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM packages ORDER BY display_order, price_paise'),
     env.DB.prepare('SELECT key, label, description FROM package_features ORDER BY display_order'),
@@ -193,7 +196,7 @@ export async function getAdminPackages(request, env) {
 }
 
 export async function putPackage(request, env, ctx, params) {
-  const { user: actor } = await requireRole(env, request, MANAGERS);
+  const { user: actor } = await requirePermission(env, request, 'packages.manage');
   const DB = env.DB;
   const p = await DB.prepare('SELECT * FROM packages WHERE id = ?1').bind(params.id).first();
   if (!p) throw new HttpError(404, 'not_found', 'Package not found.');
@@ -242,7 +245,7 @@ export async function putPackage(request, env, ctx, params) {
 
 /* ---------------- payments ---------------- */
 export async function getPayments(request, env) {
-  await requireRole(env, request, STAFF);
+  await requirePermission(env, request, 'payments.view');
   const q = new URL(request.url).searchParams;
   const page = pageOf(q);
   const status = q.get('status');
@@ -280,7 +283,7 @@ export async function getPayments(request, env) {
 }
 
 export async function postRefund(request, env, ctx, params) {
-  const { user: actor } = await requireRole(env, request, MANAGERS);
+  const { user: actor } = await requirePermission(env, request, 'payments.refund');
   const body = await readJson(request);
   const id = params.id;
   const pay = await env.DB.prepare(
@@ -296,7 +299,7 @@ export async function postRefund(request, env, ctx, params) {
 
 /* ---------------- revenue ---------------- */
 export async function getRevenue(request, env) {
-  await requireRole(env, request, MANAGERS);
+  await requirePermission(env, request, 'revenue.view');
   const q = new URL(request.url).searchParams;
   const to = isDay(q.get('to')) ? q.get('to') : nowIso().slice(0, 10);
   const from = isDay(q.get('from')) ? q.get('from') : new Date(Date.parse(to) - 29 * DAY_MS).toISOString().slice(0, 10);
@@ -365,12 +368,12 @@ async function allSettings(env) {
 }
 
 export async function getSettings(request, env) {
-  await requireRole(env, request, MANAGERS);
+  await requirePermission(env, request, 'settings.view');
   return json({ settings: await allSettings(env), paymentsConfigured: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), webhookConfigured: !!env.RAZORPAY_WEBHOOK_SECRET });
 }
 
 export async function putSettings(request, env) {
-  const { user: actor } = await requireRole(env, request, MANAGERS);
+  const { user: actor } = await requirePermission(env, request, 'settings.manage');
   const body = await readJson(request);
   const fields = {}, changes = {};
   for (const [k, v] of Object.entries(body)) {
@@ -397,7 +400,7 @@ export async function putSettings(request, env) {
 
 /* ---------------- audit log ---------------- */
 export async function getAudit(request, env) {
-  await requireRole(env, request, MANAGERS);
+  await requirePermission(env, request, 'audit.view');
   const q = new URL(request.url).searchParams;
   const page = pageOf(q);
   const action = q.get('action');

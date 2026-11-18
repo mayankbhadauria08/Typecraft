@@ -14,7 +14,8 @@ import * as adminApi from './admin-api.js';
 import * as mail from './mail.js';
 import * as content from './content.js';
 import * as site from './site.js';
-const MODULES = [billing, adminApi, mail, content];
+import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
+const MODULES = [billing, adminApi, mail, content, consoleApi];
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,

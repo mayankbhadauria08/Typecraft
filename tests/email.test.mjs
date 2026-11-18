@@ -78,7 +78,7 @@ const log = (id) => env.DB.prepare('SELECT * FROM email_logs WHERE id = ?1').bin
 const EVIL = '<script>alert(1)</script>';
 const SAMPLE = {
   welcome: {}, verify_email: { link: 'https://typecrafttyping.in/verify-email#token=abc', code: '123456' },
-  otp_login: { code: '654321' }, login_alert: { device: 'Chrome on Windows', time: '2026-11-15T10:00:00Z', location: 'IN' },
+  otp_login: { code: '654321' }, admin_otp: { code: '112233', device: 'Chrome on Windows' }, login_alert: { device: 'Chrome on Windows', time: '2026-11-15T10:00:00Z', location: 'IN' },
   password_reset: { link: 'https://typecrafttyping.in/reset-password#token=abc' }, password_changed: { time: '2026-11-15T10:00:00Z' },
   security_alert: { title: 'Odd activity', message: `Something ${EVIL} happened` }, email_changed: { oldEmail: 'a@example.com', newEmail: 'b@example.com' },
   payment_success: { packageName: `Pro ${EVIL}`, amountPaise: 19900, orderId: 'ord_1', invoiceNumber: 'TC-2026-000001', startsAt: '2026-11-15T00:00:00Z', expiresAt: '2027-02-13T00:00:00Z' },
@@ -95,7 +95,7 @@ const SAMPLE = {
 };
 
 test('every template renders a subject, escaped HTML and a text part', () => {
-  assert.equal(TEMPLATE_NAMES.length, 19);
+  assert.equal(TEMPLATE_NAMES.length, 20);
   const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com', unsubscribeUrl: 'https://typecrafttyping.in/api/email/unsubscribe?u=1&t=2' };
   for (const name of TEMPLATE_NAMES) {
     assert.ok(SAMPLE[name], `sample data for ${name}`);

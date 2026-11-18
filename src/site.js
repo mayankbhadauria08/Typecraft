@@ -14,6 +14,7 @@ import { PAGES as PAYMENT_PAGES } from './pages/payment.js';
 import { PAGES as ADMIN_PAGES } from './pages/admin.js';
 import { loadSettings } from './site-data.js';
 import notFoundBody, { meta as notFoundMeta } from './pages/public/not-found.js';
+import { serveConsole, isConsolePath } from './console/router.js'; // the new admin console (docs/ADMIN-CONSOLE.md)
 
 const APEX = 'typecrafttyping.in';
 const ADMIN_ROLES = ['owner', 'admin', 'support'];
@@ -168,6 +169,7 @@ export async function servePage(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   if (path.startsWith('/api/')) return null;
+  if (isConsolePath(path)) return serveConsole(request, env, ctx);
   const method = request.method;
   const readOnly = method === 'GET' || method === 'HEAD';
 

@@ -202,11 +202,12 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 
 ## 7. Roles and route protection (site + billing)
 
-- `src/roles.js` (billing part): `roleOf(env, user)` → `'owner'|'admin'|'support'|null`
-  (OWNER_EMAILS → owner; else `admin_users`). `requireRole(env, request, ['owner','admin'])`
-  → `{ user, role }` or 404 (admin areas answer "not found" to everyone else).
-  support: read-only payments/users/emails, contact replies. admin/owner: everything;
-  only owner can change roles.
+- `src/roles.js`: `roleOf(env, user)` → `'owner'|'admin'|'support'|null`
+  (OWNER_EMAILS → owner; else `admin_users`). What each role may do is no longer a list of
+  roles per handler: every admin handler names a permission and
+  `requirePermission(env, request, '<permission>')` (`src/console/session.js`) decides, from the
+  catalogue and the Super Admin's switches. See `docs/ADMIN-CONSOLE.md` §4. People without a
+  role still get 404 from the admin API.
 - Pages: `public` (anyone), `guest` (signed-out only; signed-in → `/dashboard`),
   `user` (signed in; else 302 `/login?next=<path>`), `admin` (role; else 404).
 

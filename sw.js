@@ -1,7 +1,7 @@
 /* TypeCraft service worker: caches the app's own files so lessons and games work
    offline. Never caches anything under /api. A new version waits until the page
    asks it to take over ("Update ready, reload"). Bump VERSION with each release. */
-const VERSION = 'typecraft-next-3';
+const VERSION = 'typecraft-next-4';
 const FILES = ['manifest.webmanifest', 'icons/icon.svg',
   'css/app.css', 'css/next.css', 'css/games.css', 'css/rewards.css', 'css/typewriter.css', 'css/plan.css',
   'shared/course-meta.js', 'shared/rewards-rules.js', 'js/course.js', 'js/rewards-ui.js', 'js/typewriter.js', 'js/app.js',
@@ -17,6 +17,8 @@ self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.ski
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) return;
+  // the admin console and its files always come straight from the network
+  if (url.pathname === '/console' || url.pathname.startsWith('/console/') || url.pathname.startsWith('/site/console/')) return;
   // pages: network first (so signing in and updates show), the cache when offline
   if (e.request.mode === 'navigate') {
     // only the app itself is kept for offline use, never the sign-in page

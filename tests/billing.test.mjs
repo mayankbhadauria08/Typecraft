@@ -494,7 +494,7 @@ test('admin endpoints answer 404 to learners and signed-out visitors, and work f
   assert.ok((await owner('GET', '/api/admin/audit')).body.total >= 4);
 });
 
-test('roles: only the owner changes roles; support is read-only; packages and settings are validated and audited', async () => {
+test('roles: only the owner changes roles; support is read-only; permissions decide the rest; packages and settings are validated and audited', async () => {
   const owner = client();
   await owner('POST', '/api/auth/login', { email: 'boss@example.com', password: pw });
   const adm = await signup(), sup = await signup();
@@ -524,7 +524,11 @@ test('roles: only the owner changes roles; support is read-only; packages and se
   assert.equal((await learner('POST', '/api/checkout/order', { packageId: 'pro' })).body.amountPaise, 24900);
   await adm('PUT', '/api/admin/packages/pro', { pricePaise: 19900, highlight: true });
   assert.equal(await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'package.update' AND target = 'package:pro'"), 2);
-  // settings
+  // settings: Admin can read them but, by default, not change them; a Super Admin can switch that on (role_permissions)
+  assert.equal((await adm('GET', '/api/admin/settings')).status, 200);
+  assert.equal((await adm('PUT', '/api/admin/settings', { signups: { open: true } })).status, 403);
+  assert.equal((await adm('POST', '/api/admin/payments/ord_none/refund', { reason: 'x' })).status, 403); // refunds are off for Admin by default
+  await env.DB.prepare("INSERT INTO role_permissions (role, permission, allowed, updated_at) VALUES ('admin', 'settings.manage', 1, '2026-11-15T00:00:00Z')").run();
   assert.equal((await adm('PUT', '/api/admin/settings', { seller: { gstin: 'nope' } })).status, 400);
   assert.equal((await adm('PUT', '/api/admin/settings', { secrets: { a: 1 } })).status, 400);
   const s = await adm('PUT', '/api/admin/settings', { seller: { legalName: 'Asha Sharma (sole proprietor)' }, signups: { open: true } });

@@ -3,3 +3,8 @@
   X-Frame-Options: DENY
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Files served straight from Cloudflare (css, js, icons) on the workers.dev address:
+# keep them out of search results, like the pages (src/site.js adds the same header to those).
+https://:worker.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

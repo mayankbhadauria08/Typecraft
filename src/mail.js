@@ -11,7 +11,7 @@
 import { HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail, nowIso } from './http.js';
 import { uuid } from './crypto.js';
 import { getSession, requireSession, hitLimit, tooMany, emailEnabled } from './session.js';
-import { requireRole } from './roles.js';
+import { requirePermission } from './console/session.js';
 import { renderTemplate, TEMPLATE_NAMES } from './mail-templates.js';
 import * as auth from './auth.js';
 import * as entitlements from './entitlements.js';
@@ -29,10 +29,10 @@ export const ANNOUNCE_BATCH = 100;               // announcement emails sent per
 const ANNOUNCE_MAX_AUDIENCE = 20000;
 
 /** Templates whose content is a secret (code or link): no retry, nothing secret in the log. */
-export const SENSITIVE = new Set(['otp_login', 'password_reset', 'verify_email']);
+export const SENSITIVE = new Set(['otp_login', 'admin_otp', 'password_reset', 'verify_email']);
 const SECRET_KEYS = ['code', 'link', 'token', 'otp', 'resetLink', 'verifyLink'];
 const CATEGORY = {
-  welcome: 'auth', verify_email: 'auth', otp_login: 'auth', password_reset: 'auth',
+  welcome: 'auth', verify_email: 'auth', otp_login: 'auth', admin_otp: 'security', password_reset: 'auth',
   login_alert: 'security', password_changed: 'security', security_alert: 'security', email_changed: 'security',
   payment_success: 'billing', payment_failed: 'billing', invoice: 'billing', subscription_renewal_reminder: 'billing',
   subscription_expired: 'billing', refund_processed: 'billing',
@@ -41,7 +41,7 @@ const CATEGORY = {
 };
 const CATEGORIES = ['auth', 'security', 'transactional', 'billing', 'platform', 'support'];
 // per recipient per template, per hour
-const PER_RECIPIENT = { otp_login: 5, password_reset: 5, verify_email: 5 };
+const PER_RECIPIENT = { otp_login: 5, admin_otp: 10, password_reset: 5, verify_email: 5 };
 const PER_RECIPIENT_DEFAULT = 20;
 const GLOBAL_LIMIT = 300;      // emails per 10 minutes, all templates
 const GLOBAL_WINDOW = 600;
@@ -480,7 +480,7 @@ function publicLog(r) {
 }
 
 export async function adminEmails(request, env) {
-  await requireRole(env, request, ['owner', 'admin', 'support']);
+  await requirePermission(env, request, 'emails.view');
   const url = new URL(request.url);
   const status = url.searchParams.get('status') || '';
   const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 100);
@@ -506,7 +506,7 @@ export async function adminEmails(request, env) {
 }
 
 export async function adminRetryEmail(request, env, ctx, params) {
-  const { user } = await requireRole(env, request, ['owner', 'admin']);
+  const { user } = await requirePermission(env, request, 'emails.retry');
   const row = await env.DB.prepare('SELECT * FROM email_logs WHERE id = ?1').bind(params.id).first();
   if (!row) throw new HttpError(404, 'not_found', 'That email was not found.');
   if (SENSITIVE.has(row.template)) throw new HttpError(400, 'not_retryable', "Codes and links can't be sent again. Ask the person to request a new one.");
@@ -529,7 +529,7 @@ function audienceSql(audience) {
 }
 
 export async function adminAnnouncement(request, env, ctx) {
-  const { user } = await requireRole(env, request, ['owner', 'admin']);
+  const { user } = await requirePermission(env, request, 'emails.announce');
   const body = await readJson(request, 64 * 1024);
   const fields = {};
   const subject = typeof body.subject === 'string' ? body.subject.trim().replace(/\s+/g, ' ') : '';
@@ -562,7 +562,7 @@ export async function adminAnnouncement(request, env, ctx) {
 
 /* ---------- admin: contact messages ---------- */
 export async function adminContact(request, env) {
-  await requireRole(env, request, ['owner', 'admin', 'support']);
+  await requirePermission(env, request, 'support.view');
   const url = new URL(request.url);
   const status = url.searchParams.get('status') || '';
   const page = pageOf(url);
@@ -581,7 +581,7 @@ export async function adminContact(request, env) {
 }
 
 export async function adminContactUpdate(request, env, ctx, params) {
-  const { user } = await requireRole(env, request, ['owner', 'admin', 'support']);
+  const { user } = await requirePermission(env, request, 'support.manage');
   const body = await readJson(request, 1024);
   if (!['new', 'answered', 'closed'].includes(body.status)) throw fieldError({ status: 'Choose new, answered or closed.' });
   const r = await env.DB.prepare('UPDATE contact_messages SET status = ?2 WHERE id = ?1').bind(params.id, body.status).run();
