@@ -4,7 +4,7 @@
 import { esc } from '../layout.js';
 import { icon } from './icons.js';
 import { CONSOLE_BASE } from './config.js';
-import { select, section, panel, lines, skeletonRows, recordFrame } from './page-kit.js';
+import { select, section, panel, lines, skeletonRows, recordFrame, listFrame } from './page-kit.js';
 
 const COURSE = ['/shared/course-meta.js', '/js/course.js', '/shared/course-edits.js'];
 const has = (me, k) => me.permissions.includes(k);
@@ -137,7 +137,41 @@ ${edit ? `<div class="form-actions"><button type="submit" class="btn btn-primary
   });
 }
 
+/* ---------- Student progress ---------- */
+function progressBody() {
+  return listFrame({
+    title: 'Student progress',
+    sub: 'How each learner is getting on: the level they are working on, lessons finished, speed and accuracy, and when they last practised. Staff accounts are left out.',
+    label: 'Find learners',
+    search: { label: 'Search learners', placeholder: 'Name or email' },
+    filters: [
+      select('level', 'Level', [['', 'All levels']]),
+      select('activity', 'Practice', [['', 'Any practice'], ['active7', 'Practised in the last 7 days'], ['quiet30', 'Not for 30 days or more'], ['never', 'Never practised']]),
+      select('stuck', 'Stuck', [['', 'Stuck or not'], ['1', 'Stuck on a lesson']]),
+      select('sort', 'Sort', [['', 'Last practice first'], ['done', 'Most lessons finished'], ['speed', 'Fastest first'], ['name', 'Name']]),
+    ].join('\n'),
+    heads: [['Learner'], ['Working on', 'col-wide'], ['Lessons', 'num'], ['Best speed', 'num col-wide'], ['Accuracy', 'num col-wide'], ['Last practice', 'col-wide'], ['', 'col-fit']],
+  });
+}
+function progressOneBody(me) {
+  return recordFrame({
+    back: ['Student progress', '/progress'],
+    missing: ['Learner not found', 'There is no learner with this ID.'],
+    main: [
+      `<div class="figures" id="figures" aria-busy="true">${lines(2)}</div>`,
+      section('days', 'Practice in the last 30 days', '<div id="daysChart">' + lines(3) + '</div>', '<span class="panel-meta">Minutes a day, in the learner\'s own days</span>'),
+      section('lessons', 'Lessons', lines(6), '<span class="panel-meta" id="lessonsMeta"></span>'),
+    ].join('\n'),
+    side: [panel('about', 'Learner', 4), panel('keys', 'Weakest keys', 4), panel('placement', 'Placement test', 2)].join('\n'),
+    sideLabel: 'About this learner',
+  });
+}
+
 export const LEARNING_PAGES = [
+  { key: 'progress', path: '/progress', title: 'Student progress', crumbs: ['Learning operations', 'Student progress'],
+    permission: 'progress.view', body: progressBody, scripts: ['progress.js'] },
+  { key: 'progress', match: /^\/progress\/([\w-]{1,64})$/, names: ['id'], title: 'Learner progress', crumbs: ['Learning operations', ['Student progress', '/progress'], 'Learner'],
+    permission: 'progress.view', body: progressOneBody, scripts: ['charts.js', 'progress-one.js'] },
   { key: 'courses', path: '/course', title: 'Courses', crumbs: ['Learning operations', 'Courses'],
     permission: 'course.view', body: courseBody, scripts: ['course-kit.js', 'course-home.js'] },
   { key: 'lessons', path: '/course/lessons', title: 'Lessons', crumbs: ['Learning operations', 'Lessons'],

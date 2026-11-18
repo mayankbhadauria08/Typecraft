@@ -14,8 +14,8 @@ the live database, without the owner's yes.
 | 0 | Plan, migration 0007, shared course-edit rules, public course edits, the app applies them | built |
 | 1 | Lessons, Levels, Modules editors (drafts) | built |
 | 2 | Courses: publish, history, go back to a version | built |
-| 3 | Exercises: practice packs | not started |
-| 4 | Student progress | not started |
+| 3 | Exercises: practice packs | built |
+| 4 | Student progress | built |
 | 5 | Learning analytics | not started |
 | 6 | Full check, docs, pull request | not started |
 | — | Unlock conditions | built (PR #20, `docs/UNLOCK-RULES.md`) |
@@ -87,6 +87,10 @@ version never stacks on an older one). Used by the app, the console pages and th
   published packs.
 - **Step 4.** Student progress (`progress.view`): learners with their level, lessons done, best
   speed, accuracy, last practice and a "stuck" flag; one learner's lessons, weak keys and practice.
+  Read only, from the tables practice already fills (no new table). Staff (admin_users and the
+  OWNER_EMAILS accounts) are left out of the list. "Working on" = the level of the lesson after the
+  furthest one finished, in course order; "stuck" = a lesson tried 5 times or more and not finished;
+  a key counts as weak once it has been typed 20 times. Names come from the published course.
 - **Step 5.** Learning analytics (`analytics.view`): active learners, practice time, how far
   learners get per level, hardest lessons, placement results, weak keys across learners.
 - **Step 6.** Full check and pull request.

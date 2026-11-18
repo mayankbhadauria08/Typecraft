@@ -13,8 +13,9 @@ import * as dashboard from './dashboard-api.js';
 import * as search from './search-api.js';
 import * as unlock from './unlock-api.js';
 import * as course from './course-api.js';
+import * as progress from './progress-api.js';
 
-const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course];
+const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress];
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006',
