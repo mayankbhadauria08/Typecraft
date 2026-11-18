@@ -2460,8 +2460,37 @@ const Plan = {
     });
   },
 
-  /* ---- certificates: earned on every plan, printed with 'certificates' ---- */
+  /* ---- certificates: earned on every plan, printed with 'certificates'. Each has a code anyone can check
+     at /verify (docs/EXAM-MODES.md); GET /api/me/certificates makes the missing ones. ---- */
+  certCodes:null, certCodesKey:'',
+  addCertificateCodes(host){
+    if(!Account.user) return;
+    // asked again when the account or the number of certificates changes
+    const key = Account.user.id + ':' + host.querySelectorAll('.rw-certitem').length;
+    if(key !== this.certCodesKey){ this.certCodes = null; this.certCodesKey = key; }
+    if(!this.certCodes) this.certCodes = api('GET', '/api/me/certificates').then(res => {
+      const by = {};
+      if(res.ok && res.ready) (res.certificates || []).forEach(c => { if(c.kind === 'level' && c.code && c.shared) by[c.level] = c.code; });
+      if(!res.ok) this.certCodes = null;   // ask again next time
+      return by;
+    });
+    this.certCodes.then(by => {
+      host.querySelectorAll('.rw-certitem').forEach(fig => {
+        const b = fig.querySelector('[data-action="print-certificate"]'); if(!b) return;
+        let data; try{ data = JSON.parse(b.dataset.cert || '{}'); }catch(e){ return; }
+        const code = by[data.level];
+        if(!code || data.code === code) return;
+        data.code = code; data.verifyAt = location.host + '/verify';
+        b.dataset.cert = JSON.stringify(data);
+        const svg = fig.querySelector('svg.rw-cert');
+        if(svg) svg.outerHTML = TC_REWARDS_UI.certificate(data);
+        const cap = fig.querySelector('figcaption span');
+        if(cap && !fig.querySelector('.rw-certcode')) cap.insertAdjacentHTML('afterend', `<a class="rw-certcode" href="/verify/${esc(code)}" target="_blank" rel="noopener">${esc(code)}</a>`);
+      });
+    });
+  },
   decorateCertificates(host){
+    this.addCertificateCodes(host);
     const can = this.has('certificates');
     host.querySelectorAll('[data-action="print-certificate"]').forEach(b => {
       if(can){ if(b.dataset.locked){ delete b.dataset.locked; b.textContent = 'Print'; b.removeAttribute('aria-label'); } return; }

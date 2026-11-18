@@ -99,6 +99,19 @@ one builds on it.
    note; each published version can be looked at and gone back to. Admin can write drafts;
    publishing stays a Super Admin task unless you switch `course.publish` on for Admin.
 
+## 1f. Exam practice and verifiable certificates
+
+Full notes: `docs/EXAM-MODES.md`.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0008_exams.sql` (two new tables, `exam_results` and
+   `certificate_codes`; adds only, no row changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('exam_results', 'certificate_codes')`.
+   Before this, exam practice still marks tests on the page but can't save them, and certificates
+   print without a code.
+2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
+3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

@@ -7,6 +7,8 @@ import about, { meta as aboutMeta } from './public/about.js';
 import features, { meta as featuresMeta } from './public/features.js';
 import practice, { meta as practiceMeta } from './public/practice.js';
 import typingTest, { meta as typingTestMeta } from './public/typing-test.js';
+import examPractice, { meta as examPracticeMeta } from './public/exam-practice.js';
+import verify, { meta as verifyMeta, codeMeta as verifyCodeMeta } from './public/verify.js';
 import pricing, { meta as pricingMeta } from './public/pricing.js';
 import faq, { meta as faqMeta } from './public/faq.js';
 import contact, { meta as contactMeta } from './public/contact.js';
@@ -55,6 +57,10 @@ export const PAGES = [
   { meta: featuresMeta, body: features, scripts: [] },
   { meta: practiceMeta, body: practice, scripts: [] },
   { meta: typingTestMeta, body: typingTest, scripts: ['/site/js/typing-test.js'] },
+  { meta: examPracticeMeta, body: examPractice,
+    scripts: ['/shared/exam-passages.js', '/shared/exam-rules.js', '/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/exam-practice.js'] },
+  { meta: verifyMeta, body: verify, scripts: ['/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/verify.js'] },
+  { meta: verifyCodeMeta, body: verify, scripts: ['/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/verify.js'] },
   { meta: pricingMeta, body: pricing, scripts: ['/site/js/pricing.js'], load: packagesData, jsonld: (ctx, loaded) => [productLd(ctx, loaded), faqJsonLd(FAQ.plans)] },
   { meta: faqMeta, body: faq, scripts: [], jsonld: () => faqJsonLd(ALL_FAQ) },
   { meta: contactMeta, body: contact, scripts: ['/site/js/contact.js'] },

@@ -2,6 +2,7 @@
 import * as dashboard from './account/dashboard.js';
 import * as profile from './account/profile.js';
 import * as history from './account/history.js';
+import * as certificates from './account/certificates.js';
 import * as analytics from './account/analytics.js';
 import * as plans from './account/plans.js';
 import * as payments from './account/payments.js';
@@ -18,6 +19,7 @@ export const PAGES = [
   page(dashboard, 'account-dashboard', [COURSE]),
   page(profile, 'account-profile'),
   page(history, 'account-history'),
+  page(certificates, 'account-certificates', ['/js/rewards-ui.js']),
   page(analytics, 'account-analytics'),
   page(plans, 'account-plans'),
   page(payments, 'account-payments'),
