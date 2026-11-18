@@ -184,8 +184,8 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
-- `0006_admin_core.sql` (Phase 2): `customer_notes`, `access_overrides`, `refund_choices`, three
-  indexes. Additive only, safe to run twice. Before it is applied, the customer pages and the
+- `0006_admin_core.sql` (Phase 2): `customer_notes`, `access_overrides`, `refund_choices`, and three
+  indexes on existing tables. Additive only, safe to run twice. Before it is applied, the customer pages and the
   other parts that need it answer "not switched on yet" (503), lists still work, and nothing
   changes for customers. Go-live steps: `docs/ADMIN-PHASE-2.md` §4 and `docs/LAUNCH.md` §1c.
 - `0005_admin_console.sql`: `admin_sessions`, `role_permissions`. Additive only.

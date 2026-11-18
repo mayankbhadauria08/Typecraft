@@ -56,7 +56,7 @@ Lives at `/console` beside the current `/admin`. Full notes: `docs/ADMIN-CONSOLE
 Full notes: `docs/ADMIN-PHASE-2.md`.
 
 1. **[Claude] Database**: take a restore bookmark in the D1 console (`/bookmark`, write it down
-   here), then apply `migrations/0006_admin_core.sql` (three tables and three indexes; adds only).
+   here), then apply `migrations/0006_admin_core.sql` (three new tables, plus three indexes on existing tables; adds only, no row changes).
    The live database has no `d1_migrations` table: never run `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('customer_notes', 'access_overrides', 'refund_choices')`.
 2. **[You] Merge the Phase 2 PR.** Learners see "Update ready, reload" once (`sw.js` changed).

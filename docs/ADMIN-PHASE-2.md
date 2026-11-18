@@ -111,7 +111,8 @@ Adds only (every statement is `CREATE … IF NOT EXISTS`, so it is safe to run t
 - `access_overrides`: a lesson or game unlocked or locked for one customer (step 5).
 - `refund_choices`: what a refund should do to the plan, keyed by the Razorpay refund id
   (step 3). A separate table so that the existing refund and webhook code is not changed.
-- Indexes: `users (created_at)`, `refunds (created_at)`.
+- Indexes on existing tables: `users (created_at)`, `refunds (created_at)`,
+  `audit_logs (target, created_at)`. Only new indexes: no existing row changes.
 
 Going live: take a bookmark in the D1 console (`/bookmark`), paste the file without its
 comments, check with `SELECT name FROM sqlite_master`. The live database has had every
