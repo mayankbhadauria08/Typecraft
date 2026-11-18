@@ -82,14 +82,20 @@ function randomNonce() {
   return btoa(String.fromCharCode(...b)).replace(/=+$/, '');
 }
 
+// Cloudflare Web Analytics (switched on for the zone) adds its beacon script to every page;
+// it loads from static.cloudflareinsights.com and reports to this site's /cdn-cgi/rum or to
+// cloudflareinsights.com. The admin console keeps its stricter policy and stays unmeasured.
+const CF_ANALYTICS_SCRIPT = 'https://static.cloudflareinsights.com';
+const CF_ANALYTICS_REPORT = 'https://cloudflareinsights.com';
+
 export function contentSecurityPolicy(nonce) {
   return [
     "default-src 'self'",
-    `script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''} https://checkout.razorpay.com`,
+    `script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''} https://checkout.razorpay.com ${CF_ANALYTICS_SCRIPT}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://*.razorpay.com",
-    "connect-src 'self' https://api.razorpay.com https://*.razorpay.com",
+    `connect-src 'self' https://api.razorpay.com https://*.razorpay.com ${CF_ANALYTICS_REPORT}`,
     'frame-src https://api.razorpay.com https://*.razorpay.com',
     "worker-src 'self'",
     "manifest-src 'self'",
