@@ -155,6 +155,10 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `{ key:'lessons', label }` (its lessons in words); the two lesson features are left out of both
   lists (docs/UNLOCK-RULES.md §2).
 - `GET /api/learning-rules` (public) → `{ rules: { closed, open, progress, placement } }`
+- `GET /api/course` (public, cached 60 s) → `{ version, edits, publishedAt }`: the published course
+  changes (lesson names, tips, keys, words, sentences; level and unit names), applied by the app
+  between lessons through `shared/course-edits.js`. Practice packs are not in it (they stay behind
+  `/api/content/packs`). Version 0 with `{}` = the course as in the code (docs/ADMIN-PHASE-3.md).
 - `POST /api/checkout/order {packageId}` (signed in) → creates `orders` row + Razorpay order
   (`POST https://api.razorpay.com/v1/orders`, Basic auth, `receipt` = our order id,
   `notes` = {orderId, userId, packageId}) → `{ orderId, razorpayOrderId, amountPaise,
@@ -200,7 +204,9 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 
 ## 6. Content (owner: app part) — `src/content.js`
 
-- `GET /api/content/packs` → list (title, description, locked) for everyone signed in.
+- `GET /api/content/packs` → list (title, description, locked) for everyone signed in. The packs
+  are the ones in the code with the published course changes on top (edited, hidden, added,
+  reordered in Console, Exercises: docs/ADMIN-PHASE-3.md).
 - `GET /api/content/packs/:id` → texts only with `exercises.premium` (402 otherwise).
   Packs: numbers & data entry, code (JS/Python/HTML snippets written by us), business
   writing, exam passages (SSC/clerk style paragraphs written by us). Original text only.

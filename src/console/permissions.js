@@ -45,6 +45,11 @@ export const PERMISSIONS = [
   P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
 
   // ----- Layer 2: learning operations -----
+  P('course.view', 'learning', 'Course', 'See the course', 'Levels, modules, lessons and practice packs, with drafts and published versions.', 1, 1),
+  P('course.edit', 'learning', 'Course', 'Edit the course (drafts)', 'Change lesson titles and texts, level and module names, and practice packs. Changes stay drafts until they are published.', 1, 0),
+  P('course.publish', 'learning', 'Course', 'Publish course changes', 'Make drafts live for every learner, or go back to an earlier version. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('progress.view', 'learning', 'Student progress', 'See student progress', 'Each learner\u2019s lessons, speed, accuracy, weak keys and practice time.', 1, 1),
+  P('analytics.view', 'learning', 'Learning analytics', 'See learning analytics', 'How far learners get, the hardest lessons, practice time and weak keys across all learners.', 1, 1),
   P('unlock.view', 'learning', 'Unlock conditions', 'See unlock conditions', 'Which lessons each plan includes, lessons and levels closed or open for everyone, and when each level opens.', 1, 1),
   P('unlock.manage', 'learning', 'Unlock conditions', 'Change unlock conditions', 'Close or open a lesson or level for everyone, and set when each level opens. Asks for your password again.', 0, 0, { sensitive: true }),
 

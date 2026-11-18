@@ -79,6 +79,26 @@ Full notes: `docs/UNLOCK-RULES.md`. No database change: the rules live in the ex
 3. If you change what Free includes, also check Free's description on its package page (it is your
    own text, and says "the first five lessons" today). The site's other wording follows by itself.
 
+## 1e. The admin console, Phase 3 (learning operations)
+
+Full notes: `docs/ADMIN-PHASE-3.md`. Merge the Unlock conditions pull request (§1d) first: this
+one builds on it.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0007_course.sql` (two new tables, `course_drafts` and
+   `course_releases`; adds only, no row changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('course_drafts', 'course_releases')`.
+   **Done 19 Nov 2026, 02:50 IST.** Restore bookmark taken just before:
+   `00000271-00000000-00005127-32b399a69ed595eccfa208e1a1804266` (D1 console:
+   `/restore <bookmark>`). Checked after: both tables exist and are empty; users 2,
+   lesson_scores 2, audit_logs 2, the same as before; 57 tables became 59. Live site answered
+   normally afterwards.
+2. **[You] Merge the Phase 3 pull request.** Learners see "Update ready, reload" once (`sw.js`
+   changed). Until someone publishes a change, learners get the course exactly as today.
+3. Course changes reach learners only when a Super Admin publishes them (Console, Courses), with a
+   note; each published version can be looked at and gone back to. Admin can write drafts;
+   publishing stays a Super Admin task unless you switch `course.publish` on for Admin.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |
