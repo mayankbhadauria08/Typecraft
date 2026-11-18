@@ -1,7 +1,10 @@
 /* TypeCraft admin console: what every page shares (window.AC).
    - AC.api(): talks to /api/admin, sends you to sign-in when the session has ended, and asks
      for your password when a sensitive action needs it confirmed.
-   - AC.el(), AC.icon(), AC.toast(), AC.confirm(), AC.fmt: small building blocks.
+   - AC.el(), AC.icon(), AC.toast(), AC.confirm(), AC.fmt, AC.money(), AC.badge(): small building blocks.
+   - AC.formDialog(): a dialog with fields that stays open until the server accepts.
+   - AC.list(): a filtered, paged table whose filters live in the address bar.
+   - AC.download(): a spreadsheet download that goes through the same checks as AC.api().
    Data from the server is only ever placed as text, never as HTML. */
 (function () {
   'use strict';
@@ -37,18 +40,39 @@
     return svg ? svg.cloneNode(true) : doc.createTextNode('');
   }
 
-  /* ---------- dates ---------- */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  /** An SVG element: sizes and positions go in attributes, so no inline styles are needed. */
+  function svg(tag, attrs, kids) {
+    var node = doc.createElementNS(SVG_NS, tag), k;
+    for (k in attrs || {}) if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) node.setAttribute(k, String(attrs[k]));
+    append(node, kids);
+    return node;
+  }
+  function badge(text, kind) { return el('span', { class: 'badge' + (kind ? ' badge-' + kind : ''), text: text }); }
+  /** ₹1,499 or ₹99.50 from an amount in paise. */
+  function money(paise, currency) {
+    var amount = (Number(paise) || 0) / 100;
+    try {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency || 'INR', minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 }).format(amount);
+    } catch (e) { return '\u20b9' + amount; }
+  }
+
+  /* ---------- dates ----------
+     The business runs on India time, and the server counts days in India time: the console shows every
+     date and time that way, in day-month-year order, wherever the administrator's own computer is set. */
+  var LOCALE = 'en-IN', ZONE = 'Asia/Kolkata';
+  function shown(iso, options) {
+    var d = new Date(iso);
+    if (!iso || isNaN(d)) return '\u2013';
+    options.timeZone = ZONE;
+    return new Intl.DateTimeFormat(LOCALE, options).format(d);
+  }
   var fmt = {
-    dateTime: function (iso) {
-      var d = new Date(iso);
-      if (!iso || isNaN(d)) return '–';
-      return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(d);
-    },
-    time: function (iso) {
-      var d = new Date(iso);
-      if (!iso || isNaN(d)) return '–';
-      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(d);
-    },
+    date: function (iso) { return shown(iso, { day: 'numeric', month: 'short', year: 'numeric' }); },
+    /** '2026-11-18' (an India day, as the server sends it) → '18 Nov'. */
+    day: function (day) { return shown(day + 'T12:00:00+05:30', { day: 'numeric', month: 'short' }); },
+    dateTime: function (iso) { return shown(iso, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); },
+    time: function (iso) { return shown(iso, { hour: 'numeric', minute: '2-digit' }); },
     ago: function (iso) {
       var d = new Date(iso);
       if (!iso || isNaN(d)) return '–';
@@ -59,7 +83,7 @@
       if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
       var days = Math.round(hours / 24);
       if (days < 7) return days + (days === 1 ? ' day ago' : ' days ago');
-      return fmt.dateTime(iso);
+      return fmt.date(iso); // callers put the exact time in a tooltip
     },
     until: function (iso) {
       var left = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
@@ -151,6 +175,77 @@
     button.classList.toggle('is-busy', !!on);
     if (on) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy');
   }
+  var dialogN = 0;
+  /**
+   * A dialog with fields. It stays open until opts.submit(values) succeeds, and shows what the server
+   * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
+   * opts: { title, text, submitLabel, danger, submit(values) → Promise,
+   *         fields: [{ name, label, type: 'text' | 'textarea' | 'number' | 'select' | 'radio', value, required,
+   *                    maxlength, min, max, placeholder, hint, options: [{ value, label, hint }] }] }
+   */
+  function formDialog(opts) {
+    return openDialog(function (close) {
+      var uid = 'acf' + (++dialogN) + '-', controls = {}, errors = {};
+      var banner = el('div', { class: 'alert alert-bad', role: 'alert', hidden: true }, [icon('alert'), el('span')]);
+      var submitBtn = el('button', { type: 'submit', class: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary'), text: opts.submitLabel || 'Save' });
+      function fieldRow(f) {
+        var id = uid + f.name, err = el('p', { class: 'err', id: id + '-err', hidden: true }), control, row;
+        errors[f.name] = err;
+        if (f.type === 'radio') {
+          var radios = f.options.map(function (o, i) {
+            var input = el('input', { type: 'radio', name: id, id: id + '-' + i, value: o.value, checked: String(o.value) === String(f.value) });
+            return el('label', { class: 'choice', for: id + '-' + i }, [input, el('span', null, [el('span', { class: 'choice-label', text: o.label }), o.hint ? el('span', { class: 'choice-hint', text: o.hint }) : null])]);
+          });
+          controls[f.name] = { read: function () { var on = row.querySelector('input:checked'); return on ? on.value : ''; }, node: null, first: function () { return row.querySelector('input'); } };
+          row = el('fieldset', { class: 'field choices' }, [el('legend', { text: f.label }), radios, f.hint ? el('p', { class: 'field-hint', text: f.hint }) : null, err]);
+          return row;
+        }
+        if (f.type === 'textarea') control = el('textarea', { id: id, rows: f.rows || 3, maxlength: f.maxlength, placeholder: f.placeholder });
+        else if (f.type === 'select') control = el('select', { id: id }, f.options.map(function (o) { return el('option', { value: o.value, text: o.label }); }));
+        else control = el('input', { id: id, type: f.type === 'number' ? 'number' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder, inputmode: f.type === 'number' ? 'numeric' : null, autocomplete: 'off' });
+        if (f.value !== undefined && f.value !== null) control.value = String(f.value);
+        controls[f.name] = { read: function () { return control.value; }, node: control, first: function () { return control; } };
+        return el('div', { class: 'field' }, [el('label', { for: id, text: f.label }), control, f.hint ? el('p', { class: 'field-hint', id: id + '-hint', text: f.hint }) : null, err]);
+      }
+      function showError(name, text) {
+        var c = controls[name], err = errors[name];
+        err.textContent = text || ''; err.hidden = !text;
+        if (c.node) { if (text) { c.node.setAttribute('aria-invalid', 'true'); c.node.setAttribute('aria-describedby', err.id); } else { c.node.removeAttribute('aria-invalid'); c.node.removeAttribute('aria-describedby'); } }
+      }
+      var fields = opts.fields || [];
+      var form = el('form', { novalidate: true }, [
+        el('div', { class: 'dialog-body' }, [el('h2', { text: opts.title }), opts.text ? el('p', { text: opts.text }) : null, fields.map(fieldRow), banner]),
+        el('div', { class: 'dialog-actions' }, [
+          el('button', { type: 'button', class: 'btn btn-quiet', text: 'Cancel', on: { click: function () { close(false); } } }),
+          submitBtn
+        ])
+      ]);
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        banner.hidden = true;
+        var values = {}, firstBad = null;
+        fields.forEach(function (f) {
+          var v = controls[f.name].read();
+          values[f.name] = typeof v === 'string' ? v.trim() : v;
+          var missing = f.required && !values[f.name];
+          showError(f.name, missing ? (f.requiredText || 'Fill this in.') : '');
+          if (missing && !firstBad) firstBad = controls[f.name].first();
+        });
+        if (firstBad) { firstBad.focus(); return; }
+        busy(submitBtn, true);
+        Promise.resolve().then(function () { return opts.submit(values); }).then(function (result) {
+          close(result === undefined ? true : result);
+        }, function (err) {
+          busy(submitBtn, false);
+          if (err && err.code === 'cancelled') return; // the password check was cancelled: stay here
+          var shown = false, name;
+          if (err && err.fields) for (name in err.fields) if (errors[name]) { showError(name, err.fields[name]); if (!shown) controls[name].first().focus(); shown = true; }
+          if (!shown) { banner.querySelector('span').textContent = (err && err.message) || 'Something went wrong. Try again.'; banner.hidden = false; }
+        });
+      });
+      return form;
+    }, opts.title);
+  }
 
   /* ---------- the API ---------- */
   function ApiError(status, code, message, fields) {
@@ -200,6 +295,127 @@
       }
       throw err;
     });
+  }
+
+  /**
+   * Saves a file the server makes (a spreadsheet). Same checks as AC.api(): sends you to sign-in when the
+   * session has ended, and asks for the password when the download is sensitive.
+   */
+  function download(path, button) {
+    function attempt() {
+      return fetch(path, { credentials: 'same-origin', cache: 'no-store' }).then(function (res) {
+        if (res.ok) {
+          var named = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '');
+          return res.blob().then(function (blob) {
+            lastContact = Date.now();
+            var url = URL.createObjectURL(blob), link = el('a', { href: url, download: named ? named[1] : 'download.csv', hidden: true });
+            doc.body.appendChild(link); link.click(); link.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+            return named ? named[1] : 'download.csv';
+          });
+        }
+        return res.json().catch(function () { return null; }).then(function (data) {
+          var err = (data && data.error) || {};
+          throw new ApiError(res.status, err.code || 'server_error', err.message || 'The download failed. Try again.', err.fields);
+        });
+      }, function () { throw new ApiError(0, 'network', "Couldn't reach TypeCraft. Check your connection and try again."); });
+    }
+    if (button) busy(button, true);
+    var done = function () { if (button) busy(button, false); };
+    return attempt().catch(function (err) {
+      if (signedOut(err)) return never();
+      if (err.status === 403 && err.code === 'reauth_required') {
+        return confirmPassword().then(function (ok) {
+          if (!ok) throw new ApiError(403, 'cancelled', 'Cancelled.');
+          return attempt().catch(function (again) { if (signedOut(again)) return never(); throw again; });
+        });
+      }
+      throw err;
+    }).then(function (name) { done(); return name; }, function (err) { done(); throw err; });
+  }
+
+  /**
+   * A filtered, paged table. The filters are the form's named controls (an empty value means "any"); they are
+   * kept in the address bar, so a reload or the Back button brings the same list back.
+   * cfg: { endpoint, form, table, body, pager, count, clear, columns, noun: [one, many], empty,
+   *        row(item, data) → <tr>, onData(data) }    → { reload(), query() }
+   */
+  function list(cfg) {
+    var controls = Array.prototype.slice.call(cfg.form.querySelectorAll('[name]'));
+    var state = {}, page = 1, seq = 0, timer = null;
+    function fromAddress() {
+      var q = new URLSearchParams(location.search);
+      controls.forEach(function (c) { state[c.name] = q.get(c.name) || ''; });
+      page = Math.max(1, parseInt(q.get('page'), 10) || 1);
+      show();
+    }
+    // a select may get its options later (plans come with the data): show the state again whenever they change
+    function show() {
+      controls.forEach(function (c) { if (c.value !== state[c.name]) c.value = state[c.name]; });
+      if (cfg.clear) cfg.clear.hidden = !filtered();
+    }
+    function filtered() { return controls.some(function (c) { return c.name !== 'sort' && state[c.name]; }); }
+    function query() {
+      var q = new URLSearchParams();
+      controls.forEach(function (c) { if (state[c.name]) q.set(c.name, state[c.name]); });
+      if (page > 1) q.set('page', String(page));
+      return q.toString();
+    }
+    function toAddress() { var qs = query(); history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '')); }
+    function message(kids) { clear(cfg.body); cfg.body.appendChild(el('tr', null, el('td', { class: 'empty-cell', colspan: cfg.columns }, kids))); }
+    function pagerFor(data) {
+      clear(cfg.pager);
+      cfg.pager.hidden = data.pages <= 1;
+      if (data.pages <= 1) return;
+      var go = function (to) { return function () { page = to; toAddress(); load(); cfg.table.scrollIntoView({ block: 'nearest' }); }; };
+      append(cfg.pager, [
+        el('button', { type: 'button', class: 'btn btn-quiet btn-sm', disabled: data.page <= 1, on: { click: go(data.page - 1) } }, [icon('arrowLeft'), el('span', { text: 'Previous' })]),
+        el('span', { class: 'pager-where', text: 'Page ' + data.page + ' of ' + data.pages }),
+        el('button', { type: 'button', class: 'btn btn-quiet btn-sm', disabled: data.page >= data.pages, on: { click: go(data.page + 1) } }, [el('span', { text: 'Next' }), icon('arrowRight')])
+      ]);
+    }
+    function load() {
+      var mine = ++seq, qs = query();
+      cfg.table.setAttribute('aria-busy', 'true');
+      api('GET', cfg.endpoint + (qs ? '?' + qs : '')).then(function (data) {
+        if (mine !== seq) return; // a newer search has been sent since
+        if (data.page > data.pages) { page = data.pages; toAddress(); load(); return; }
+        if (cfg.onData) cfg.onData(data);
+        show();
+        clear(cfg.body);
+        if (!data.items.length) message(filtered() ? 'Nothing matches. Try fewer filters.' : cfg.empty);
+        data.items.forEach(function (item) { cfg.body.appendChild(cfg.row(item, data)); });
+        cfg.table.removeAttribute('aria-busy');
+        cfg.count.textContent = data.total.toLocaleString('en-IN') + ' ' + (data.total === 1 ? cfg.noun[0] : cfg.noun[1]) + (filtered() ? ' match' + (data.total === 1 ? 'es' : '') : '');
+        pagerFor(data);
+      }, function (err) {
+        if (mine !== seq) return;
+        cfg.table.removeAttribute('aria-busy');
+        cfg.count.textContent = '';
+        cfg.pager.hidden = true;
+        message(["Couldn't load the list. " + err.message, el('button', { type: 'button', class: 'btn btn-quiet btn-sm', text: 'Try again', on: { click: load } })]);
+      });
+    }
+    function changed(control, wait) {
+      state[control.name] = control.value.trim();
+      page = 1;
+      if (cfg.clear) cfg.clear.hidden = !filtered();
+      clearTimeout(timer);
+      timer = setTimeout(function () { toAddress(); load(); }, wait);
+    }
+    controls.forEach(function (c) {
+      if (c.tagName === 'SELECT') c.addEventListener('change', function () { changed(c, 0); });
+      else c.addEventListener('input', function () { changed(c, 300); }); // typing: wait for a pause
+    });
+    cfg.form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); toAddress(); load(); });
+    if (cfg.clear) cfg.clear.addEventListener('click', function () {
+      controls.forEach(function (c) { if (c.name !== 'sort') state[c.name] = ''; });
+      page = 1; show(); toAddress(); load();
+    });
+    window.addEventListener('popstate', function () { fromAddress(); load(); });
+    fromAddress();
+    load();
+    return { reload: load, query: query };
   }
 
   /* ---------- the frame ---------- */
@@ -279,7 +495,8 @@
   window.AC = {
     base: base, boot: boot, me: me,
     can: function (permission) { return !!(me && me.permissions.indexOf(permission) !== -1); },
-    el: el, clear: clear, icon: icon, fmt: fmt, toast: toast, confirm: confirmDialog, busy: busy, api: api, ApiError: ApiError
+    el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, badge: badge, toast: toast, busy: busy,
+    confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, ApiError: ApiError
   };
   if (doc.querySelector('.app')) initFrame();
 })();

@@ -2,14 +2,38 @@
 // Each page's own script in site/console/ then asks for that page's data only.
 // Adding a page: add it here, list its module in ./modules.js with the same key and
 // path, and name the permission its API handlers check. See docs/ADMIN-CONSOLE.md §6.
-import { icon, esc } from '../layout.js';
-import { ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
+// A page with an id in its address has `match` and `names` in place of `path`, and keeps
+// its module's key so the sidebar shows where you are.
+import { esc } from '../layout.js';
+import { icon } from './icons.js';
+import { CONSOLE_BASE, ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
 import { LAYERS } from './permissions.js';
+import { LAYERS as MODULE_LAYERS } from './modules.js';
 
 const skeletonRows = (n, cols) => Array.from({ length: n }, () =>
   `<tr class="skeleton-row" aria-hidden="true">${Array.from({ length: cols }, (_, c) => `<td><span class="skeleton${c === 0 ? ' skeleton-wide' : ''}"></span></td>`).join('')}</tr>`).join('');
 
 /* ---------- Home ---------- */
+// What the current admin (/admin) looks after, by the console module that takes it over.
+const OLD_ADMIN = [['customers', 'customers'], ['payments', 'payments'], ['packages', 'packages'], ['emails', 'emails']];
+
+const wordList = (words) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
+
+/** The notice on Home: what is ready here and what the current admin still looks after.
+ *  Read from the module list, so it stays true as each module is built. */
+function phaseNotice(me) {
+  const built = MODULE_LAYERS.flatMap((layer) => layer.modules).filter((m) => m.path);
+  const open = built.filter((m) => me.permissions.includes(m.permission));
+  const waiting = OLD_ADMIN.filter(([key]) => !built.some((m) => m.key === key)).map(([, word]) => word);
+  const ready = open.length ? ` Ready here: ${open.map((m) => `<a href="${CONSOLE_BASE}${m.path}">${esc(m.label)}</a>`).join(', ')}.` : '';
+  const list = wordList(waiting);
+  const old = waiting.length
+    ? ` ${list.charAt(0).toUpperCase()}${list.slice(1)} ${waiting.length === 1 ? 'is' : 'are'} still managed in the current admin until ${waiting.length === 1 ? 'it is' : 'each one is'} rebuilt in this console.`
+    : '';
+  return `<div class="notice">${icon('info')}<div><p><strong>This console is being built in phases.</strong>${ready}${old}</p>
+<p><a href="/admin" target="_blank" rel="noopener">Open the current admin</a>. It uses your normal TypeCraft sign-in.</p></div></div>`;
+}
+
 function homeBody(me) {
   const role = ROLE_LABELS[me.role] || me.role;
   const canSetup = me.permissions.includes('settings.view');
@@ -24,8 +48,7 @@ function homeBody(me) {
 <p class="page-sub">You're signed in as ${esc(role)}.</p>
 </div>
 
-<div class="notice">${icon('info')}<div><p><strong>This console is being built in phases.</strong> Roles and permissions are ready here. Customers, payments, packages and emails are still managed in the current admin until each one is rebuilt in this console.</p>
-<p><a href="/admin" target="_blank" rel="noopener">Open the current admin</a>. It uses your normal TypeCraft sign-in.</p></div></div>
+${phaseNotice(me)}
 
 <div class="cols">
 <section class="panel" aria-labelledby="sessionTitle">
@@ -90,7 +113,7 @@ function rolesBody() {
 <div class="block-head"><h2 id="staffTitle">People with admin access</h2></div>
 <div class="notice notice-warn" id="ownerGap" role="alert" hidden>${icon('alert')}<div><p><strong id="ownerGapCount"></strong> Whoever signs up with that email first becomes Super Admin. Create the account now, or take the email out of OWNER_EMAILS.</p></div></div>
 <div class="table-panel">
-<table class="list" id="staff" aria-busy="true">
+<table class="list fold" id="staff" aria-busy="true">
 <thead><tr><th scope="col">Person</th><th scope="col" class="col-fit">Role</th><th scope="col" class="col-wide">Last admin sign-in</th><th scope="col" class="col-fit">Account</th></tr></thead>
 <tbody id="staffBody">${skeletonRows(2, 4)}</tbody>
 </table>
@@ -99,11 +122,107 @@ function rolesBody() {
 </section>`;
 }
 
+/* ---------- Customers ---------- */
+const option = ([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`;
+const select = (name, label, options) => `<label class="pick"><span class="vh">${esc(label)}</span><select name="${esc(name)}">${options.map(option).join('')}</select></label>`;
+
+function customersBody(me) {
+  const canExport = me.permissions.includes('customers.export');
+  return `<div class="page-head page-head-row">
+<div><h1>Customers</h1>
+<p class="page-sub">Everyone with a TypeCraft account. Open a customer to see their plan, payments and progress.</p></div>
+${canExport ? `<button type="button" class="btn btn-quiet" id="exportBtn">${icon('download')}<span>Download list</span></button>` : ''}
+</div>
+
+<form class="toolbar" id="filters" role="search" aria-label="Find customers">
+<div class="search">${icon('search')}<label class="vh" for="q">Search customers</label><input id="q" name="q" type="search" placeholder="Name, email or phone" autocomplete="off" spellcheck="false" maxlength="80"></div>
+${select('plan', 'Plan', [['', 'All plans'], ['free', 'Free'], ['paid', 'Any paid plan']])}
+${select('status', 'Account', [['', 'All accounts'], ['active', 'Active'], ['disabled', 'Disabled']])}
+${select('verified', 'Email', [['', 'Email: any'], ['1', 'Email verified'], ['0', 'Email not verified']])}
+${select('joined', 'Joined', [['', 'Joined: any time'], ['today', 'Joined today'], ['7d', 'Joined in the last 7 days'], ['30d', 'Joined in the last 30 days']])}
+${select('sort', 'Order', [['', 'Newest first'], ['oldest', 'Oldest first'], ['login', 'Last sign-in'], ['name', 'Name A to Z']])}
+<button type="button" class="btn-link" id="clearFilters" hidden>Clear filters</button>
+</form>
+
+<p class="list-meta" id="listCount" aria-live="polite">&nbsp;</p>
+<div class="table-panel">
+<table class="list fold" id="list" aria-busy="true">
+<thead><tr><th scope="col">Customer</th><th scope="col" class="col-wide">Phone</th><th scope="col">Plan</th><th scope="col" class="col-fit">Account</th><th scope="col" class="col-wide">Joined</th><th scope="col" class="col-wide">Last sign-in</th></tr></thead>
+<tbody id="listBody">${skeletonRows(8, 6)}</tbody>
+</table>
+</div>
+<nav class="pager" id="pager" aria-label="Pages" hidden></nav>`;
+}
+
+const lines = (n) => `<div class="loading-lines" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<span class="skeleton${i % 2 ? '' : ' skeleton-wide'}"></span>`).join('')}</div>`;
+const section = (id, title, inner, meta = '') => `<section class="block" aria-labelledby="${id}Title">
+<div class="block-head"><h2 id="${id}Title">${esc(title)}</h2>${meta}</div>
+<div id="${id}Body">${inner}</div>
+</section>`;
+
+function customerBody(me) {
+  const has = (k) => me.permissions.includes(k);
+  return `<a class="back" href="${esc(CONSOLE_BASE)}/customers">${icon('arrowLeft')}<span>Customers</span></a>
+
+<div class="empty empty-page" id="custMissing" hidden>
+<div class="empty-icon">${icon('help')}</div>
+<h1 id="custMissingTitle">Customer not found</h1>
+<p id="custMissingText">There is no account with this ID. It may have been deleted.</p>
+<a class="btn btn-quiet" href="${esc(CONSOLE_BASE)}/customers">Back to customers</a>
+</div>
+
+<div id="custPage" aria-busy="true">
+<div class="detail-head">
+<span class="avatar avatar-lg" id="custAvatar" aria-hidden="true"></span>
+<div class="detail-title"><h1 id="custName"><span class="skeleton skeleton-wide"></span></h1>
+<p class="page-sub" id="custEmail"><span class="skeleton"></span></p>
+<div class="badges" id="custBadges"></div></div>
+<div class="detail-actions" id="custActions"></div>
+</div>
+<p class="hint" id="custBlock" hidden></p>
+
+<div class="detail-grid">
+<div class="detail-main">
+${section('plan', 'Plan', lines(3))}
+${has('payments.view') ? section('orders', 'Payments', lines(3)) : ''}
+${section('progress', 'Progress', lines(4))}
+<section class="block" aria-labelledby="notesTitle">
+<div class="block-head"><h2 id="notesTitle">Notes</h2><span class="panel-meta">Only staff see these</span></div>
+${has('customers.notes') ? `<form class="note-form" id="noteForm" novalidate>
+<label class="vh" for="noteText">New note</label>
+<textarea id="noteText" name="body" rows="3" maxlength="2000" placeholder="For example: asked for an invoice copy by email on 12 Nov."></textarea>
+<p class="err" id="noteErr" hidden></p>
+<div class="note-form-foot"><span class="panel-meta" id="noteCount">0 of 2,000</span><button type="submit" class="btn btn-quiet btn-sm" id="noteBtn">Add note</button></div>
+</form>` : ''}
+<div id="notesBody">${lines(2)}</div>
+</section>
+${has('emails.view') ? section('emails', 'Emails sent', lines(3)) : ''}
+${has('audit.view') ? section('activity', 'Admin activity', lines(3), '<span class="panel-meta">Changes staff made to this account</span>') : ''}
+</div>
+<aside class="detail-side" aria-label="Account details">
+<section class="panel" aria-labelledby="accountTitle"><h2 id="accountTitle">Account</h2><div id="accountBody">${lines(5)}</div></section>
+<section class="panel" aria-labelledby="devicesTitle"><h2 id="devicesTitle">Devices and sign-ins</h2><div id="devicesBody">${lines(3)}</div></section>
+</aside>
+</div>
+</div>`;
+}
+
 export const PAGES = [
   { key: 'home', path: '', title: 'Home', crumbs: ['Home'], body: homeBody, scripts: ['home.js'] },
+  { key: 'customers', path: '/customers', title: 'Customers', crumbs: ['Core operations', 'Customers'],
+    permission: 'customers.view', body: customersBody, scripts: ['customers.js'] },
+  { key: 'customers', match: /^\/customers\/([\w-]{1,64})$/, names: ['id'], title: 'Customer', crumbs: ['Core operations', ['Customers', '/customers'], 'Customer'],
+    permission: 'customers.view', body: customerBody, scripts: ['customer.js'] },
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
 ];
 
-/** The page for a path below CONSOLE_BASE ('' is home), or null. */
-export const findConsolePage = (sub) => PAGES.find((p) => p.path === sub) || null;
+/** The page for a path below CONSOLE_BASE ('' is home): { page, params }, or null. */
+export function findConsolePage(sub) {
+  for (const page of PAGES) {
+    if (page.path !== undefined) { if (page.path === sub) return { page, params: {} }; continue; }
+    const m = sub.match(page.match);
+    if (m) return { page, params: Object.fromEntries(page.names.map((n, i) => [n, m[i + 1]])) };
+  }
+  return null;
+}

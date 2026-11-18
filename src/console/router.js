@@ -105,7 +105,8 @@ export async function serveConsole(request, env, ctx) {
 
   const me = await describe(env, who);
   const prefs = navPrefs(request);
-  const page = findConsolePage(sub);
+  const found = findConsolePage(sub);
+  const page = found && found.page;
   if (!page) {
     return html(request, url, 404, renderShell(me, { key: 'not-found', title: 'Page not found',
       body: messageBody('missing', 'Page not found', "There's no admin page at this address. It may have moved, or it isn't built yet.") }, prefs));
@@ -114,5 +115,5 @@ export async function serveConsole(request, env, ctx) {
     return html(request, url, 403, renderShell(me, { key: 'forbidden', title: 'No access',
       body: messageBody('forbidden', "Your role doesn't include this page", `${page.title} isn't part of the ${me.roleLabel} role. A Super Admin can change that under Roles and permissions.`) }, prefs));
   }
-  return html(request, url, 200, renderShell(me, { key: page.key, title: page.title, crumbs: page.crumbs, body: page.body(me), scripts: page.scripts }, prefs));
+  return html(request, url, 200, renderShell(me, { key: page.key, title: page.title, crumbs: page.crumbs, body: page.body(me, found.params), scripts: page.scripts, params: found.params }, prefs));
 }

@@ -12,7 +12,7 @@ export const LAYERS = [
     key: 'core', label: 'Core operations', hint: 'Run the business',
     modules: [
       { key: 'dashboard', label: 'Dashboard', icon: 'chart', phase: 2 },
-      { key: 'customers', label: 'Customers', icon: 'users', phase: 2 },
+      { key: 'customers', label: 'Customers', icon: 'users', path: '/customers', permission: 'customers.view' },
       { key: 'payments', label: 'Payments', icon: 'card', phase: 2 },
       { key: 'refunds', label: 'Refunds', icon: 'refresh', phase: 2 },
       { key: 'packages', label: 'Packages', icon: 'package', phase: 2 },

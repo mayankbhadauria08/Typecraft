@@ -2,19 +2,21 @@
 // layers, top bar) around each page body. Pure functions: no I/O here.
 // Styles and behaviour: site/console/console.css, console.js. No inline scripts or styles,
 // so the console's Content-Security-Policy can refuse both.
-import { icon, esc, scriptJson } from '../layout.js';
+import { esc, scriptJson } from '../layout.js';
+import { icon } from './icons.js';
 import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '1';
+export const CONSOLE_ASSETS = '2';
 const asset = (name) => `/site/console/${name}?v=${CONSOLE_ASSETS}`;
 
 const FONTS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap';
 const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='3' y='7' width='34' height='30' rx='8' fill='%23177a6c'/%3E%3Crect x='3' y='3' width='34' height='29' rx='8' fill='%2345cdb6'/%3E%3Cpath d='M12.5 11.5h15v4.2h-5.3V25h-4.4v-9.3h-5.3z' fill='%230c1615'/%3E%3C/svg%3E";
 const MARK = '<svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="7" width="34" height="30" rx="8" fill="#177a6c"/><rect x="3" y="3" width="34" height="29" rx="8" fill="#45cdb6"/><path d="M12.5 11.5h15v4.2h-5.3V25h-4.4v-9.3h-5.3z" fill="#0c1615"/></svg>';
 // icons the browser code draws (toasts, dialogs, tables): AC.icon() clones them from here
-const CLIENT_ICONS = ['check', 'x', 'alert', 'info', 'lock', 'shield', 'refresh', 'external', 'minus', 'clock', 'mail', 'user', 'users', 'eye'];
+const CLIENT_ICONS = ['check', 'x', 'alert', 'info', 'lock', 'shield', 'refresh', 'external', 'minus', 'clock', 'mail', 'user', 'users', 'eye',
+  'search', 'copy', 'note', 'trash', 'download', 'arrowLeft', 'arrowRight', 'chevronRight', 'calendar', 'card', 'devices', 'history', 'package', 'logout'];
 
 function head(title) {
   return `<!DOCTYPE html>
@@ -79,7 +81,12 @@ ${groups}
 function topbar(me, crumbs) {
   const first = String(me.user.fullName || '').trim().split(/\s+/)[0] || 'Account';
   const role = ROLE_LABELS[me.role] || me.role;
-  const trail = crumbs.map((c, i) => `<span class="${i === crumbs.length - 1 ? 'crumb is-here' : 'crumb'}">${esc(c)}</span>`).join('<span class="crumb-sep" aria-hidden="true">/</span>');
+  // a crumb is a label, or [label, path below CONSOLE_BASE] for one that links back
+  const trail = crumbs.map((c, i) => {
+    const here = i === crumbs.length - 1;
+    if (Array.isArray(c) && !here) return `<a class="crumb" href="${esc(CONSOLE_BASE + c[1])}">${esc(c[0])}</a>`;
+    return `<span class="${here ? 'crumb is-here' : 'crumb'}">${esc(Array.isArray(c) ? c[0] : c)}</span>`;
+  }).join('<span class="crumb-sep" aria-hidden="true">/</span>');
   return `<header class="top">
 <button type="button" class="icon-btn nav-open" id="navOpen" aria-label="Open navigation" aria-controls="side" aria-expanded="false">${icon('menu')}</button>
 <div class="crumbs">${trail}</div>
@@ -101,12 +108,12 @@ function topbar(me, crumbs) {
 }
 
 /**
- * A console page. `page`: { key, title, crumbs?, body, scripts? }; `me`: describe() from ./auth.js;
+ * A console page. `page`: { key, title, crumbs?, body, scripts?, params? }; `me`: describe() from ./auth.js;
  * `navPrefs`: which layers the person keeps open or closed.
  */
 export function renderShell(me, page, navPrefs = {}) {
   const crumbs = page.crumbs || [page.title];
-  const boot = { me, page: { key: page.key, title: page.title } };
+  const boot = { me, page: { key: page.key, title: page.title, params: page.params || {} } };
   const scripts = ['console.js', ...(page.scripts || [])].map((s) => `<script src="${asset(s)}" defer></script>`).join('\n');
   return `${head(page.title)}
 <body class="console">
