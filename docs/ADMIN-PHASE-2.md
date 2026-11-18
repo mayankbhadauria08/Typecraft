@@ -18,7 +18,7 @@ nothing is applied to the live database, without the owner's yes.
 | 4 | Subscriptions | built |
 | 5 | Learning access | built |
 | 6 | Packages | built |
-| 7 | Dashboard | not started |
+| 7 | Dashboard | built |
 | 8 | Search box | not started |
 | 9 | Full check, docs, pull request | not started |
 
@@ -257,19 +257,25 @@ touches new purchases only (subscriptions keep a copy of features and limits); c
 changes what every free user gets at once, and the page says so. Audit `package.create` and
 `package.update` with before and after.
 
-## 11. Step 7: Dashboard
+## 11. Step 7: Dashboard (built)
 
 Page: `/console/dashboard`. `GET /api/console/dashboard?range=today|7d|30d`
-(`dashboard.view`), one `DB.batch`.
+(`dashboard.view`), one `DB.batch`. The period is kept in the address.
 
-- Customers: new in the range, total, active learners. Plans: active per package, ending in
-  7 days. Payments: paid, failed, pending. Money (gross, refunds, net) only with
-  `revenue.view`. The previous period beside each figure.
-- Needs attention, each a link to a filtered page: orders pending over 15 minutes, pending
-  or failed refunds, failed emails, new messages, setup items that are off.
-- Chart of daily net revenue and sign-ups for 7 and 30 days: drawn as SVG by the page's
-  script, with a table for screen readers. No chart library.
-- A Refresh button. No automatic polling.
+- Customers: new in the range, learners who practised, all customers, paying customers and
+  plans ending in 7 days. Payments: made, failed, not paid yet. Money (in, refunds, after
+  refunds) only with `revenue.view`. Each figure beside the same number of days just before.
+- Needs attention, each a link to a filtered page, only what the role may open: payments not
+  confirmed after 15 minutes, refunds on their way or failed, failed emails (not the ones that
+  failed because sending is off), new contact messages (these two in the current admin), and
+  services not set up (with `settings.view`; the checklist is `setupItems()` in
+  `src/console/access-api.js`).
+- Charts (`site/console/charts.js`, SVG, no library): sign-ups per day and money in after
+  refunds per day (payments per day without `revenue.view`), at least 7 days. One hue,
+  `--chart`, checked against the surface in each theme (contrast, lightness, chroma). Hover
+  or arrow keys show a day; "Show the numbers" opens the same values as a table. Paid plans
+  in force as bars per package.
+- A Refresh button. No automatic polling; the last figures stay, dimmed, while new ones load.
 - The Home page notice (what is ready here, what is still in `/admin`) is read from
   `src/console/modules.js`: giving a module a `path` is all it needs.
 

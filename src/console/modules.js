@@ -11,7 +11,7 @@ export const LAYERS = [
   {
     key: 'core', label: 'Core operations', hint: 'Run the business',
     modules: [
-      { key: 'dashboard', label: 'Dashboard', icon: 'chart', phase: 2 },
+      { key: 'dashboard', label: 'Dashboard', icon: 'chart', path: '/dashboard', permission: 'dashboard.view' },
       { key: 'customers', label: 'Customers', icon: 'users', path: '/customers', permission: 'customers.view' },
       { key: 'payments', label: 'Payments', icon: 'card', path: '/payments', permission: 'payments.view' },
       { key: 'refunds', label: 'Refunds', icon: 'refresh', path: '/refunds', permission: 'refunds.view' },

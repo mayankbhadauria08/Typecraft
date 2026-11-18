@@ -169,6 +169,35 @@ ${me.permissions.includes('audit.view') ? panel('history', 'History', 3) : ''}
 </div>`;
 }
 
+/* ---------- Dashboard ---------- */
+const tiles = (id, n) => `<div class="tiles" id="${id}">${Array.from({ length: n }, () => '<div class="tile" aria-hidden="true"><span class="skeleton"></span><span class="skeleton skeleton-wide"></span></div>').join('')}</div>`;
+function dashboardBody(me) {
+  const money = me.permissions.includes('revenue.view');
+  return `<div class="page-head">
+<h1>Dashboard</h1>
+<p class="page-sub">How TypeCraft is doing, from the live data. Days are India days, and each figure is compared with the same number of days just before.</p>
+</div>
+<div class="dash-bar">
+<div class="seg" role="group" aria-label="Period" id="rangePick">
+<button type="button" data-range="today" aria-pressed="false">Today</button><button type="button" data-range="7d" aria-pressed="true">Last 7 days</button><button type="button" data-range="30d" aria-pressed="false">Last 30 days</button>
+</div>
+<button type="button" class="btn btn-quiet btn-sm" id="refreshBtn">${icon('refresh')}<span>Refresh</span></button>
+<span class="list-meta" id="dashUpdated" aria-live="polite"></span>
+</div>
+
+<div id="dash" aria-busy="true">
+<section class="block" aria-labelledby="attentionTitle"><div class="block-head"><h2 id="attentionTitle">Needs attention</h2></div><div id="attentionBody">${lines(2)}</div></section>
+<section class="block" aria-labelledby="customersTitle"><div class="block-head"><h2 id="customersTitle">Customers</h2></div>${tiles('customerTiles', 4)}</section>
+<section class="block" aria-labelledby="paymentsTitle"><div class="block-head"><h2 id="paymentsTitle">Payments</h2></div>${tiles('paymentTiles', 3)}</section>
+${money ? `<section class="block" aria-labelledby="moneyTilesTitle"><div class="block-head"><h2 id="moneyTilesTitle">Money</h2></div>${tiles('moneyTiles', 3)}</section>` : ''}
+<div class="dash-cols">
+<section class="block" aria-labelledby="plansTitle"><div class="block-head"><h2 id="plansTitle">Paid plans in force</h2><span class="panel-meta" id="plansMeta"></span></div><div id="plansBody">${lines(4)}</div></section>
+<section class="block" aria-labelledby="signupsTitle"><div class="block-head"><h2 id="signupsTitle">Sign-ups per day</h2></div><div class="chart" id="signupsChart">${lines(3)}</div></section>
+</div>
+<section class="block" aria-labelledby="moneyTitle"><div class="block-head"><h2 id="moneyTitle">${money ? 'Money in per day, after refunds' : 'Payments per day'}</h2></div><div class="chart" id="moneyChart">${lines(3)}</div></section>
+</div>`;
+}
+
 export const CORE_PAGES = [
   { key: 'payments', path: '/payments', title: 'Payments', crumbs: ['Core operations', 'Payments'],
     permission: 'payments.view', body: paymentsBody, scripts: ['payments.js'] },
@@ -180,6 +209,8 @@ export const CORE_PAGES = [
     permission: 'subscriptions.view', body: subscriptionsBody, scripts: ['plan-actions.js', 'subscriptions.js'] },
   { key: 'access', path: '/access', title: 'Learning access', crumbs: ['Core operations', 'Learning access'],
     permission: 'access.view', body: accessBody, scripts: ['access-actions.js', 'access.js'] },
+  { key: 'dashboard', path: '/dashboard', title: 'Dashboard', crumbs: ['Core operations', 'Dashboard'],
+    permission: 'dashboard.view', body: dashboardBody, scripts: ['charts.js', 'dashboard.js'] },
   { key: 'packages', path: '/packages', title: 'Packages', crumbs: ['Core operations', 'Packages'],
     permission: 'packages.view', body: packagesBody, scripts: ['packages.js'] },
   { key: 'packages', path: '/packages/new', title: 'New package', crumbs: ['Core operations', ['Packages', '/packages'], 'New package'],

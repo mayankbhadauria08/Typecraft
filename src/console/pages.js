@@ -27,7 +27,7 @@ function phaseNotice(me) {
   const ready = open.length ? ` Ready here: ${open.map((m) => `<a href="${CONSOLE_BASE}${m.path}">${esc(m.label)}</a>`).join(', ')}.` : '';
   const list = wordList(waiting);
   const old = waiting.length
-    ? ` ${list.charAt(0).toUpperCase()}${list.slice(1)} ${waiting.length === 1 ? 'is' : 'are'} still managed in the current admin until ${waiting.length === 1 ? 'it is' : 'each one is'} rebuilt in this console.`
+    ? ` ${list.charAt(0).toUpperCase()}${list.slice(1)} are still managed in the current admin until ${waiting.length === 1 ? 'they are' : 'each one is'} rebuilt in this console.`
     : '';
   return `<div class="notice">${icon('info')}<div><p><strong>This console is being built in phases.</strong>${ready}${old}</p>
 <p><a href="/admin" target="_blank" rel="noopener">Open the current admin</a>. It uses your normal TypeCraft sign-in.</p></div></div>`;
