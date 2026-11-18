@@ -104,5 +104,5 @@ version never stacks on an older one). Used by the app, the console pages and th
 ## 5. Going live
 
 1. Bookmark, then apply `migrations/0007_course.sql` (adds two tables; changes no rows). Never
-   `wrangler d1 migrations apply`.
+   `wrangler d1 migrations apply`. **Done 19 Nov 2026** (bookmark in `docs/LAUNCH.md` §1e).
 2. Merge. Learners see "Update ready, reload" once.

@@ -88,6 +88,11 @@ one builds on it.
    here), then apply `migrations/0007_course.sql` (two new tables, `course_drafts` and
    `course_releases`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('course_drafts', 'course_releases')`.
+   **Done 19 Nov 2026, 02:50 IST.** Restore bookmark taken just before:
+   `00000271-00000000-00005127-32b399a69ed595eccfa208e1a1804266` (D1 console:
+   `/restore <bookmark>`). Checked after: both tables exist and are empty; users 2,
+   lesson_scores 2, audit_logs 2, the same as before; 57 tables became 59. Live site answered
+   normally afterwards.
 2. **[You] Merge the Phase 3 pull request.** Learners see "Update ready, reload" once (`sw.js`
    changed). Until someone publishes a change, learners get the course exactly as today.
 3. Course changes reach learners only when a Super Admin publishes them (Console, Courses), with a
