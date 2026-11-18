@@ -17,7 +17,7 @@ the live database, without the owner's yes.
 | 3 | Exercises: practice packs | built |
 | 4 | Student progress | built |
 | 5 | Learning analytics | built |
-| 6 | Full check, docs, pull request | not started |
+| 6 | Full check, docs, pull request | built |
 | — | Unlock conditions | built (PR #20, `docs/UNLOCK-RULES.md`) |
 
 ## 1. Decisions

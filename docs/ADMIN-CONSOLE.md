@@ -48,7 +48,7 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 a link.
 
 1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
-2. **Learning operations**: Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (built: docs/UNLOCK-RULES.md), Student progress, Learning analytics
+2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth**: Coupons, Promotions, Email campaigns, Support, Notifications, Business reports
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
 
@@ -184,6 +184,10 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
+- `0007_course.sql` (Phase 3): `course_drafts`, `course_releases`. Two new tables, no row
+  changes, safe to run twice. Before it is applied, the course pages answer "not switched on yet"
+  (503) and learners get the course exactly as it is in the code. Go-live steps:
+  `docs/ADMIN-PHASE-3.md` §5 and `docs/LAUNCH.md` §1e.
 - `0006_admin_core.sql` (Phase 2): `customer_notes`, `access_overrides`, `refund_choices`, and three
   indexes on existing tables. Additive only, safe to run twice. Before it is applied, the customer pages and the
   other parts that need it answer "not switched on yet" (503), lists still work, and nothing
@@ -240,5 +244,7 @@ with the fake Razorpay in `tests/fake-razorpay.mjs`), `console-plans` (subscript
 access, packages), `console-overview` (dashboard, search); `tests/app-plan.test.mjs` covers
 what learning access changes for customers.
 Unlock conditions: `tests/unlock-rules.test.mjs` (docs/UNLOCK-RULES.md §7).
+Phase 3: `tests/console-course.test.mjs` (course edits, drafts, publishing, versions, practice
+packs), `console-progress` (student progress), `console-analytics` (learning analytics).
 The other test files still pass unchanged apart from two expectations that follow the new
 defaults (an Admin cannot change settings or refund until allowed).
