@@ -770,8 +770,41 @@ function backToDashboard(){
   stopTimers();
   saveKeyStats();
   if(Account.pendingServerData){ const d = Account.pendingServerData; Account.pendingServerData = null; applyServerProgress(d); }
+  CourseEdits.applyPending(false);
   renderHome();
 }
+
+/* ---- course edits published in the admin console (docs/ADMIN-PHASE-3.md, shared/course-edits.js):
+   lesson titles, tips and texts, level and module names. The last version this browser saw is
+   applied at start-up; a newer one is applied between lessons, never in the middle of one. ---- */
+const COURSE_EDITS_KEY = 'typingMasterCourse';
+const CourseEdits = {
+  version: 0, pending: null, checkedAt: 0,
+  start(){
+    try{
+      const c = JSON.parse(localStorage.getItem(COURSE_EDITS_KEY) || 'null');
+      if(c && typeof c.version === 'number' && c.edits){ TC_EDITS.apply(c.edits); this.version = c.version; }
+    }catch(e){}
+    this.check();
+  },
+  check(){
+    this.checkedAt = Date.now();
+    api('GET', '/api/course').then(res => {
+      if(!res.ok || typeof res.version !== 'number' || res.version === this.version) return;
+      this.pending = { version: res.version, edits: res.edits || {} };
+      this.applyPending(true);
+    });
+  },
+  /** repaint: draw the home screen again (false when the caller is about to). */
+  applyPending(repaint){
+    if(!this.pending || document.documentElement.classList.contains('in-lesson')) return;
+    const p = this.pending; this.pending = null;
+    TC_EDITS.apply(p.edits); this.version = p.version;
+    try{ localStorage.setItem(COURSE_EDITS_KEY, JSON.stringify(p)); }catch(e){}
+    if(activeTier !== 'all' && !LEVELS.some(L => L.name === activeTier)) activeTier = 'all';   // a level was renamed
+    if(repaint && homeView.style.display !== 'none') renderHome();
+  },
+};
 function openFunMode(){
   document.documentElement.classList.remove('in-lesson');
   hideExtraViews(); setNavCurrent('funSelectView'); closeThemeMenu();
@@ -2630,6 +2663,7 @@ document.addEventListener('visibilitychange', () => {
   if(document.visibilityState !== 'visible') return;
   if(Account.user && Date.now() - Plan.loadedAt > 30000) Plan.load();
   else if(!Account.user && Date.now() - Plan.rulesAt > 60000) Plan.loadRules();
+  if(Date.now() - CourseEdits.checkedAt > 300000) CourseEdits.check();
 });
 
 /* ---- init ---- */
@@ -2649,6 +2683,7 @@ document.addEventListener('visibilitychange', () => {
   hideExtraViews(); setNavCurrent('homeView');
   document.getElementById('arcadePlay').style.display='none';
   rebuildGuestProgress();
+  CourseEdits.start(); // the last course edits this browser saw at once, the current ones when the server answers
   Plan.loadRules();   // the last known rules at once, the current ones when the server answers
   renderHome();
   initAccount(); // async: signs you back in and loads your account's progress, if there is a server

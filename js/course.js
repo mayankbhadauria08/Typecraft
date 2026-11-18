@@ -748,8 +748,14 @@ function dailyText(dateStr){
 
 const STEP_LABEL = { watch:'Watch', character:'Keys', mixed:'Mixed', word:'Words', paragraph:'Sentences', challenge:'Challenge', timed:'Timed test', sprint:'Sprints', boss:'Boss', intro:'Meet the keyboard', lock:'Accuracy lock', exam:'Exam' };
 
+/* After lesson texts change (shared/course-edits.js), word pools and arcade sets are worked out again. */
+function resetCaches(){
+  Object.keys(wordPoolCache).forEach(k => { delete wordPoolCache[k]; });
+  Object.keys(arcadeCache).forEach(k => { delete arcadeCache[k]; });
+}
+
 root.TC_COURSE = {
-  lessons, byId, steps, stepText, bossWords, wordPool, allowedThrough, placementText, dailyText, STEP_LABEL,
+  lessons, byId, steps, stepText, bossWords, wordPool, allowedThrough, placementText, dailyText, STEP_LABEL, TIER, resetCaches,
   WORDS: { COMMON: COMMON_WORDS, TOP100, TOP300, PROVERBS, PROSE },
   gen: { generateFromTokens, generateFromPool, generateMixed, generateParagraph, pickParagraph, timedText, challengeText, sprintText },
 };

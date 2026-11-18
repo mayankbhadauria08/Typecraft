@@ -132,7 +132,7 @@ export function kit(S, { ipPrefix = '10.60.0.' } = {}) {
 export function assertNoInlineCode(html) {
   for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
     // the console's own scripts, and the shared course rules from /shared/
-    assert.ok(/\bsrc="\/(site\/console|shared)\/[\w.-]+\?v=\w+"/.test(attrs) ? body === '' : /type="application\/json"/.test(attrs), `inline script: ${attrs}`);
+    assert.ok(/\bsrc="\/(site\/console|shared|js)\/[\w.-]+\?v=\w+"/.test(attrs) ? body === '' : /type="application\/json"/.test(attrs), `inline script: ${attrs}`);
   }
   assert.ok(!/\sstyle="/.test(html), 'no inline styles');
   assert.ok(!/\son[a-z]+="/.test(html), 'no inline event handlers');

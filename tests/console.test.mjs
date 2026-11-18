@@ -317,10 +317,12 @@ test('defaults: Support cannot refund, manage administrators, or touch settings;
   for (const k of ['payments.refund', 'admins.manage', 'roles.manage', 'settings.view', 'settings.manage', 'audit.view', 'customers.manage', 'subscriptions.manage', 'packages.manage']) {
     assert.ok(!support.includes(k), `support must not have ${k}`);
   }
-  assert.deepEqual(support.sort(), ['access.view', 'customers.notes', 'customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.recheck', 'payments.view', 'refunds.view', 'subscriptions.view', 'support.manage', 'support.view', 'unlock.view']);
+  assert.deepEqual(support.sort(), ['access.view', 'analytics.view', 'course.view', 'customers.notes', 'customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.recheck',
+    'payments.view', 'progress.view', 'refunds.view', 'subscriptions.view', 'support.manage', 'support.view', 'unlock.view']);
+  for (const k of ['course.edit', 'course.publish']) assert.ok(!support.includes(k), `support must not have ${k}`);
   for (const k of ['customers.export', 'customers.manage', 'payments.export']) assert.ok(!support.includes(k), `support must not have ${k}`);
-  for (const k of ['payments.refund', 'settings.manage', 'roles.manage', 'admins.manage', 'unlock.manage']) assert.ok(!admin.includes(k), `admin must not have ${k} by default`);
-  assert.equal(admin.length, 25);
+  for (const k of ['payments.refund', 'settings.manage', 'roles.manage', 'admins.manage', 'unlock.manage', 'course.publish']) assert.ok(!admin.includes(k), `admin must not have ${k} by default`);
+  assert.equal(admin.length, 29);
   assert.deepEqual(await keys('learner'), []); assert.deepEqual(await keys(null), []);
   await assert.rejects(() => can(A.env, 'admin', 'no.such.permission'), /unknown permission/);
   // every permission belongs to one of the four layers

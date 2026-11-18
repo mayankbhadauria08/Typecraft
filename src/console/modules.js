@@ -23,14 +23,14 @@ export const LAYERS = [
   {
     key: 'learning', label: 'Learning operations', hint: 'Control the typing platform',
     modules: [
-      { key: 'courses', label: 'Courses', icon: 'book', phase: 3 },
-      { key: 'course-modules', label: 'Modules', icon: 'layers', phase: 3 },
-      { key: 'levels', label: 'Levels', icon: 'trend', phase: 3 },
-      { key: 'lessons', label: 'Lessons', icon: 'keyboard', phase: 3 },
-      { key: 'exercises', label: 'Exercises', icon: 'target', phase: 3 },
+      { key: 'courses', label: 'Courses', icon: 'book', path: '/course', permission: 'course.view' },
+      { key: 'course-modules', label: 'Modules', icon: 'layers', path: '/course/modules', permission: 'course.view' },
+      { key: 'levels', label: 'Levels', icon: 'trend', path: '/course/levels', permission: 'course.view' },
+      { key: 'lessons', label: 'Lessons', icon: 'keyboard', path: '/course/lessons', permission: 'course.view' },
+      { key: 'exercises', label: 'Exercises', icon: 'target', path: '/course/exercises', permission: 'course.view' },
       { key: 'access-rules', label: 'Unlock conditions', icon: 'lock', path: '/unlock', permission: 'unlock.view' },
-      { key: 'progress', label: 'Student progress', icon: 'history', phase: 3 },
-      { key: 'analytics', label: 'Learning analytics', icon: 'chart', phase: 3 },
+      { key: 'progress', label: 'Student progress', icon: 'history', path: '/progress', permission: 'progress.view' },
+      { key: 'analytics', label: 'Learning analytics', icon: 'chart', path: '/learning-analytics', permission: 'analytics.view' },
     ],
   },
   {

@@ -5,7 +5,7 @@ import { HttpError, json, nowIso } from './http.js';
 import { requireSession } from './session.js';
 import { META, normalizeEvent, processEvents, countRejects } from './pipeline.js';
 import { entitlementsFor, has } from './entitlements.js';
-import { PACKS, PACK_BY_ID } from './content-packs.js';
+import { packsFor } from './course-store.js';   // the packs in code, with the published edits (docs/ADMIN-PHASE-3.md)
 
 export const PACK_FEATURE = 'exercises.premium';
 
@@ -24,12 +24,12 @@ async function listPacks(request, env) {
   const { user } = await requireSession(env, request);
   const ent = await entitlementsFor(env, user.id);
   const locked = !has(ent, PACK_FEATURE);
-  return json({ packs: PACKS.map((p) => summary(p, locked)) });
+  return json({ packs: (await packsFor(env)).map((p) => summary(p, locked)) });
 }
 
 async function getPack(request, env, ctx, params) {
   const { user } = await requireSession(env, request);
-  const pack = PACK_BY_ID[params.id];
+  const pack = (await packsFor(env)).find((p) => p.id === params.id);
   if (!pack) throw new HttpError(404, 'not_found', 'There is no practice pack with that name.');
   const ent = await entitlementsFor(env, user.id);
   if (!has(ent, PACK_FEATURE)) return planRequired(PACK_FEATURE, 'Practice packs are part of the Pro plan and above. See the plans to unlock them.');
