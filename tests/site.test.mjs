@@ -38,6 +38,18 @@ test('every public page renders with a title, one h1, a canonical link and a CSP
   }
 });
 
+test('the CSP lets Cloudflare Web Analytics load and report on site pages, not in the console', async () => {
+  const cookie = await signup('analytics-csp@example.com', '203.0.113.77');
+  for (const path of ['/', '/exam-practice', '/verify', '/app']) {
+    const csp = (await get(path, { cookie })).headers.get('content-security-policy') || '';
+    const directive = (name) => (csp.split(';').map((d) => d.trim()).find((d) => d.startsWith(name + ' ')) || '');
+    assert.match(directive('script-src'), /https:\/\/static\.cloudflareinsights\.com/, `${path}: beacon script allowed`);
+    assert.match(directive('connect-src'), /https:\/\/cloudflareinsights\.com/, `${path}: beacon report allowed`);
+  }
+  const consoleCsp = (await get('/console/login')).headers.get('content-security-policy') || '';
+  assert.doesNotMatch(consoleCsp, /cloudflareinsights/, 'the admin console stays unmeasured');
+});
+
 test('host rules: www goes to the apex; workers.dev pages are noindex', async () => {
   const w = await get('/pricing?x=1', { host: 'https://www.typecrafttyping.in' });
   assert.equal(w.status, 301);
