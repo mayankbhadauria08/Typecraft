@@ -14,7 +14,7 @@ import { HttpError, json, readJson, fieldError, nowIso, clientIp } from '../http
 import { uuid } from '../crypto.js';
 import { audit } from '../billing.js';
 import { requireAdmin } from './session.js';
-import { Binder, PAGE_SIZE, DAY_MS, pageOf, offsetOf, paged, like, oneOf, idParam, reasonOf } from './lib.js';
+import { Binder, PAGE_SIZE, DAY_MS, pageOf, offsetOf, paged, like, oneOf, idParam, reasonOf, assertNotOwnAccount } from './lib.js';
 
 const META = globalThis.TC_META;
 // the arcade's names (they live in js/games/*.js, for the browser); the ids are the shared rules' list
@@ -81,6 +81,7 @@ export async function postAccess(request, env, ctx, params) {
   const DB = env.DB;
   const u = await DB.prepare('SELECT id FROM users WHERE id = ?1').bind(idParam(params.id, 'Customer not found.')).first();
   if (!u) throw new HttpError(404, 'not_found', 'Customer not found.');
+  assertNotOwnAccount(who, u.id);
   const body = await readJson(request);
   const kind = oneOf(body.kind, ['lesson', 'game'], null);
   if (!kind) throw fieldError({ kind: 'Choose a lesson or a game.' });
@@ -122,6 +123,7 @@ export async function postAccessEnd(request, env, ctx, params) {
   const DB = env.DB;
   const a = await DB.prepare('SELECT * FROM access_overrides WHERE id = ?1').bind(idParam(params.id, 'Exception not found.')).first();
   if (!a) throw new HttpError(404, 'not_found', 'Exception not found.');
+  assertNotOwnAccount(who, a.user_id);
   const body = await readJson(request);
   const reason = reasonOf(body, { required: false });
   const now = nowIso();

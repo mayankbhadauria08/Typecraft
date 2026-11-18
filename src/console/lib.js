@@ -56,6 +56,14 @@ export const istStamp = (iso) => {
   return Number.isFinite(t) ? new Date(t + IST_MS).toISOString().slice(0, 16).replace('T', ' ') : '';
 };
 
+/* ---------- who may change what ---------- */
+/** True when `who` may not change what this account gets: Admin and Support never change their own
+ *  plan, access or payments; a Super Admin may, to try things out. */
+export const ownAccount = (who, userId) => userId === who.user.id && who.role !== 'owner';
+export function assertNotOwnAccount(who, userId) {
+  if (ownAccount(who, userId)) throw new HttpError(403, 'forbidden', "You can't change your own account here. Ask a Super Admin.");
+}
+
 /* ---------- input ---------- */
 /** The reason an administrator gives for a change: 3 to 300 characters. */
 export function reasonOf(body, { required = true } = {}) {

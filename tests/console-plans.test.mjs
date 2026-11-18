@@ -527,3 +527,30 @@ test('packages pages: frames by permission; Support may look, not change', async
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
   }
 });
+
+test('Admin and Support do not change their own plans or access; a Super Admin may, to try things out', async () => {
+  const self = admin.who.id;
+  let r = await admin('POST', `/api/console/customers/${self}/subscriptions`, { packageId: 'premium', ...reasons });
+  assert.equal(r.status, 403); assert.match(r.body.error.message, /your own account/);
+  r = await admin('POST', `/api/console/customers/${self}/access`, { kind: 'game', target: 'storm', effect: 'allow', ...why });
+  assert.equal(r.status, 403);
+  // a plan someone else gave this admin cannot be extended or ended by the admin either
+  const given = (await owner('POST', `/api/console/customers/${self}/subscriptions`, { packageId: 'starter', ...reasons })).body.subscription;
+  assert.equal((await admin('POST', `/api/console/subscriptions/${given.id}/extend`, { days: 30, ...reasons })).status, 403);
+  assert.equal((await admin('POST', `/api/console/subscriptions/${given.id}/revoke`, reasons)).status, 403);
+  const page = (await admin('GET', `/api/console/customers/${self}`)).body;
+  assert.deepEqual([page.can.plans, page.can.access], [false, false], 'and the buttons are not offered');
+  assert.match(page.can.manageBlock, /only a Super Admin can change it, its plan or its access/, 'and the page says why');
+  // Support (no customers.manage) who was allowed to change plans is told too
+  await K.setPermission('support', 'subscriptions.manage', true);
+  assert.match((await support('GET', `/api/console/customers/${support.who.id}`)).body.can.manageBlock, /your own account/);
+  r = await support('POST', `/api/console/customers/${support.who.id}/subscriptions`, { packageId: 'premium', ...reasons });
+  assert.equal(r.status, 403); assert.match(r.body.error.message, /your own account/);
+  await K.setPermission('support', 'subscriptions.manage', false);
+  assert.equal((await support('GET', `/api/console/customers/${support.who.id}`)).body.can.manageBlock, null);
+  // the owner may, on their own account
+  r = await owner('POST', `/api/console/customers/${owner.who.id}/subscriptions`, { packageId: 'starter', days: 1, reason: 'Trying the paid plan' });
+  assert.equal(r.status, 201);
+  assert.equal((await owner('POST', `/api/console/subscriptions/${given.id}/revoke`, reasons)).status, 200);
+  await K.run('DELETE FROM user_subscriptions WHERE id = ?1', r.body.subscription.id);
+});

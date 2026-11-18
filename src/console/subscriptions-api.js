@@ -15,7 +15,7 @@ import { hitLimit } from '../session.js';
 import { audit } from '../billing.js';
 import { entitlementsFor } from '../entitlements.js';
 import { requireAdmin } from './session.js';
-import { Binder, PAGE_SIZE, DAY_MS, pageOf, offsetOf, paged, like, oneOf, idParam, reasonOf } from './lib.js';
+import { Binder, PAGE_SIZE, DAY_MS, pageOf, offsetOf, paged, like, oneOf, idParam, reasonOf, assertNotOwnAccount } from './lib.js';
 
 /** A date column moved by `mod` ('+7 days'), in the same text form as toISOString(). */
 const shift = (column, mod) => `strftime('%Y-%m-%dT%H:%M:%fZ', ${column}, ${mod})`;
@@ -97,6 +97,7 @@ export async function postGrant(request, env, ctx, params) {
   const DB = env.DB;
   const u = await DB.prepare('SELECT id FROM users WHERE id = ?1').bind(idParam(params.id, 'Customer not found.')).first();
   if (!u) throw new HttpError(404, 'not_found', 'Customer not found.');
+  assertNotOwnAccount(who, u.id);
   const body = await readJson(request);
   const pkg = typeof body.packageId === 'string' && /^[a-z][a-z0-9-]{0,30}$/.test(body.packageId)
     ? await DB.prepare('SELECT * FROM packages WHERE id = ?1').bind(body.packageId).first() : null;
@@ -128,6 +129,7 @@ function daysOf(body, max) {
 export async function postExtend(request, env, ctx, params) {
   const who = await requireAdmin(env, request, 'subscriptions.manage');
   const s = await subRow(env, params.id);
+  assertNotOwnAccount(who, s.user_id);
   const body = await readJson(request);
   const days = daysOf(body, 365);
   const reason = reasonOf(body);
@@ -155,6 +157,7 @@ export async function postExtend(request, env, ctx, params) {
 export async function postRevoke(request, env, ctx, params) {
   const who = await requireAdmin(env, request, 'subscriptions.manage');
   const s = await subRow(env, params.id);
+  assertNotOwnAccount(who, s.user_id);
   const body = await readJson(request);
   const reason = reasonOf(body);
   const now = nowIso();

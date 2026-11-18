@@ -552,3 +552,23 @@ test("Razorpay's notice of a refund handled before the console saved its choice:
     assert.deepEqual(trail.map((a) => [a.action, a.actor_id]), [['refund.processed', null], ['subscription.revoke', owner.who.id]]);
   } finally { fake.onRefund = null; }
 });
+
+test('no one refunds a payment of their own account except a Super Admin', async () => {
+  const b = await bought('pro');
+  // an Admin with the refund permission, refunding a payment of their own account
+  await K.setPermission('admin', 'payments.refund', true);
+  try {
+    const me = await K.account({ role: 'admin', name: 'Self Refund', email: 'self-refund@example.com' });
+    const o = (await me.learner('POST', '/api/checkout/order', { packageId: 'starter' })).body;
+    const p = fake.pay(o.razorpayOrderId);
+    const sig = createHmac('sha256', KEY_SECRET).update(`${o.razorpayOrderId}|${p.id}`).digest('hex');
+    assert.equal((await me.learner('POST', '/api/checkout/verify', { orderId: o.orderId, razorpay_order_id: o.razorpayOrderId, razorpay_payment_id: p.id, razorpay_signature: sig })).body.status, 'paid');
+    const row = await K.one('SELECT id FROM payments WHERE razorpay_payment_id = ?1', p.id);
+    const c = await K.consoleLogin(me);
+    const r = await send(c, { paymentId: row.id });
+    assert.equal(r.status, 403); assert.match(r.body.error.message, /your own account/);
+    const page = (await c('GET', `/api/console/payments/${o.orderId}`)).body;
+    assert.deepEqual([page.can.refund, page.can.refundBlock], [false, 'This is your own payment. Ask a Super Admin to refund it.']);
+    assert.equal((await send(c, { paymentId: b.paymentId, amountPaise: 100 })).status, 201, "someone else's payment is fine");
+  } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'payments.refund'"); }
+});

@@ -15,7 +15,7 @@ import * as rzp from '../razorpay.js';
 import { audit, reconcileOrder } from '../billing.js';
 import { requireAdmin } from './session.js';
 import { permissionsFor } from './permissions.js';
-import { PAGE_SIZE, EXPORT_MAX, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, isDay, istDay, istDayStart, istDayEnd, istStamp, csvResponse, parseJson } from './lib.js';
+import { PAGE_SIZE, EXPORT_MAX, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, isDay, istDay, istDayStart, istDayEnd, istStamp, csvResponse, parseJson, ownAccount } from './lib.js';
 
 /* ---------- the list ---------- */
 // what the Status filter means in the orders table
@@ -194,8 +194,9 @@ export async function getPayment(request, env, ctx, params) {
     }) : null,
     can: {
       recheck: has('payments.recheck') && !block, recheckBlock: has('payments.recheck') && RECHECKABLE.includes(o.status) ? block : null,
-      refund: has('payments.refund') && keys && refundable,
-      refundBlock: has('payments.refund') && !keys && refundable ? 'The Razorpay keys are not set, so refunds cannot be sent.' : null,
+      refund: has('payments.refund') && keys && refundable && !ownAccount(who, o.user_id),
+      refundBlock: has('payments.refund') && refundable && ownAccount(who, o.user_id) ? "This is your own payment. Ask a Super Admin to refund it."
+        : has('payments.refund') && !keys && refundable ? 'The Razorpay keys are not set, so refunds cannot be sent.' : null,
       recheckRefund: has('payments.recheck') && keys,
     },
     emailsOn: emailEnabled(env),

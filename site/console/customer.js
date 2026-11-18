@@ -17,7 +17,9 @@
 
   var ACTION = { 'user.disable': 'Account disabled', 'user.enable': 'Account restored', 'user.sign_out': 'Signed out everywhere', 'user.note_add': 'Note added',
     'user.note_delete': 'Note deleted', 'user.role': 'Staff role changed', 'subscription.grant': 'Plan given', 'subscription.revoke': 'Plan ended',
-    'subscription.extend': 'Plan extended', 'access.add': 'Access exception added', 'access.end': 'Access exception ended' };
+    'subscription.extend': 'Plan extended', 'access.add': 'Access exception added', 'access.end': 'Access exception ended',
+    'admin.login': 'Signed in to the admin console', 'admin.logout': 'Signed out of the admin console',
+    'admin.login_failed': 'Admin console sign-in failed', 'admin.reauth_failed': 'Wrong password at a password check' };
   var reloadAfter = function (r) { if (r && r !== true) load(); };
   var fill = AC.fill, quiet = AC.quiet, table = AC.table, fact = AC.fact;
   function initials(name, email) {

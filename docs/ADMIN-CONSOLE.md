@@ -4,13 +4,14 @@ The new admin dashboard, built in six phases beside the current `/admin` pages. 
 map for whoever works on it next: what exists, how sign-in and permissions work, how to add a
 module, and what has to happen before it replaces the current admin.
 
-Status: **Phase 1 of 6 is built** (foundation). It lives at `/console`. The current `/admin`
-keeps working unchanged until the cutover in §9.
+Status: **Phases 1 and 2 of 6 are built** (foundation; core operations). It lives at
+`/console`. The current `/admin` keeps working unchanged until the cutover in §9. Phase 2's
+work order, endpoints and rules: `docs/ADMIN-PHASE-2.md`.
 
 | Phase | Contents | Status |
 | --- | --- | --- |
 | 1 | Audit, admin sign-in, roles and permissions, migrations, the four-layer frame | built |
-| 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access | not started |
+| 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access, the search box | built |
 | 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | not started |
 | 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | not started |
 | 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | not started |
@@ -46,7 +47,7 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 `src/console/modules.js`; a module without a `path` is shown as a label with its phase, never as
 a link.
 
-1. **Core operations**: Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
+1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
 2. **Learning operations**: Courses, Modules, Levels, Lessons, Exercises, Unlock conditions, Student progress, Learning analytics
 3. **Business growth**: Coupons, Promotions, Email campaigns, Support, Notifications, Business reports
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
@@ -146,9 +147,12 @@ the current `/admin` pages still use it. That second way is removed at cutover (
   scripts and styles from this site only, **no inline scripts or styles**.
 - The console is not listed in `robots.txt` (listing it would advertise it).
 
-Files: `src/console/shell.js` (frame and sign-in HTML), `src/console/pages.js` (each page's
-frame), `site/console/` (`console.css`, `console.js` the shared kit, one script per page).
-Bump `CONSOLE_ASSETS` in `shell.js` whenever a file in `site/console/` changes.
+Files: `src/console/shell.js` (frame and sign-in HTML), `src/console/pages.js` and
+`src/console/pages-core.js` (each page's frame; `src/console/page-kit.js` builds list pages and
+record pages), `site/console/` (`console.css`, `console.js` the shared kit, `charts.js`,
+`plan-actions.js`, `access-actions.js`, one script per page). Bump `CONSOLE_ASSETS` in
+`shell.js` whenever a file in `site/console/` changes. A page with an id in its address has
+`match` and `names`; an exact address wins over one with an id (`/packages/new`).
 
 ## 6. Adding a module (Phases 2–5)
 
@@ -162,16 +166,28 @@ Bump `CONSOLE_ASSETS` in `shell.js` whenever a file in `site/console/` changes.
    `site/console/`. Give the module its `path` and `permission` in `src/console/modules.js`.
 4. **Data**: the page's script asks only for that module's data, when the page opens. No page
    loads another module's data "in case".
-5. **Tests**: add to `tests/console.test.mjs`: who is refused, who is allowed, what is audited.
+5. **Tests**: a `tests/console-*.test.mjs` file on its own port, using `tests/console-kit.mjs`:
+   who is refused, who is allowed, what is audited, what a wrong input answers.
 6. **Migration**, if the module needs tables: a new numbered file, `CREATE … IF NOT EXISTS` and
    `ALTER TABLE … ADD COLUMN` only. Never `DROP`, never rewrite a table in place.
 
 The browser kit (`window.AC`): `AC.api(method, path, body)` (sends to sign-in when the session
 ended, asks for the password when the server wants it confirmed), `AC.el`, `AC.icon`,
-`AC.toast`, `AC.confirm`, `AC.fmt`, `AC.can(permission)`. Data is placed as text, never as HTML.
+`AC.toast`, `AC.confirm`, `AC.formDialog`, `AC.fmt` (India time), `AC.money`, `AC.status`,
+`AC.can(permission)`, `AC.listPage` (filters kept in the address, pager), `AC.record`,
+`AC.download` (CSV through the password check), `AC.charts`. Data is placed as text, never as
+HTML.
+
+Rules every Phase 2 module follows: Admin and Support never change their own plan, access or
+payments (a Super Admin may); a reason is required for changes to a customer; money moves only
+through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
+- `0006_admin_core.sql` (Phase 2): `customer_notes`, `access_overrides`, `refund_choices`, three
+  indexes. Additive only, safe to run twice. Before it is applied, the customer pages and the
+  other parts that need it answer "not switched on yet" (503), lists still work, and nothing
+  changes for customers. Go-live steps: `docs/ADMIN-PHASE-2.md` §4 and `docs/LAUNCH.md` §1c.
 - `0005_admin_console.sql`: `admin_sessions`, `role_permissions`. Additive only.
 - Apply to live D1 **before or right after** the Phase 1 merge. Until then `/console/login`
   says the console isn't switched on, and the rest of the site is unaffected (tested).
@@ -219,5 +235,9 @@ All are secrets or variables on the `typecraft` Worker in Cloudflare; none are i
 
 `node --test tests/console.test.mjs` (sign-in, codes, limits, sessions, the grid and its effect
 on the older admin APIs, page headers, redirects, the not-yet-migrated state, static routing).
+Phase 2: `tests/console-core.test.mjs` (customers), `console-payments` (payments, refunds,
+with the fake Razorpay in `tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning
+access, packages), `console-overview` (dashboard, search); `tests/app-plan.test.mjs` covers
+what learning access changes for customers.
 The other test files still pass unchanged apart from two expectations that follow the new
 defaults (an Admin cannot change settings or refund until allowed).

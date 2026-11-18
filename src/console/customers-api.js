@@ -22,7 +22,7 @@ import { subView } from './subscriptions-api.js';
 import { ACCESS_SELECT, accessView, TARGETS } from './learning-access-api.js';
 import { permissionsFor } from './permissions.js';
 import { ROLE_LABELS } from './config.js';
-import { PAGE_SIZE, EXPORT_MAX, DAY_MS, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, istDayStart, istStamp, reasonOf, csvResponse } from './lib.js';
+import { PAGE_SIZE, EXPORT_MAX, DAY_MS, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, istDayStart, istStamp, reasonOf, csvResponse, ownAccount } from './lib.js';
 
 const META = globalThis.TC_META;
 const NOTE_MAX = 2000;
@@ -136,7 +136,8 @@ async function customerRow(env, id) {
 }
 /** Why `who` may not disable, restore or sign out this account; null when they may. */
 function manageBlock(who, target) {
-  if (target.id === who.user.id) return "You can't do this to your own account.";
+  if (target.id === who.user.id) return who.role === 'owner' ? "You can't disable your own account or sign it out everywhere here."
+    : 'This is your own account, so only a Super Admin can change it, its plan or its access.';
   if (target.role === 'owner') return 'A Super Admin account cannot be changed here.';
   if (target.role && who.role !== 'owner') return 'Only a Super Admin can change another staff account.';
   return null;
@@ -226,8 +227,11 @@ export async function getCustomer(request, env, ctx, params) {
     notes: R.notes.map((n) => noteView(who, n)),
     emails: R.emails ? R.emails.map((e) => ({ template: e.template, subject: e.subject, status: e.status, createdAt: e.created_at })) : null,
     activity: R.activity ? R.activity.map((a) => ({ action: a.action, reason: reasonIn(a.detail), actor: a.actor || 'System', createdAt: a.created_at })) : null,
-    can: { manage: has('customers.manage') && !manageBlock(who, u), manageBlock: has('customers.manage') ? manageBlock(who, u) : null, notes: has('customers.notes'),
-      plans: has('subscriptions.manage'), access: has('access.manage') },
+    // on their own page, staff who could change plans or access are told why the buttons are missing
+    can: { manage: has('customers.manage') && !manageBlock(who, u),
+      manageBlock: has('customers.manage') || (ownAccount(who, u.id) && (has('subscriptions.manage') || has('access.manage'))) ? manageBlock(who, u) : null,
+      notes: has('customers.notes'),
+      plans: has('subscriptions.manage') && !ownAccount(who, u.id), access: has('access.manage') && !ownAccount(who, u.id) },
   });
 }
 

@@ -238,7 +238,7 @@ test('who may change which account: not yourself, never a Super Admin, staff onl
   assert.deepEqual(await can(admin, support.who.id), { manage: false, manageBlock: 'Only a Super Admin can change another staff account.', notes: true });
   assert.deepEqual(await can(owner, support.who.id), { manage: true, manageBlock: null, notes: true });
   assert.deepEqual(await can(admin, owner.who.id), { manage: false, manageBlock: 'A Super Admin account cannot be changed here.', notes: true });
-  assert.deepEqual(await can(owner, owner.who.id), { manage: false, manageBlock: "You can't do this to your own account.", notes: true });
+  assert.deepEqual(await can(owner, owner.who.id), { manage: false, manageBlock: "You can't disable your own account or sign it out everywhere here.", notes: true });
   assert.equal((await owner('GET', `/api/console/customers/${admin.who.id}`)).body.customer.roleLabel, 'Admin');
 
   const off = (c, id) => c('POST', `/api/console/customers/${id}/status`, { status: 'disabled', reason: 'testing the rules' });

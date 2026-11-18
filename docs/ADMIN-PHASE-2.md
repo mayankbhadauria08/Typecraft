@@ -20,7 +20,7 @@ nothing is applied to the live database, without the owner's yes.
 | 6 | Packages | built |
 | 7 | Dashboard | built |
 | 8 | Search box | built |
-| 9 | Full check, docs, pull request | not started |
+| 9 | Full check, docs, pull request | built |
 
 Update this table in the same commit as each step.
 
@@ -55,6 +55,10 @@ email sending plus `SESSION_SECRET` (no emails to customers until then).
    must tolerate that table not existing yet.
 10. Say plainly what is not done. Do not call it production-ready while something critical
     is missing.
+11. Admin and Support never change their own account: no giving, extending or ending their
+    own plan, no opening or closing their own lessons or games, no refunding their own
+    payment. A Super Admin may (the owner). `ownAccount` / `assertNotOwnAccount` in
+    `src/console/lib.js`; the buttons are hidden too, but the server refuses on its own.
 
 ## 3. Conventions
 
@@ -293,7 +297,7 @@ built as a combobox with a listbox (arrow keys, Enter, Escape; a second Escape c
 250 ms pause before asking, older answers ignored. The sidebar sits above the page so the
 results can open over it.
 
-## 13. Step 9: Finish
+## 13. Step 9: Finish (built)
 
 - All test files pass; a browser walk-through on desktop and phone, in both themes, with no
   script errors and no Content-Security-Policy violations.
@@ -301,3 +305,8 @@ results can open over it.
   0006 bookmark line.
 - Pull request with: what is built, what changed for customers (step 5), what is not done,
   and the go-live steps of section 4.
+
+Done: the review added rule 11 (own-account guard, with tests in `console-plans` and
+`console-payments`); every test file passes; the walk-throughs of every Phase 2 page ran on
+desktop (1280 wide) and phone (390 wide), light and dark, with no script errors and no
+Content-Security-Policy reports.

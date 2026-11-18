@@ -500,11 +500,13 @@
     return text ? fact(label, el('span', { class: 'mono id-text', text: text }), copyButton(text, what)) : fact(label, '\u2013');
   }
   /** What was done, by whom and when. items: [{ action, reason, note, actor, createdAt }]; labels: action → words. */
+  // an action this page has no name for still reads as words: 'refund.failed' -> 'Refund failed'
+  function readable(key) { var s = String(key || '').replace(/[._]+/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
   function timeline(items, labels, empty) {
     if (!items.length) return quiet(empty);
     return el('ul', { class: 'timeline' }, items.map(function (a) {
       return el('li', null, [
-        el('div', { class: 'timeline-what' }, [el('span', { class: 'cell-main', text: labels[a.action] || a.action }), a.note ? el('span', { class: 'timeline-why', text: a.note }) : null,
+        el('div', { class: 'timeline-what' }, [el('span', { class: 'cell-main', text: labels[a.action] || readable(a.action) }), a.note ? el('span', { class: 'timeline-why', text: a.note }) : null,
           a.reason ? el('span', { class: 'timeline-why', text: a.reason }) : null]),
         el('div', { class: 'cell-sub', text: a.actor + ' \u00b7 ' + fmt.dateTime(a.createdAt) })
       ]);

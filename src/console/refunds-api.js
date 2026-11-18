@@ -11,7 +11,7 @@ import { hitLimit, emailEnabled } from '../session.js';
 import * as rzp from '../razorpay.js';
 import { audit, refund, recheckRefund } from '../billing.js';
 import { requireAdmin } from './session.js';
-import { Binder, PAGE_SIZE, pageOf, offsetOf, paged, like, oneOf, idParam, isDay, istDayStart, istDayEnd, money } from './lib.js';
+import { Binder, PAGE_SIZE, pageOf, offsetOf, paged, like, oneOf, idParam, isDay, istDayStart, istDayEnd, money, assertNotOwnAccount } from './lib.js';
 
 /** Why the money goes back. The words are stored with the refund ("Customer request: bought the wrong plan"). */
 export const REASONS = {
@@ -76,6 +76,7 @@ export async function postRefund(request, env, ctx) {
   if (typeof body.paymentId !== 'string' || !/^[\w-]{1,64}$/.test(body.paymentId)) throw fieldError({ paymentId: 'Choose the payment to refund.' });
   const pay = await DB.prepare('SELECT * FROM payments WHERE id = ?1').bind(body.paymentId).first();
   if (!pay) throw new HttpError(404, 'not_found', 'Payment not found.');
+  assertNotOwnAccount(who, pay.user_id);
   if (!REFUNDABLE.includes(pay.status)) throw new HttpError(400, 'not_refundable', 'Only a payment that went through can be refunded.');
   if (!rzp.configured(env)) throw new HttpError(503, 'payments_unavailable', 'The Razorpay keys are not set, so refunds cannot be sent.');
 
