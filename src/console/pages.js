@@ -9,9 +9,8 @@ import { icon } from './icons.js';
 import { CONSOLE_BASE, ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
 import { LAYERS } from './permissions.js';
 import { LAYERS as MODULE_LAYERS } from './modules.js';
-
-const skeletonRows = (n, cols) => Array.from({ length: n }, () =>
-  `<tr class="skeleton-row" aria-hidden="true">${Array.from({ length: cols }, (_, c) => `<td><span class="skeleton${c === 0 ? ' skeleton-wide' : ''}"></span></td>`).join('')}</tr>`).join('');
+import { skeletonRows, lines, select, section, listFrame, downloadButton } from './page-kit.js';
+import { CORE_PAGES } from './pages-core.js';
 
 /* ---------- Home ---------- */
 // What the current admin (/admin) looks after, by the console module that takes it over.
@@ -123,42 +122,23 @@ function rolesBody() {
 }
 
 /* ---------- Customers ---------- */
-const option = ([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`;
-const select = (name, label, options) => `<label class="pick"><span class="vh">${esc(label)}</span><select name="${esc(name)}">${options.map(option).join('')}</select></label>`;
-
 function customersBody(me) {
-  const canExport = me.permissions.includes('customers.export');
-  return `<div class="page-head page-head-row">
-<div><h1>Customers</h1>
-<p class="page-sub">Everyone with a TypeCraft account. Open a customer to see their plan, payments and progress.</p></div>
-${canExport ? `<button type="button" class="btn btn-quiet" id="exportBtn">${icon('download')}<span>Download list</span></button>` : ''}
-</div>
-
-<form class="toolbar" id="filters" role="search" aria-label="Find customers">
-<div class="search">${icon('search')}<label class="vh" for="q">Search customers</label><input id="q" name="q" type="search" placeholder="Name, email or phone" autocomplete="off" spellcheck="false" maxlength="80"></div>
-${select('plan', 'Plan', [['', 'All plans'], ['free', 'Free'], ['paid', 'Any paid plan']])}
-${select('status', 'Account', [['', 'All accounts'], ['active', 'Active'], ['disabled', 'Disabled']])}
-${select('verified', 'Email', [['', 'Email: any'], ['1', 'Email verified'], ['0', 'Email not verified']])}
-${select('joined', 'Joined', [['', 'Joined: any time'], ['today', 'Joined today'], ['7d', 'Joined in the last 7 days'], ['30d', 'Joined in the last 30 days']])}
-${select('sort', 'Order', [['', 'Newest first'], ['oldest', 'Oldest first'], ['login', 'Last sign-in'], ['name', 'Name A to Z']])}
-<button type="button" class="btn-link" id="clearFilters" hidden>Clear filters</button>
-</form>
-
-<p class="list-meta" id="listCount" aria-live="polite">&nbsp;</p>
-<div class="table-panel">
-<table class="list fold" id="list" aria-busy="true">
-<thead><tr><th scope="col">Customer</th><th scope="col" class="col-wide">Phone</th><th scope="col">Plan</th><th scope="col" class="col-fit">Account</th><th scope="col" class="col-wide">Joined</th><th scope="col" class="col-wide">Last sign-in</th></tr></thead>
-<tbody id="listBody">${skeletonRows(8, 6)}</tbody>
-</table>
-</div>
-<nav class="pager" id="pager" aria-label="Pages" hidden></nav>`;
+  return listFrame({
+    title: 'Customers',
+    sub: 'Everyone with a TypeCraft account. Open a customer to see their plan, payments and progress.',
+    action: me.permissions.includes('customers.export') ? downloadButton() : '',
+    label: 'Find customers',
+    search: { label: 'Search customers', placeholder: 'Name, email or phone' },
+    filters: [
+      select('plan', 'Plan', [['', 'All plans'], ['free', 'Free'], ['paid', 'Any paid plan']]),
+      select('status', 'Account', [['', 'All accounts'], ['active', 'Active'], ['disabled', 'Disabled']]),
+      select('verified', 'Email', [['', 'Email: any'], ['1', 'Email verified'], ['0', 'Email not verified']]),
+      select('joined', 'Joined', [['', 'Joined: any time'], ['today', 'Joined today'], ['7d', 'Joined in the last 7 days'], ['30d', 'Joined in the last 30 days']]),
+      select('sort', 'Order', [['', 'Newest first'], ['oldest', 'Oldest first'], ['login', 'Last sign-in'], ['name', 'Name A to Z']]),
+    ].join('\n'),
+    heads: [['Customer'], ['Phone', 'col-wide'], ['Plan'], ['Account', 'col-fit'], ['Joined', 'col-wide'], ['Last sign-in', 'col-wide']],
+  });
 }
-
-const lines = (n) => `<div class="loading-lines" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<span class="skeleton${i % 2 ? '' : ' skeleton-wide'}"></span>`).join('')}</div>`;
-const section = (id, title, inner, meta = '') => `<section class="block" aria-labelledby="${id}Title">
-<div class="block-head"><h2 id="${id}Title">${esc(title)}</h2>${meta}</div>
-<div id="${id}Body">${inner}</div>
-</section>`;
 
 function customerBody(me) {
   const has = (k) => me.permissions.includes(k);
@@ -213,15 +193,17 @@ export const PAGES = [
     permission: 'customers.view', body: customersBody, scripts: ['customers.js'] },
   { key: 'customers', match: /^\/customers\/([\w-]{1,64})$/, names: ['id'], title: 'Customer', crumbs: ['Core operations', ['Customers', '/customers'], 'Customer'],
     permission: 'customers.view', body: customerBody, scripts: ['customer.js'] },
+  ...CORE_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
 ];
 
-/** The page for a path below CONSOLE_BASE ('' is home): { page, params }, or null. */
+/** The page for a path below CONSOLE_BASE ('' is home): { page, params }, or null. An exact address wins over one with an id. */
 export function findConsolePage(sub) {
+  const exact = PAGES.find((page) => page.path === sub);
+  if (exact) return { page: exact, params: {} };
   for (const page of PAGES) {
-    if (page.path !== undefined) { if (page.path === sub) return { page, params: {} }; continue; }
-    const m = sub.match(page.match);
+    const m = page.match && sub.match(page.match);
     if (m) return { page, params: Object.fromEntries(page.names.map((n, i) => [n, m[i + 1]])) };
   }
   return null;

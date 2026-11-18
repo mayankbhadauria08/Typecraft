@@ -14,24 +14,10 @@
   var api = '/api/console/customers/' + encodeURIComponent(id);
   var current = null;
 
-  var ORDER = { created: ['Pending', 'warn'], attempted: ['Pending', 'warn'], pending: ['Pending', 'warn'], paid: ['Paid', 'ok'], failed: ['Failed', 'bad'],
-    refunded: ['Refunded', ''], partially_refunded: ['Partly refunded', ''], cancelled: ['Cancelled', ''] };
-  var SUB = { active: ['Active', 'ok'], expired: ['Ended', ''], revoked: ['Ended by staff', 'bad'] };
-  var SOURCE = { purchase: 'Bought', admin: 'Given by staff', promo: 'Promotion' };
-  var EMAIL = { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] };
   var ACTION = { 'user.disable': 'Account disabled', 'user.enable': 'Account restored', 'user.sign_out': 'Signed out everywhere', 'user.note_add': 'Note added',
     'user.note_delete': 'Note deleted', 'user.role': 'Staff role changed', 'subscription.grant': 'Plan given', 'subscription.revoke': 'Plan ended',
     'subscription.extend': 'Plan extended', 'access.add': 'Access exception added', 'access.end': 'Access exception ended' };
-  var pair = function (map, key) { var p = map[key] || [key, '']; return AC.badge(p[0], p[1]); };
-
-  function fill(target, kids) { var node = byId(target); if (!node) return null; AC.clear(node); node.appendChild(el('div', null, kids)); return node; }
-  function quiet(text) { return el('p', { class: 'quiet', text: text }); }
-  function table(heads, rows) {
-    return el('div', { class: 'table-panel' }, el('table', { class: 'list compact' }, [
-      el('thead', null, el('tr', null, heads.map(function (h) { return el('th', { scope: 'col', class: h[1] || null, text: h[0] }); }))),
-      el('tbody', null, rows)
-    ]));
-  }
+  var fill = AC.fill, quiet = AC.quiet, table = AC.table, fact = AC.fact;
   function initials(name, email) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
     return (parts.length ? parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '') : String(email || '?')[0]).toUpperCase();
@@ -100,8 +86,8 @@
     var p = d.plan, now = p.id === 'free' ? 'On the Free plan.' : 'On ' + p.name + (p.expiresAt ? ' until ' + AC.fmt.date(p.expiresAt) + '.' : ', with no end date.');
     var rows = d.subscriptions.map(function (s) {
       return el('tr', null, [
-        el('td', null, [el('span', { class: 'cell-main', text: s.packageName }), el('div', { class: 'cell-sub', text: SOURCE[s.source] || s.source })]),
-        el('td', { class: 'col-fit' }, pair(SUB, s.status)),
+        el('td', null, [el('span', { class: 'cell-main', text: s.packageName }), el('div', { class: 'cell-sub', text: AC.source(s.source) })]),
+        el('td', { class: 'col-fit' }, AC.status('plan', s.status)),
         el('td', { class: 'col-wide nowrap', text: AC.fmt.date(s.startsAt) }),
         el('td', { class: 'nowrap', text: s.expiresAt ? AC.fmt.date(s.expiresAt) : 'No end date' })
       ]);
@@ -113,15 +99,16 @@
     if (!d.orders) return;
     var rows = d.orders.map(function (o) {
       return el('tr', null, [
-        el('td', { class: 'nowrap', title: AC.fmt.dateTime(o.createdAt), text: AC.fmt.date(o.createdAt) }),
+        el('td', { class: 'nowrap', title: AC.fmt.dateTime(o.createdAt) }, el('a', { class: 'cell-link', href: AC.base + '/payments/' + encodeURIComponent(o.id), text: AC.fmt.date(o.createdAt) })),
         el('td', null, o.packageName),
         el('td', { class: 'num', text: AC.money(o.amountPaise, o.currency) }),
-        el('td', { class: 'col-fit' }, pair(ORDER, o.status)),
+        el('td', { class: 'col-fit' }, AC.status('order', o.status)),
         el('td', { class: 'col-wide mono', text: o.invoiceNumber || '–' })
       ]);
     });
     fill('ordersBody', rows.length ? [table([['Date'], ['Plan'], ['Amount', 'num'], ['Status', 'col-fit'], ['Invoice', 'col-wide']], rows),
-      d.orders.length === 10 ? el('p', { class: 'hint', text: 'The 10 most recent payments.' }) : null] : quiet('No payments yet.'));
+      d.orders.length === 10 ? el('p', { class: 'hint' }, ['The 10 most recent payments. ',
+        el('a', { href: AC.base + '/payments?q=' + encodeURIComponent(d.customer.email), text: 'See all of them' }), '.']) : null] : quiet('No payments yet.'));
   }
   function figure(value, label, sub) {
     return el('div', { class: 'figure' }, [el('div', { class: 'figure-value', text: value }), el('div', { class: 'figure-label', text: label }), sub ? el('div', { class: 'figure-sub', text: sub }) : null]);
@@ -185,33 +172,24 @@
   function emails(d) {
     if (!d.emails) return;
     var rows = d.emails.map(function (e) {
-      return el('tr', null, [el('td', null, e.subject), el('td', { class: 'col-fit' }, pair(EMAIL, e.status)), el('td', { class: 'nowrap', title: AC.fmt.dateTime(e.createdAt), text: AC.fmt.ago(e.createdAt) })]);
+      return el('tr', null, [el('td', null, e.subject), el('td', { class: 'col-fit' }, AC.status('email', e.status)), el('td', { class: 'nowrap', title: AC.fmt.dateTime(e.createdAt), text: AC.fmt.ago(e.createdAt) })]);
     });
     fill('emailsBody', rows.length ? [table([['Subject'], ['Status', 'col-fit'], ['When']], rows), d.emails.length === 10 ? el('p', { class: 'hint', text: 'The 10 most recent emails.' }) : null]
       : quiet('No emails have been sent to this customer.'));
   }
   function activity(d) {
     if (!d.activity) return;
-    fill('activityBody', d.activity.length ? el('ul', { class: 'timeline' }, d.activity.map(function (a) {
-      return el('li', null, [
-        el('div', { class: 'timeline-what' }, [el('span', { class: 'cell-main', text: ACTION[a.action] || a.action }), a.reason ? el('span', { class: 'timeline-why', text: a.reason }) : null]),
-        el('div', { class: 'cell-sub', text: a.actor + ' · ' + AC.fmt.dateTime(a.createdAt) })
-      ]);
-    })) : quiet('Staff have not changed anything on this account.'));
+    fill('activityBody', AC.timeline(d.activity, ACTION, 'Staff have not changed anything on this account.'));
   }
-  function fact(label, value, extra) { return el('div', null, [el('dt', { text: label }), el('dd', null, [value, extra || null])]); }
   function account(d) {
     var c = d.customer;
-    var copy = el('button', { type: 'button', class: 'icon-btn icon-btn-sm', 'aria-label': 'Copy the customer ID', on: { click: function () {
-      (navigator.clipboard ? navigator.clipboard.writeText(c.id) : Promise.reject()).then(function () { AC.toast('Customer ID copied.'); }, function () { AC.toast('Could not copy. Select the ID and copy it by hand.', 'bad'); });
-    } } }, AC.icon('copy'));
     fill('accountBody', el('dl', { class: 'facts facts-stack' }, [
       fact('Email', c.email),
       fact('Phone', c.phone || '–'),
       fact('Joined', AC.fmt.dateTime(c.createdAt)),
       fact('Last sign-in', c.lastLoginAt ? AC.fmt.dateTime(c.lastLoginAt) : 'Never'),
       c.passwordChangedAt ? fact('Password changed', AC.fmt.dateTime(c.passwordChangedAt)) : null,
-      fact('Customer ID', el('span', { class: 'mono id-text', text: c.id }), copy)
+      AC.idFact('Customer ID', c.id, 'customer ID')
     ]));
   }
   function devices(d) {

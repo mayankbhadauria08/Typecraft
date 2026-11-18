@@ -410,8 +410,12 @@ test('customer pages: frames by permission, the sidebar shows where you are, str
 
   // Home says what is ready here, with links only to what the role may open
   const home = (await owner('GET', '/console')).text;
-  assert.match(home, /Ready here: <a href="\/console\/customers">Customers<\/a>, <a href="\/console\/roles">Roles and permissions<\/a>\. Payments, packages and emails are still managed in the current admin/);
-  assert.match((await support('GET', '/console')).text, /Ready here: <a href="\/console\/customers">Customers<\/a>\. Payments/);
+  assert.match(home, /Ready here: <a href="\/console\/customers">Customers<\/a>, /);
+  assert.match(home, /<a href="\/console\/roles">Roles and permissions<\/a>\. /);
+  assert.ok(!/ustomers[^.<]* still managed in the current admin/.test(home), 'what is built here is no longer listed as managed elsewhere');
+  const supportHome = (await support('GET', '/console')).text;
+  assert.match(supportHome, /Ready here: <a href="\/console\/customers">Customers<\/a>/);
+  assert.ok(!supportHome.includes('href="/console/roles"'), 'Support may not open Roles, so it is not offered');
 
   assert.equal((await owner('GET', '/console/customers/a/b')).status, 404);
   assert.equal((await owner('GET', '/console/customers/' + 'x'.repeat(70))).status, 404);

@@ -35,6 +35,8 @@ export const PERMISSIONS = [
   P('packages.view', 'core', 'Packages', 'See packages and prices', 'The plans on sale and what each includes.', 1, 1),
   P('packages.manage', 'core', 'Packages', 'Change packages and prices', 'Edit price, validity, features and which plans are on sale.', 1, 0),
   P('payments.view', 'core', 'Payments', 'See payments', 'Orders, payment status and Razorpay references.', 1, 1),
+  P('payments.recheck', 'core', 'Payments', 'Check a payment with Razorpay', 'Ask Razorpay what happened to an order that is not paid. The order becomes paid only if Razorpay confirms it.', 1, 1),
+  P('payments.export', 'core', 'Payments', 'Download the payments list', 'A spreadsheet of orders with customer names and emails. Asks for your password again.', 1, 0, { sensitive: true }),
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
 
   // ----- Layer 3: business growth -----

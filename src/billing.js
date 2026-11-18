@@ -628,6 +628,35 @@ export async function getAnalytics(request, env) {
 }
 
 /* ---------------- crons ---------------- */
+/**
+ * Asks Razorpay what happened to one order and acts on the answer: used by the scheduled
+ * check below and by "Check with Razorpay" in the admin console. Only a payment Razorpay
+ * reports as captured for this order and this amount can make it paid.
+ * → { outcome: 'paid' | 'pending' | 'failed' | 'mismatch' | 'cancelled' | 'waiting', attempts, counts }
+ *   attempts: payments Razorpay has for the order; counts: the scheduled check's counter to raise, or null.
+ * Throws when Razorpay cannot be asked.
+ */
+export async function reconcileOrder(env, ctx, o, now = Date.now()) {
+  const list = await rzp.fetchOrderPayments(env, o.razorpay_order_id);
+  const items = (list && Array.isArray(list.items) ? list.items : []).filter((p) => p && p.order_id === o.razorpay_order_id);
+  const attempts = items.length;
+  const good = items.find((p) => p.status === 'captured') || items.find((p) => p.status === 'authorized');
+  if (good) {
+    const r = await handlePayment(env, ctx, o, good, 'api');
+    return { outcome: r.status, attempts, counts: r.status === 'paid' ? 'paid' : null };
+  }
+  if (attempts && items.every((p) => p.status === 'failed')) {
+    for (const p of items) if (p.amount === o.amount_paise) await recordPayment(env, o, p, 'api');
+    const changed = await markFailed(env, ctx, o, items[items.length - 1].error_description || 'The payment did not go through.');
+    return { outcome: 'failed', attempts, counts: changed ? 'failed' : null };
+  }
+  if (!attempts && Date.parse(o.created_at) < now - DAY_MS) {
+    await env.DB.prepare("UPDATE orders SET status = 'cancelled', updated_at = ?2 WHERE id = ?1 AND status IN ('created', 'attempted')").bind(o.id, nowIso()).run();
+    return { outcome: 'cancelled', attempts, counts: 'cancelled' };
+  }
+  return { outcome: 'waiting', attempts, counts: null };
+}
+
 /** Every 10 minutes: orders waiting for a payment result are checked with Razorpay. */
 export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
   const DB = env.DB;
@@ -641,19 +670,8 @@ export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
     for (const o of rows) {
       out.checked++;
       try {
-        const list = await rzp.fetchOrderPayments(env, o.razorpay_order_id);
-        const items = (list && Array.isArray(list.items) ? list.items : []).filter((p) => p && p.order_id === o.razorpay_order_id);
-        const good = items.find((p) => p.status === 'captured') || items.find((p) => p.status === 'authorized');
-        if (good) {
-          const r = await handlePayment(env, ctx, o, good, 'api');
-          if (r.status === 'paid') out.paid++;
-        } else if (items.length && items.every((p) => p.status === 'failed')) {
-          for (const p of items) if (p.amount === o.amount_paise) await recordPayment(env, o, p, 'api');
-          if (await markFailed(env, ctx, o, items[items.length - 1].error_description || 'The payment did not go through.')) out.failed++;
-        } else if (!items.length && Date.parse(o.created_at) < now - DAY_MS) {
-          await DB.prepare("UPDATE orders SET status = 'cancelled', updated_at = ?2 WHERE id = ?1 AND status IN ('created', 'attempted')").bind(o.id, nowIso()).run();
-          out.cancelled++;
-        }
+        const r = await reconcileOrder(env, ctx, o, now);
+        if (r.counts) out[r.counts]++;
       } catch (err) {
         console.error('reconcile failed for an order:', err && err.code);
       }

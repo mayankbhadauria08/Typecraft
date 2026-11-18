@@ -5,6 +5,8 @@
    - AC.formDialog(): a dialog with fields that stays open until the server accepts.
    - AC.list(): a filtered, paged table whose filters live in the address bar.
    - AC.download(): a spreadsheet download that goes through the same checks as AC.api().
+   - AC.listPage() and AC.record(): a list page and a record's page built on the frames in src/console/page-kit.js.
+   - AC.status(), AC.method(): the words the console uses for the states in the database.
    Data from the server is only ever placed as text, never as HTML. */
 (function () {
   'use strict';
@@ -56,6 +58,24 @@
       return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency || 'INR', minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 }).format(amount);
     } catch (e) { return '\u20b9' + amount; }
   }
+
+  /* ---------- words for states ----------
+     One place for what the console calls each state in the database, and its colour. */
+  var STATUS = {
+    order: { created: ['Not paid yet', ''], attempted: ['Not paid yet', ''], pending: ['Processing', 'warn'], paid: ['Paid', 'ok'], failed: ['Failed', 'bad'],
+      refunded: ['Refunded', ''], partially_refunded: ['Partly refunded', ''], cancelled: ['Cancelled', ''] },
+    payment: { created: ['Started', ''], authorized: ['Not captured yet', 'warn'], captured: ['Paid', 'ok'], failed: ['Failed', 'bad'],
+      refunded: ['Refunded', ''], partially_refunded: ['Partly refunded', ''] },
+    refund: { pending: ['On its way', 'warn'], processed: ['Sent', 'ok'], failed: ['Failed', 'bad'] },
+    plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended by staff', 'bad'] },
+    email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] }
+  };
+  /** A badge for a state: AC.status('order', 'paid'). */
+  function status(kind, key) { var p = (STATUS[kind] || {})[key] || [key, '']; return badge(p[0], p[1]); }
+  var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer' };
+  function method(key) { return key ? (METHOD[key] || key) : '\u2013'; }
+  var SOURCE = { purchase: 'Bought', admin: 'Given by staff', promo: 'Promotion' };
+  function source(key) { return SOURCE[key] || key; }
 
   /* ---------- dates ----------
      The business runs on India time, and the server counts days in India time: the console shows every
@@ -418,6 +438,106 @@
     return { reload: load, query: query };
   }
 
+  /* ---------- a list page (the frame from listFrame() in src/console/page-kit.js) ---------- */
+  function byId(id) { return doc.getElementById(id); }
+  /** cfg: { endpoint, noun, empty, row, onData, exportPath, exportNote } → { reload(), query() } */
+  function listPage(cfg) {
+    var table = byId('list');
+    var view = list({
+      endpoint: cfg.endpoint, form: byId('filters'), table: table, body: byId('listBody'), pager: byId('pager'), count: byId('listCount'), clear: byId('clearFilters'),
+      columns: table.querySelectorAll('thead th').length, noun: cfg.noun, empty: cfg.empty, row: cfg.row, onData: cfg.onData
+    });
+    var button = byId('exportBtn');
+    if (button && cfg.exportPath) button.addEventListener('click', function () {
+      var q = new URLSearchParams(view.query());
+      q.delete('page');
+      var qs = q.toString();
+      download(cfg.exportPath + (qs ? '?' + qs : ''), button).then(function (name) {
+        toast('Saved ' + name + '.' + (cfg.exportNote ? ' ' + cfg.exportNote : ''));
+      }, function (err) { if (err.code !== 'cancelled') toast(err.message, 'bad'); });
+    });
+    return view;
+  }
+  /** Adds the choices that come with the data to a filter, once: AC.options(select, [{ id, name }]). */
+  function options(select, items) {
+    if (!select || select.getAttribute('data-filled') || !items) return;
+    select.setAttribute('data-filled', '1');
+    items.forEach(function (item) { select.appendChild(el('option', { value: item.id, text: item.name })); });
+  }
+
+  /* ---------- a record's page (the frame from recordFrame()) ---------- */
+  function fill(id, kids) { var node = byId(id); if (!node) return null; clear(node); node.appendChild(el('div', null, kids)); return node; }
+  function quiet(text) { return el('p', { class: 'quiet', text: text }); }
+  /** A small table inside a section. heads: [[text, class]]; fold: on a phone the col-fit columns go too (the row's main cell repeats them). */
+  function table(heads, rows, fold) {
+    return el('div', { class: 'table-panel table-panel-inner' }, el('table', { class: 'list compact' + (fold ? ' fold' : '') }, [
+      el('thead', null, el('tr', null, heads.map(function (h) { return el('th', { scope: 'col', class: h[1] || null, text: h[0] }); }))),
+      el('tbody', null, rows)
+    ]));
+  }
+  function fact(label, value, extra) { return el('div', null, [el('dt', { text: label }), el('dd', null, [value, extra || null])]); }
+  function facts(rows) { return el('dl', { class: 'facts facts-stack' }, rows); }
+  /** A small button that copies `text`; `what` names it ("order ID"). */
+  function copyButton(text, what) {
+    return el('button', { type: 'button', class: 'icon-btn icon-btn-sm', 'aria-label': 'Copy the ' + what, on: { click: function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { toast(what.charAt(0).toUpperCase() + what.slice(1) + ' copied.'); },
+        function () { toast('Could not copy. Select the text and copy it by hand.', 'bad'); });
+    } } }, icon('copy'));
+  }
+  /** An ID shown in full with a copy button, for a fact's value. */
+  function idFact(label, text, what) {
+    return text ? fact(label, el('span', { class: 'mono id-text', text: text }), copyButton(text, what)) : fact(label, '\u2013');
+  }
+  /** What was done, by whom and when. items: [{ action, reason, note, actor, createdAt }]; labels: action → words. */
+  function timeline(items, labels, empty) {
+    if (!items.length) return quiet(empty);
+    return el('ul', { class: 'timeline' }, items.map(function (a) {
+      return el('li', null, [
+        el('div', { class: 'timeline-what' }, [el('span', { class: 'cell-main', text: labels[a.action] || a.action }), a.note ? el('span', { class: 'timeline-why', text: a.note }) : null,
+          a.reason ? el('span', { class: 'timeline-why', text: a.reason }) : null]),
+        el('div', { class: 'cell-sub', text: a.actor + ' \u00b7 ' + fmt.dateTime(a.createdAt) })
+      ]);
+    }));
+  }
+  /** The top of a record's page. opts: { title, crumb, sub, badges: [nodes], actions: [nodes], note: node | null } */
+  function head(opts) {
+    doc.title = opts.title + ' \u2013 TypeCraft Admin';
+    var crumb = doc.querySelector('.crumb.is-here'); if (crumb) crumb.textContent = opts.crumb || opts.title;
+    byId('recTitle').textContent = opts.title;
+    var sub = clear(byId('recSub')); append(sub, opts.sub);
+    var badges = clear(byId('recBadges')); append(badges, opts.badges);
+    var actions = clear(byId('recActions')); append(actions, opts.actions);
+    var note = clear(byId('recNote')); append(note, opts.note);
+  }
+  /** A box of plain words under the title: what the state means, or why something cannot be done. */
+  function notice(text, kind) {
+    return el('div', { class: 'notice' + (kind === 'warn' ? ' notice-warn' : ' notice-quiet') }, [icon(kind === 'warn' ? 'alert' : 'info'), el('div', null, el('p', { text: text }))]);
+  }
+  /** cfg: { endpoint, notFound: [title, text], render(data) } → { load() } */
+  function record(cfg) {
+    function missing(title, message, retry) {
+      byId('recPage').hidden = true;
+      var box = byId('recMissing');
+      byId('recMissingTitle').textContent = title;
+      byId('recMissingText').textContent = message;
+      var old = box.querySelector('[data-retry]'); if (old) old.remove();
+      if (retry) box.appendChild(el('button', { type: 'button', class: 'btn btn-quiet', 'data-retry': true, text: 'Try again', on: { click: load } }));
+      box.hidden = false;
+    }
+    function load() {
+      return api('GET', cfg.endpoint).then(function (data) {
+        byId('recMissing').hidden = true;
+        var page = byId('recPage'); page.hidden = false; page.removeAttribute('aria-busy');
+        cfg.render(data);
+      }, function (err) {
+        if (err.status === 404) missing(cfg.notFound[0], cfg.notFound[1], false);
+        else missing("Couldn't load this page", err.message, true);
+      });
+    }
+    load();
+    return { load: load };
+  }
+
   /* ---------- the frame ---------- */
   function setTheme(theme) {
     root.setAttribute('data-theme', theme);
@@ -496,7 +616,10 @@
     base: base, boot: boot, me: me,
     can: function (permission) { return !!(me && me.permissions.indexOf(permission) !== -1); },
     el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, badge: badge, toast: toast, busy: busy,
-    confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, ApiError: ApiError
+    status: status, method: method, source: source,
+    confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, listPage: listPage, options: options,
+    record: record, head: head, notice: notice, fill: fill, quiet: quiet, table: table, fact: fact, facts: facts, idFact: idFact, copyButton: copyButton, timeline: timeline,
+    ApiError: ApiError
   };
   if (doc.querySelector('.app')) initFrame();
 })();

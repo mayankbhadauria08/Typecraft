@@ -76,6 +76,44 @@ export function kit(S, { ipPrefix = '10.60.0.' } = {}) {
                SELECT ?1, ?2, p.id, NULL, ?4, ?5, p.features, p.limits, ?6, ?7, ?6, ?6 FROM packages p WHERE p.id = ?3`, id, userId, packageId, status, source, started, expires);
     return id;
   }
+  const hex = (n) => randomUUID().replace(/-/g, '').slice(0, n);
+  let invoiceN = 0;
+  /**
+   * An order row with the payment row it would have (none for an order nobody paid).
+   * status: created | pending | paid | failed | cancelled | refunded | partially_refunded
+   * → { id, userId, amountPaise, paymentRowId, razorpayOrderId, razorpayPaymentId, invoiceNumber }
+   */
+  async function order(userId, packageId, { status = 'paid', amountPaise = 19900, createdAt = new Date().toISOString(), method = 'upi', failureReason = null,
+    invoice = false, atRazorpay = true } = {}) {
+    const id = 'ord_' + hex(24), razorpayOrderId = atRazorpay ? 'order_' + hex(14) : null;
+    const settled = ['paid', 'refunded', 'partially_refunded'].includes(status);
+    await run(`INSERT INTO orders (id, user_id, package_id, amount_paise, currency, status, razorpay_order_id, failure_reason, paid_at, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, 'INR', ?5, ?6, ?7, ?8, ?9, ?9)`, id, userId, packageId, amountPaise, status, razorpayOrderId,
+      status === 'failed' ? (failureReason || 'The payment did not go through.') : null, settled ? createdAt : null, createdAt);
+    const payStatus = status === 'paid' ? 'captured' : settled ? status : status === 'failed' ? 'failed' : status === 'pending' ? 'authorized' : null;
+    let paymentRowId = null, razorpayPaymentId = null, invoiceNumber = null;
+    if (payStatus) {
+      paymentRowId = 'pay_row_' + hex(20); razorpayPaymentId = 'pay_' + hex(14);
+      await run(`INSERT INTO payments (id, order_id, user_id, razorpay_payment_id, amount_paise, currency, status, method, error_description, verified_by, captured_at, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'INR', ?6, ?7, ?8, 'signature', ?9, ?10, ?10)`, paymentRowId, id, userId, razorpayPaymentId, amountPaise, payStatus, method,
+        payStatus === 'failed' ? (failureReason || 'The payment did not go through.') : null, settled ? createdAt : null, createdAt);
+    }
+    if (invoice) {
+      const seq = 900000 + (++invoiceN);   // far from the real sequence, which the server counts from 1
+      invoiceNumber = `TC-2026-${String(seq).padStart(6, '0')}`;
+      await run(`INSERT INTO invoices (id, number, seq, order_id, user_id, amount_paise, currency, billed_name, billed_email, seller, lines, issued_at)
+                 SELECT ?1, ?2, ?3, ?4, u.id, ?5, 'INR', u.full_name, u.email, '{}', '[]', ?6 FROM users u WHERE u.id = ?7`, randomUUID(), invoiceNumber, seq, id, amountPaise, createdAt, userId);
+    }
+    return { id, userId, amountPaise, paymentRowId, razorpayOrderId, razorpayPaymentId, invoiceNumber };
+  }
+  /** A refund row for an order made with order(). → { id, razorpayRefundId } */
+  async function refundRow(o, { amountPaise = o.amountPaise, status = 'processed', reason = 'Customer request', requestedBy = null, createdAt = new Date().toISOString() } = {}) {
+    const id = randomUUID(), razorpayRefundId = 'rfnd_' + hex(14);
+    await run(`INSERT INTO refunds (id, payment_id, order_id, user_id, razorpay_refund_id, amount_paise, status, reason, requested_by, processed_at, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)`, id, o.paymentRowId, o.id, o.userId, razorpayRefundId, amountPaise, status, reason, requestedBy,
+      status === 'processed' ? createdAt : null, createdAt);
+    return { id, razorpayRefundId };
+  }
   /** Gives or removes one permission for a role, as a Super Admin would in the grid. */
   async function setPermission(role, permission, allowed) {
     await run(`INSERT INTO role_permissions (role, permission, allowed, updated_at) VALUES (?1, ?2, ?3, ?4)
@@ -87,7 +125,7 @@ export function kit(S, { ipPrefix = '10.60.0.' } = {}) {
   }
   const audits = (like) => many('SELECT action, target, detail, actor_id FROM audit_logs WHERE action LIKE ?1 ORDER BY created_at, rowid', like);
 
-  return { client, settle, one, many, run, account, owner, consoleLogin, customer, subscription, setPermission, stale, audits };
+  return { client, settle, one, many, run, account, owner, consoleLogin, customer, subscription, order, refundRow, setPermission, stale, audits };
 }
 
 /** Fails when a console page carries inline code or styles (its Content-Security-Policy would refuse them). */

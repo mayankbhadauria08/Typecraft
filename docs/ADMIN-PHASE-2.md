@@ -13,7 +13,7 @@ nothing is applied to the live database, without the owner's yes.
 | --- | --- | --- |
 | 0 | Plan, migration 0006, pages with an id in the address, shared kit | built |
 | 1 | Customers | built |
-| 2 | Payments | not started |
+| 2 | Payments | built |
 | 3 | Refunds | not started |
 | 4 | Subscriptions | not started |
 | 5 | Learning access | not started |
@@ -87,9 +87,16 @@ SVG attributes.
 **Permissions** are added to `src/console/permissions.js` in the step that first uses them,
 and the two counts in `tests/console.test.mjs` are updated in the same commit.
 
-**Tests** go in `tests/console-core.test.mjs` (ports 8794 and 8795). Every step: who is
-refused, who is allowed, what is audited, what a wrong input answers. All test files and
-`node tests/check-lessons.mjs` pass before each commit.
+**Tests**: one file per group of modules, each with its own port: `console-core` (customers,
+8794), `console-payments` (payments and refunds, 8795, with the fake Razorpay in
+`tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning access, packages, 8796),
+`console-overview` (dashboard and search, 8798). `tests/console-kit.mjs` holds what they
+share. Every step: who is refused, who is allowed, what is audited, what a wrong input
+answers. All test files and `node tests/check-lessons.mjs` pass before each commit.
+
+**Frames.** `src/console/page-kit.js` has `listFrame()` and `recordFrame()`; their ids are
+the ones `AC.listPage()` and `AC.record()` look for. The Phase 2 pages are in
+`src/console/pages-core.js`.
 
 ## 4. Database: `migrations/0006_admin_core.sql`
 
@@ -127,7 +134,7 @@ sessions. "Current plan" is the active, unexpired subscription whose package has
 `display_order`; none means Free. Not here on purpose: editing a customer's email or
 password, signing in as a customer, changing staff roles (Phase 5).
 
-## 6. Step 2: Payments
+## 6. Step 2: Payments (built)
 
 Pages: `/console/payments` (one row per order) and `/console/payments/:orderId`.
 
@@ -136,13 +143,20 @@ Pages: `/console/payments` (one row per order) and `/console/payments/:orderId`.
 | `GET /api/console/payments` | `payments.view` | `q` (order id, Razorpay ids, invoice number, email), `status` (`paid`, `pending`, `failed`, `refunded`, `cancelled`), `package`, `from`, `to`, `page` |
 | `GET /api/console/payments/export.csv` | `payments.export` (new, password check) | Same filters |
 | `GET /api/console/payments/:orderId` | `payments.view` | Order, every payment attempt, refunds, invoice, the subscription it created |
-| `POST /api/console/payments/:orderId/recheck` | `payments.recheck` (new) | Ask Razorpay for the truth about a stuck order |
+| `POST /api/console/payments/:orderId/recheck` | `payments.recheck` (new, on for Admin and Support) | Ask Razorpay for the truth about an order that is not paid |
 
-Re-check: move the per-order body of `reconcile()` in `src/billing.js` into an exported
-`reconcileOrder(env, ctx, order)` and call it from both places, with no change to what the
-scheduled job does. Once per order per 30 seconds. Never marks anything paid unless Razorpay
-says so. 503 `payments_unavailable` without Razorpay keys. Audit `payment.recheck`.
-Link customer names to the customer page and the customer page's orders to this page.
+Search matches an email or name in part, and an ID only whole (ours, Razorpay's order,
+payment or refund ID, an invoice number, a customer ID), so the unique indexes answer.
+The Status filter's `pending` means `created`, `attempted` or `pending`; `refunded` includes
+part refunds.
+
+Re-check: the per-order body of `reconcile()` in `src/billing.js` is now the exported
+`reconcileOrder(env, ctx, order)`, called from both places; the scheduled job does what it
+did. Any order that is not paid can be checked, also a failed or cancelled one (a later
+attempt on the same Razorpay order may have gone through). Once per order per 30 seconds.
+Never marks anything paid unless Razorpay reports a captured payment of the same amount.
+503 `payments_unavailable` without Razorpay keys. Audit `payment.recheck` with before and
+after. Customer names link to the customer page and the customer page's payments link here.
 
 ## 7. Step 3: Refunds
 
