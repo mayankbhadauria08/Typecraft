@@ -109,6 +109,11 @@ Full notes: `docs/EXAM-MODES.md`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('exam_results', 'certificate_codes')`.
    Before this, exam practice still marks tests on the page but can't save them, and certificates
    print without a code.
+   **Done 19 Nov 2026, 03:55 IST.** Restore bookmark taken just before:
+   `00000283-00000000-00005127-b29994f2730f7bef7641ca485fc6b735` (D1 console:
+   `/restore <bookmark>`). Checked after: both tables and both indexes exist and are empty; users 2,
+   certificates 0, lesson_scores 2, audit_logs 2, the same as before; 59 tables became 61. Live
+   site answered normally afterwards.
 2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
 
