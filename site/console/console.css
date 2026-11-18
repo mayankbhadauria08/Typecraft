@@ -767,3 +767,20 @@ td .none { color: var(--ink-3); }
 .plain-list li { margin: 4px 0; }
 .publish-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 #f-tip { font-family: inherit; font-size: 14px; }
+.exercise-list { margin: 12px 0 16px; padding: 0; list-style: none; }
+.exercise { padding: 14px 0; border-top: 1px solid var(--line); }
+.exercise.has-error .exercise-n { background: var(--bad); color: #fff; }
+.exercise-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.exercise-n { display: grid; place-items: center; width: 26px; height: 26px; margin-bottom: 8px; border-radius: 50%; background: var(--surface-2); font-size: 12px; font-weight: 600; }
+.exercise-title { margin: 0; }
+.exercise-tools { margin-bottom: 10px; white-space: nowrap; }
+.exercise textarea { font-family: var(--mono); font-size: 13px; line-height: 1.55; }
+.exercise-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 6px; }
+.tick-inline { margin-top: 0; font-size: 13px; }
+.char-count { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .exercise-head { grid-template-columns: auto minmax(0, 1fr); }
+  .exercise-tools { grid-column: 1 / -1; margin: 0; }
+}
+.exercise-foot label.tick { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 400; }
+.exercise-foot label.tick input { margin: 0; }

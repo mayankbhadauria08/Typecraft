@@ -171,3 +171,68 @@ test('course pages: frames by permission, the course loaded on the lesson page, 
   const menu = (await support('GET', '/console')).text;
   for (const p of ['/console/course"', '/console/course/lessons"', '/console/course/levels"', '/console/course/modules"']) assert.ok(menu.includes(`href="${p}`), p);
 });
+
+/* ---------------- step 3: practice packs ---------------- */
+test('practice packs: edit, hide, add and reorder through drafts; learners get them behind the plan check; never in the public course', async () => {
+  const list = (await admin('GET', '/api/console/course/packs')).body;
+  assert.deepEqual(list.items.map((p) => p.id), ['numbers', 'code', 'business', 'exam']);
+  const numbers = (await admin('GET', '/api/console/course/packs/numbers')).body;
+  assert.equal(numbers.added, false); assert.equal(numbers.pack.exercises.length, 12);
+  assert.equal((await admin('GET', '/api/console/course/packs/nope')).status, 404);
+  // edit an original pack: hide one exercise, change one text, add one
+  const ex = numbers.original.exercises.map((x) => ({ ...x }));
+  ex[0].hidden = true; ex[1].text = 'Plot 14, Sector 21, Gandhinagar 382021.';
+  ex.push({ id: 'aadhaar-free', title: 'Form numbers', text: 'Form No. 48-B, Serial 00417, Ref CK/22/0019.\nSigned: R. Mehta' });
+  let r = await draft(admin, 'pack:numbers', { title: 'Numbers and data entry', description: numbers.original.description, hidden: false, exercises: ex });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await draft(admin, 'pack:numbers', { title: 'X', exercises: [{ id: 'aa', title: 'A', text: 'naïve' }] });
+  assert.equal(r.status, 400); assert.match(Object.values(r.body.error.fields)[0], /cannot type/);
+  assert.equal((await draft(admin, 'pack:numbers', { added: true, title: 'X', exercises: [] })).status, 400, 'an original pack is not new');
+  // a new pack, and the order
+  r = await draft(admin, 'pack:ssc-passages', { added: true, title: 'SSC typing passages', description: 'Ten-minute passages like the SSC typing test.',
+    exercises: [{ id: 'p1', title: 'Passage 1', text: 'The office will remain open on Saturday for the annual audit. Staff are requested to bring their files.' }] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await draft(admin, 'pack:fresh', { title: 'Not marked new', exercises: [] })).status, 400);
+  r = await draft(admin, 'order:packs', { order: ['exam', 'ssc-passages', 'numbers', 'code', 'business'] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const pending = (await admin('GET', '/api/console/course/packs')).body;
+  assert.deepEqual(pending.drafted.map((p) => p.id), ['ssc-passages']);
+  assert.deepEqual(pending.order, { order: ['exam', 'ssc-passages', 'numbers', 'code', 'business'] });
+  // learners: nothing changes until it is published
+  const sub = await K.subscription(learner.id, 'pro', { days: 30, source: 'purchase' });
+  let packs = (await learner.learner('GET', '/api/content/packs')).body.packs;
+  assert.deepEqual(packs.map((p) => p.id), ['numbers', 'code', 'business', 'exam']);
+  r = await publish(owner, 'Practice packs: SSC passages, numbers tidied');
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  packs = (await learner.learner('GET', '/api/content/packs')).body.packs;
+  assert.deepEqual(packs.map((p) => p.id), ['exam', 'ssc-passages', 'numbers', 'code', 'business']);
+  const n = packs.find((p) => p.id === 'numbers');
+  assert.equal(n.exerciseCount, 12, 'one hidden, one added');
+  assert.ok(!n.exercises.some((x) => x.id === ex[0].id) && n.exercises.some((x) => x.id === 'aadhaar-free'));
+  const one = (await learner.learner('GET', '/api/content/packs/ssc-passages')).body.pack;
+  assert.equal(one.exercises[0].title, 'Passage 1');
+  assert.equal((await learner.learner('GET', '/api/content/packs/numbers')).body.pack.exercises.find((x) => x.id === 'pincodes').text, 'Plot 14, Sector 21, Gandhinagar 382021.');
+  // the plan check still applies, and the public course never carries pack texts
+  const free = await K.account({ email: 'free.packs@example.com', name: 'Free Packs' });
+  assert.equal((await free.learner('GET', '/api/content/packs/ssc-passages')).status, 402);
+  assert.ok((await free.learner('GET', '/api/content/packs')).body.packs.every((p) => p.locked));
+  const pub = await K.client()('GET', '/api/course');
+  assert.ok(!('packs' in pub.body.edits) && !pub.text.includes('Passage 1'));
+  // removing the new pack: a draft, then gone after publishing; an earlier version still has it
+  assert.equal((await draft(admin, 'pack:ssc-passages', { reset: true })).status, 200);
+  await publish(owner, 'SSC passages moved out for now');
+  packs = (await learner.learner('GET', '/api/content/packs')).body.packs;
+  assert.ok(!packs.some((p) => p.id === 'ssc-passages'));
+  assert.equal((await learner.learner('GET', '/api/content/packs/ssc-passages')).status, 404);
+  await K.run('DELETE FROM user_subscriptions WHERE id = ?1', sub);
+});
+
+test('exercise pages: frames by permission, no inline code', async () => {
+  const list = await support('GET', '/console/course/exercises');
+  assert.equal(list.status, 200); assertNoInlineCode(list.text);
+  assert.ok(!list.text.includes('id="newPack"'));
+  assert.ok((await admin('GET', '/console/course/exercises')).text.includes('id="newPack"'));
+  const one = await support('GET', '/console/course/exercises/numbers');
+  assert.equal(one.status, 200); assertNoInlineCode(one.text); assert.ok(one.text.includes('data-readonly'));
+  assert.ok((await admin('GET', '/console/course/exercises/numbers')).text.includes('id="saveDraft"'));
+});

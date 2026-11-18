@@ -5,6 +5,7 @@
 //   GET    /api/console/course/lessons              course.view     every lesson with its state (edited, draft)
 //   GET    /api/console/course/lessons/:id          course.view     one lesson: original, published, draft, keys it may use
 //   GET    /api/console/course/packs                course.view     every practice pack with its state
+//   GET    /api/console/course/packs/:id            course.view     one practice pack: live, original, draft
 //   PUT    /api/console/course/drafts/:item         course.edit     { value }: the item as it should become ({ reset: true }: the original)
 //   DELETE /api/console/course/drafts/:item         course.edit     discard the draft
 //   POST   /api/console/course/publish              course.publish  { note, drafts: [{ item, updatedAt }] } → a new version
@@ -190,6 +191,20 @@ export async function getPacks(request, env) {
   });
 }
 
+export async function getPack(request, env, ctx, params) {
+  const who = await requireAdmin(env, request, 'course.view');
+  const id = params.id;
+  const [course, list] = await Promise.all([loadCourse(env), drafts(env)]);
+  const live = mergePacks(course.edits, { all: true }).find((p) => p.id === id) || null;
+  const d = draftOf(list, 'pack:' + id);
+  if (!live && !(d && d.value.added)) throw new HttpError(404, 'not_found', 'There is no practice pack with this ID.');
+  return json({
+    pack: live, original: originalPack(id), draftValue: d ? d.value : null, ...stateOf(live && live.edited ? live : null, d),
+    added: !originalPack(id), published: !!live, limits: { exercises: E.LIMITS.exercises, text: E.LIMITS.exText },
+    can: await can(env, who),
+  });
+}
+
 /* ---------- drafts ---------- */
 export async function putDraft(request, env, ctx, params) {
   const who = await requireAdmin(env, request, 'course.edit');
@@ -305,6 +320,7 @@ export const ROUTES = {
 };
 export const PATTERNS = [
   ['GET', /^\/api\/console\/course\/lessons\/(l\d{1,3})$/, ['id'], getLesson],
+  ['GET', /^\/api\/console\/course\/packs\/([a-z][a-z0-9-]{1,39})$/, ['id'], getPack],
   ['PUT', /^\/api\/console\/course\/drafts\/([a-z]+(?::|%3A)[a-z0-9-]{1,40})$/i, ['item'], putDraft],
   ['DELETE', /^\/api\/console\/course\/drafts\/([a-z]+(?::|%3A)[a-z0-9-]{1,40})$/i, ['item'], deleteDraft],
   ['GET', /^\/api\/console\/course\/versions\/(\d{1,6})$/, ['v'], getVersion],

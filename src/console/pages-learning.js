@@ -98,6 +98,45 @@ function modulesBody() {
 ${tableFrame([['Module'], ['Level', 'col-wide'], ['Lessons', 'num col-wide'], ['State', 'col-fit'], ['', 'col-act']], 8)}`;
 }
 
+/* ---------- Exercises: practice packs ---------- */
+function exercisesBody(me) {
+  const edit = has(me, 'course.edit');
+  return `<div class="page-head page-head-row"><div><h1>Exercises</h1>
+<p class="page-sub">The practice packs in the trainer: real-world texts like phone numbers, letters, code and exam passages, for plans with practice packs. ${esc(draftNote)}</p></div>
+${edit ? `<button type="button" class="btn btn-quiet" id="newPack">${icon('package')}<span>New pack</span></button>` : ''}
+</div>
+${tableFrame([['Pack'], ['Exercises', 'num col-wide'], ['In the trainer', 'col-wide'], ['State', 'col-fit'], ['', 'col-act']], 5)}
+<p class="hint">Learners see the packs in this order. A hidden pack, or one with no exercises shown, is not in the trainer.</p>`;
+}
+function exerciseBody(me) {
+  const edit = has(me, 'course.edit');
+  return recordFrame({
+    back: ['Exercises', '/course/exercises'],
+    missing: ['Pack not found', 'There is no practice pack with this ID.'],
+    main: `<form id="packForm" class="pack-form" novalidate${edit ? '' : ' data-readonly'}>
+<section class="block" aria-labelledby="packTitle"><div class="block-head"><h2 id="packTitle">The pack</h2></div>
+<div class="field" data-field="title"><label for="f-title">Title</label><input id="f-title" name="title" type="text" maxlength="60" autocomplete="off"${edit ? '' : ' readonly'}>
+<p class="err" id="f-title-err" hidden></p></div>
+<div class="field" data-field="description"><label for="f-description">Description</label><textarea id="f-description" name="description" rows="2" maxlength="300"${edit ? '' : ' readonly'}></textarea>
+<p class="hint">Shown on the pack's card in the trainer.</p><p class="err" id="f-description-err" hidden></p></div>
+<label class="tick" for="f-hidden"><input type="checkbox" id="f-hidden" name="hidden"${edit ? '' : ' disabled'}><span><span class="tick-label">Hide this pack</span><span class="tick-hint">It stays here, but learners do not see it.</span></span></label>
+</section>
+<section class="block" aria-labelledby="exTitle"><div class="block-head"><h2 id="exTitle">Exercises</h2><span class="panel-meta" id="exMeta"></span></div>
+<p class="hint">Learners type each text exactly: letters, digits, punctuation, the rupee sign and line breaks (typed with Enter).</p>
+<ol class="exercise-list" id="exercises"></ol>
+${edit ? `<button type="button" class="btn btn-quiet" id="addExercise">Add an exercise</button>` : ''}
+<p class="err" id="f-exercises-err" hidden></p>
+</section>
+${edit ? `<div class="form-actions"><button type="submit" class="btn btn-primary" id="saveDraft">Save draft</button>
+<button type="button" class="btn btn-quiet" id="discardDraft" hidden>Discard draft</button>
+<button type="button" class="btn btn-quiet" id="toOriginal" hidden>Back to the original</button>
+<button type="button" class="btn btn-quiet btn-quiet-danger" id="removePack" hidden>Remove this pack</button></div>` : ''}
+</form>`,
+    side: panel('about', 'About this pack', 4),
+    sideLabel: 'About this pack',
+  });
+}
+
 export const LEARNING_PAGES = [
   { key: 'courses', path: '/course', title: 'Courses', crumbs: ['Learning operations', 'Courses'],
     permission: 'course.view', body: courseBody, scripts: ['course-kit.js', 'course-home.js'] },
@@ -107,6 +146,10 @@ export const LEARNING_PAGES = [
     permission: 'course.view', body: lessonBody, scripts: [...COURSE, 'course-kit.js', 'lesson.js'] },
   { key: 'levels', path: '/course/levels', title: 'Levels', crumbs: ['Learning operations', 'Levels'],
     permission: 'course.view', body: levelsBody, scripts: ['course-kit.js', 'levels.js'] },
+  { key: 'exercises', path: '/course/exercises', title: 'Exercises', crumbs: ['Learning operations', 'Exercises'],
+    permission: 'course.view', body: exercisesBody, scripts: ['course-kit.js', 'exercises.js'] },
+  { key: 'exercises', match: /^\/course\/exercises\/([a-z][a-z0-9-]{1,39})$/, names: ['id'], title: 'Practice pack', crumbs: ['Learning operations', ['Exercises', '/course/exercises'], 'Practice pack'],
+    permission: 'course.view', body: exerciseBody, scripts: ['/shared/course-meta.js', '/shared/course-edits.js', 'course-kit.js', 'exercise.js'] },
   { key: 'course-modules', path: '/course/modules', title: 'Modules', crumbs: ['Learning operations', 'Modules'],
     permission: 'course.view', body: modulesBody, scripts: ['course-kit.js', 'levels.js'] },
 ];
