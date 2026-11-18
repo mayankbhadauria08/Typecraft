@@ -15,7 +15,7 @@ nothing is applied to the live database, without the owner's yes.
 | 1 | Customers | built |
 | 2 | Payments | built |
 | 3 | Refunds | built |
-| 4 | Subscriptions | not started |
+| 4 | Subscriptions | built |
 | 5 | Learning access | not started |
 | 6 | Packages | not started |
 | 7 | Dashboard | not started |
@@ -188,22 +188,28 @@ Page: `/console/refunds`; the refund dialog opens from a payment's page ("Refund
 - The dialog shows who gets the money, how much is left, what happens to the plan, and
   whether the customer is emailed (only once email sending is switched on).
 
-## 8. Step 4: Subscriptions
+## 8. Step 4: Subscriptions (built)
 
-Page: `/console/subscriptions`; the same actions on the customer page.
+Page: `/console/subscriptions` (Extend and End on each row); on a customer's page, Give a
+plan, Extend and End. The dialogs are shared: `site/console/plan-actions.js` (`AC.plans`).
 
 | Method and path | Permission | What |
 | --- | --- | --- |
-| `GET /api/console/subscriptions` | `subscriptions.view` (new) | `state` (`active`, `ending` = within 7 days, `expired`, `revoked`), `package`, `source`, `q`, `page` |
+| `GET /api/console/subscriptions` | `subscriptions.view` (new, on for Admin and Support) | `state` (`active`, `ending` = within 7 days, soonest first, `expired`, `revoked`), `package`, `source`, `q`, `page`; also `counts` per state |
 | `POST /api/console/customers/:id/subscriptions` | `subscriptions.manage` | Grant: `{ packageId, days or null, reason }` |
 | `POST /api/console/subscriptions/:id/extend` | `subscriptions.manage` | `{ days 1–365, reason }`; clears `reminded_at` |
 | `POST /api/console/subscriptions/:id/revoke` | `subscriptions.manage` | `{ reason }`; the dialog says it does not refund |
 | `POST /api/console/subscriptions/extend-all` | `subscriptions.bulk` (new, off for Admin and Support, password check) | `{ days 1–30, reason }` for every active plan with an end date |
 
-Only an active, unexpired plan can be extended; a lifetime plan cannot. Dates stay in the
-exact `toISOString()` format (they are compared as text): in SQL use
+Only an active, unexpired plan can be extended; a lifetime plan cannot. Extending a plan
+moves the plans queued after it (a renewal bought before it ended starts when it ends) by
+the same days, so the customer gains the days in full; extending every plan moves a plan
+that has not started yet with it. A grant starts now (to add days, extend instead). Ending a
+plan refunds nothing; the dialog says where refunds are sent. Dates stay in the exact
+`toISOString()` format (they are compared as text): SQL uses
 `strftime('%Y-%m-%dT%H:%M:%fZ', expires_at, '+N days')`. No email is sent yet; the dialogs
-say so. Rename the `subscriptions.manage` label to "Grant, extend and end plans".
+say so. `subscriptions.manage` is now labelled "Grant, extend and end plans". Extending every
+plan is allowed once a minute and audited as `subscription.extend_all` with the count.
 
 ## 9. Step 5: Learning access
 

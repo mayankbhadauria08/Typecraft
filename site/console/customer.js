@@ -1,11 +1,12 @@
 /* One customer's profile.
-   GET    /api/console/customers/:id → { customer, plan, subscriptions, orders | null, progress, devices, sessions,
-                                          notes, emails | null, activity | null, can: { manage, manageBlock, notes } }
+   GET    /api/console/customers/:id → { customer, plan, subscriptions, packages | null, orders | null, progress, devices, sessions,
+                                          notes, emails | null, activity | null, can: { manage, manageBlock, notes, plans } }
           (orders, emails and activity are null when the role may not see them; their sections are then not on the page)
    POST   /api/console/customers/:id/status   { status, reason }
    POST   /api/console/customers/:id/sign-out
    POST   /api/console/customers/:id/notes    { body } → { notes }
-   DELETE /api/console/notes/:id              → { notes } */
+   DELETE /api/console/notes/:id              → { notes }
+   Giving, extending and ending plans: AC.plans (plan-actions.js). */
 (function () {
   'use strict';
   var AC = window.AC, el = AC.el, doc = document;
@@ -17,6 +18,7 @@
   var ACTION = { 'user.disable': 'Account disabled', 'user.enable': 'Account restored', 'user.sign_out': 'Signed out everywhere', 'user.note_add': 'Note added',
     'user.note_delete': 'Note deleted', 'user.role': 'Staff role changed', 'subscription.grant': 'Plan given', 'subscription.revoke': 'Plan ended',
     'subscription.extend': 'Plan extended', 'access.add': 'Access exception added', 'access.end': 'Access exception ended' };
+  var reloadAfter = function (r) { if (r && r !== true) load(); };
   var fill = AC.fill, quiet = AC.quiet, table = AC.table, fact = AC.fact;
   function initials(name, email) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -82,18 +84,49 @@
   }
 
   /* ---------- sections ---------- */
+  /** "On Premium until 2 Dec 2026, then Pro until 6 Feb 2027." The plan shown is the highest one the customer has; a lower one may last longer. */
+  function planLine(d) {
+    var p = d.plan;
+    if (p.id === 'free') return 'On the Free plan.';
+    var on = d.subscriptions.filter(function (s) { return s.status === 'active' || s.status === 'upcoming'; });
+    var top = on.filter(function (s) { return s.packageId === p.id; });
+    if (!top.length) return 'On ' + p.name + (p.expiresAt ? ' until ' + AC.fmt.date(p.expiresAt) + '.' : ', with no end date.');
+    var lasts = function (s) { return s.expiresAt || '9999'; };   // no end date lasts longest
+    var topEnd = top.map(lasts).sort().pop();
+    if (topEnd === '9999') return 'On ' + p.name + ', with no end date.';
+    var after = on.filter(function (s) { return s.packageId !== p.id && lasts(s) > topEnd; }).sort(function (a, b) { return lasts(a) < lasts(b) ? 1 : -1; })[0];
+    return 'On ' + p.name + ' until ' + AC.fmt.date(topEnd)
+      + (after ? ', then ' + after.packageName + (after.expiresAt ? ' until ' + AC.fmt.date(after.expiresAt) : ' with no end date') : '') + '.';
+  }
   function plan(d) {
-    var p = d.plan, now = p.id === 'free' ? 'On the Free plan.' : 'On ' + p.name + (p.expiresAt ? ' until ' + AC.fmt.date(p.expiresAt) + '.' : ', with no end date.');
+    var now = planLine(d);
+    var who = d.customer.fullName || d.customer.email, can = d.can.plans;
     var rows = d.subscriptions.map(function (s) {
+      var on = s.status === 'active' || s.status === 'upcoming';
+      var how = s.source === 'purchase' && s.orderId && d.orders ? el('a', { href: AC.base + '/payments/' + encodeURIComponent(s.orderId), text: 'Bought' }) : AC.source(s.source);
       return el('tr', null, [
-        el('td', null, [el('span', { class: 'cell-main', text: s.packageName }), el('div', { class: 'cell-sub', text: AC.source(s.source) })]),
+        el('td', null, [el('span', { class: 'cell-main', text: s.packageName }), el('div', { class: 'cell-sub' }, how)]),
         el('td', { class: 'col-fit' }, AC.status('plan', s.status)),
         el('td', { class: 'col-wide nowrap', text: AC.fmt.date(s.startsAt) }),
-        el('td', { class: 'nowrap', text: s.expiresAt ? AC.fmt.date(s.expiresAt) : 'No end date' })
+        el('td', { class: 'nowrap', text: s.expiresAt ? AC.fmt.date(s.expiresAt) : 'No end date' }),
+        can ? el('td', { class: 'col-act' }, on ? el('div', { class: 'row-actions' }, [
+          s.expiresAt ? el('button', { type: 'button', class: 'btn-link', text: 'Extend', 'aria-label': 'Extend ' + s.packageName,
+            on: { click: function () { AC.plans.extend(s, who).then(reloadAfter); } } }) : null,
+          el('button', { type: 'button', class: 'btn-link btn-link-danger', text: 'End', 'aria-label': 'End ' + s.packageName,
+            on: { click: function () { AC.plans.end(s, who).then(reloadAfter); } } })
+        ]) : null) : null
       ]);
     });
-    fill('planBody', [el('p', { class: 'lead', text: now }),
-      rows.length ? table([['Plan'], ['Status', 'col-fit'], ['Started', 'col-wide'], ['Ends']], rows) : quiet('No paid plan so far.')]);
+    var heads = [['Plan'], ['Status', 'col-fit'], ['Started', 'col-wide'], ['Ends']];
+    if (can) heads.push(['', 'col-act']);
+    fill('planBody', [el('p', { class: 'lead', text: now }), rows.length ? table(heads, rows) : quiet('No paid plan so far.')]);
+    // "Give a plan" sits beside the section's title
+    var head = byId('planTitle').parentNode, old = head.querySelector('.block-actions');
+    if (old) old.remove();
+    if (can && d.packages && d.packages.length) {
+      head.appendChild(el('div', { class: 'block-actions' }, el('button', { type: 'button', class: 'btn btn-quiet btn-sm', text: 'Give a plan',
+        on: { click: function () { AC.plans.grant(d.customer, d.packages).then(reloadAfter); } } })));
+    }
   }
   function orders(d) {
     if (!d.orders) return;

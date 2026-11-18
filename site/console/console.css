@@ -486,6 +486,9 @@ th.col-role, td.col-role { width: 116px; padding-left: 8px; padding-right: 8px; 
 .timeline-what { display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .timeline-why { color: var(--ink-2); }
 .cell-action { margin-top: 6px; font-size: 13px; }
+:where(.console) :where(th, td).col-act { width: 1%; white-space: nowrap; text-align: right; }
+.row-actions { display: flex; justify-content: flex-end; gap: 14px; }
+.btn-link-danger { color: var(--bad); }
 .measure { max-width: 44ch; }   /* long text in a table cell: keeps the column from taking the room of the others */
 .devices > li { display: grid; gap: 1px; }
 

@@ -317,10 +317,10 @@ test('defaults: Support cannot refund, manage administrators, or touch settings;
   for (const k of ['payments.refund', 'admins.manage', 'roles.manage', 'settings.view', 'settings.manage', 'audit.view', 'customers.manage', 'subscriptions.manage', 'packages.manage']) {
     assert.ok(!support.includes(k), `support must not have ${k}`);
   }
-  assert.deepEqual(support.sort(), ['customers.notes', 'customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.recheck', 'payments.view', 'refunds.view', 'support.manage', 'support.view']);
+  assert.deepEqual(support.sort(), ['customers.notes', 'customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.recheck', 'payments.view', 'refunds.view', 'subscriptions.view', 'support.manage', 'support.view']);
   for (const k of ['customers.export', 'customers.manage', 'payments.export']) assert.ok(!support.includes(k), `support must not have ${k}`);
   for (const k of ['payments.refund', 'settings.manage', 'roles.manage', 'admins.manage']) assert.ok(!admin.includes(k), `admin must not have ${k} by default`);
-  assert.equal(admin.length, 21);
+  assert.equal(admin.length, 22);
   assert.deepEqual(await keys('learner'), []); assert.deepEqual(await keys(null), []);
   await assert.rejects(() => can(A.env, 'admin', 'no.such.permission'), /unknown permission/);
   // every permission belongs to one of the four layers

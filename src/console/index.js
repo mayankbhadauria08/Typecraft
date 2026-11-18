@@ -6,8 +6,9 @@ import * as access from './access-api.js';
 import * as customers from './customers-api.js';
 import * as payments from './payments-api.js';
 import * as refunds from './refunds-api.js';
+import * as subscriptions from './subscriptions-api.js';
 
-const PARTS = [auth, access, customers, payments, refunds];
+const PARTS = [auth, access, customers, payments, refunds, subscriptions];
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006' };

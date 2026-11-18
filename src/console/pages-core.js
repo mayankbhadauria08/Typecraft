@@ -1,5 +1,6 @@
 // The frames of the Core operations pages built in Phase 2 (docs/ADMIN-PHASE-2.md).
 // Customers is in ./pages.js; everything here is listed into PAGES there.
+import { icon } from './icons.js';
 import { select, dayField, section, panel, lines, listFrame, recordFrame, downloadButton } from './page-kit.js';
 
 /* ---------- Payments ---------- */
@@ -51,6 +52,23 @@ function refundsBody() {
   });
 }
 
+/* ---------- Subscriptions ---------- */
+function subscriptionsBody(me) {
+  return listFrame({
+    title: 'Subscriptions',
+    sub: "Every plan customers have or had. To give someone a plan, open the customer.",
+    action: me.permissions.includes('subscriptions.bulk') ? `<button type="button" class="btn btn-quiet" id="extendAllBtn">${icon('calendar')}<span>Extend every plan</span></button>` : '',
+    label: 'Find plans',
+    search: { label: 'Search plans', placeholder: 'Email, name or plan ID' },
+    filters: [
+      select('state', 'State', [['', 'All plans'], ['active', 'Active'], ['ending', 'Ending in 7 days'], ['expired', 'Ended'], ['revoked', 'Ended early']]),
+      select('package', 'Plan', [['', 'Every package']]),
+      select('source', 'How', [['', 'Any way'], ['purchase', 'Bought'], ['admin', 'Given by staff'], ['promo', 'Promotion']]),
+    ].join('\n'),
+    heads: [['Customer'], ['Plan', 'col-wide'], ['Status', 'col-fit'], ['Started', 'col-wide'], ['Ends', 'col-wide'], ['How', 'col-wide'], ['', 'col-act']],
+  });
+}
+
 export const CORE_PAGES = [
   { key: 'payments', path: '/payments', title: 'Payments', crumbs: ['Core operations', 'Payments'],
     permission: 'payments.view', body: paymentsBody, scripts: ['payments.js'] },
@@ -58,4 +76,6 @@ export const CORE_PAGES = [
     permission: 'payments.view', body: paymentBody, scripts: ['payment.js'] },
   { key: 'refunds', path: '/refunds', title: 'Refunds', crumbs: ['Core operations', 'Refunds'],
     permission: 'refunds.view', body: refundsBody, scripts: ['refunds.js'] },
+  { key: 'subscriptions', path: '/subscriptions', title: 'Subscriptions', crumbs: ['Core operations', 'Subscriptions'],
+    permission: 'subscriptions.view', body: subscriptionsBody, scripts: ['plan-actions.js', 'subscriptions.js'] },
 ];

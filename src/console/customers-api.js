@@ -18,6 +18,7 @@ import { roleFrom } from '../roles.js';
 import { entitlementsFor } from '../entitlements.js';
 import { audit } from '../billing.js';
 import { requireAdmin, endAdminSessionsFor } from './session.js';
+import { subView } from './subscriptions-api.js';
 import { permissionsFor } from './permissions.js';
 import { ROLE_LABELS } from './config.js';
 import { PAGE_SIZE, EXPORT_MAX, DAY_MS, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, istDayStart, istStamp, reasonOf, csvResponse } from './lib.js';
@@ -152,7 +153,7 @@ export async function getCustomer(request, env, ctx, params) {
   const firstDay = istDay(Date.now() - 13 * DAY_MS);
 
   const stmts = {
-    subs: DB.prepare(`SELECT s.id, s.package_id, p.name, s.order_id, s.status, s.source, s.starts_at, s.expires_at
+    subs: DB.prepare(`SELECT s.id, s.package_id, p.name AS package_name, s.order_id, s.status, s.source, s.starts_at, s.expires_at, s.created_at
                         FROM user_subscriptions s JOIN packages p ON p.id = s.package_id WHERE s.user_id = ?1 ORDER BY s.created_at DESC LIMIT 50`).bind(u.id),
     totals: DB.prepare('SELECT xp, streak_count, streak_best FROM user_totals WHERE user_id = ?1').bind(u.id),
     lessons: DB.prepare(`SELECT COALESCE(SUM(status = 'completed'), 0) AS done, COALESCE(SUM(stars), 0) AS stars, COALESCE(SUM(crown), 0) AS crowns,
@@ -169,6 +170,9 @@ export async function getCustomer(request, env, ctx, params) {
     stmts.orders = DB.prepare(`SELECT o.id, p.name AS package_name, o.amount_paise, o.currency, o.status, o.created_at, o.paid_at, i.number AS invoice_number
                                  FROM orders o JOIN packages p ON p.id = o.package_id LEFT JOIN invoices i ON i.order_id = o.id
                                 WHERE o.user_id = ?1 ORDER BY o.created_at DESC LIMIT 10`).bind(u.id);
+  }
+  if (has('subscriptions.manage')) {
+    stmts.packages = DB.prepare("SELECT id, name, validity_days, active FROM packages WHERE id <> 'free' ORDER BY display_order, name");
   }
   if (has('emails.view')) {
     stmts.emails = DB.prepare('SELECT template, subject, status, created_at FROM email_logs WHERE user_id = ?1 ORDER BY created_at DESC LIMIT 10').bind(u.id);
@@ -196,8 +200,8 @@ export async function getCustomer(request, env, ctx, params) {
       role: u.role, roleLabel: u.role ? ROLE_LABELS[u.role] : null, createdAt: u.created_at, lastLoginAt: u.last_login_at, passwordChangedAt: u.password_changed_at,
     },
     plan: { id: ent.plan, name: ent.planName, expiresAt: ent.expiresAt },
-    subscriptions: R.subs.map((s) => ({ id: s.id, packageId: s.package_id, packageName: s.name, orderId: s.order_id, source: s.source, startsAt: s.starts_at, expiresAt: s.expires_at,
-      status: s.status === 'active' && s.expires_at && s.expires_at <= now ? 'expired' : s.status })),
+    subscriptions: R.subs.map((s) => subView(s, now)),
+    packages: R.packages ? R.packages.map((p) => ({ id: p.id, name: p.name, validityDays: p.validity_days, onSale: !!p.active })) : null,
     orders: R.orders ? R.orders.map((o) => ({ id: o.id, packageName: o.package_name, amountPaise: o.amount_paise, currency: o.currency, status: o.status,
       createdAt: o.created_at, paidAt: o.paid_at, invoiceNumber: o.invoice_number })) : null,
     progress: {
@@ -214,7 +218,8 @@ export async function getCustomer(request, env, ctx, params) {
     notes: R.notes.map((n) => noteView(who, n)),
     emails: R.emails ? R.emails.map((e) => ({ template: e.template, subject: e.subject, status: e.status, createdAt: e.created_at })) : null,
     activity: R.activity ? R.activity.map((a) => ({ action: a.action, reason: reasonIn(a.detail), actor: a.actor || 'System', createdAt: a.created_at })) : null,
-    can: { manage: has('customers.manage') && !manageBlock(who, u), manageBlock: has('customers.manage') ? manageBlock(who, u) : null, notes: has('customers.notes') },
+    can: { manage: has('customers.manage') && !manageBlock(who, u), manageBlock: has('customers.manage') ? manageBlock(who, u) : null, notes: has('customers.notes'),
+      plans: has('subscriptions.manage') },
   });
 }
 

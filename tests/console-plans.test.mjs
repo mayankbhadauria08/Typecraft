@@ -1,0 +1,252 @@
+// Admin console, phase 2: subscriptions (docs/ADMIN-PHASE-2.md §8), learning access (§9) and packages (§10).
+//   node --test tests/console-plans.test.mjs
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { makeEnv, startServer } from './server.mjs';
+import { kit, OWNER, pw, assertNoInlineCode } from './console-kit.mjs';
+
+const DAY = 86400000;
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
+
+let S, K, owner, admin, support, P = {}, U = {};
+before(async () => {
+  const env = makeEnv({ OWNER_EMAILS: OWNER, SITE_URL: 'https://typecraft.test' });
+  S = { env, srv: await startServer(env, 8796) };
+  S.base = `http://localhost:${S.srv.port}`;
+  K = kit(S, { ipPrefix: '10.62.0.' });
+  owner = await K.consoleLogin(await K.owner());
+  admin = await K.consoleLogin(await K.account({ role: 'admin', name: 'Kavita Ops' }));
+  support = await K.consoleLogin(await K.account({ role: 'support', name: 'Rahul Help' }));
+
+  U.riya = await K.customer({ name: 'Riya Sharma', email: 'riya.sharma@example.com' });
+  U.amit = await K.customer({ name: 'Amit Verma', email: 'amit@example.com' });
+  U.neha = await K.customer({ name: 'Neha Gupta', email: 'neha@example.com' });
+  U.zoya = await K.customer({ name: 'Zoya Khan', email: 'zoya@example.com' });
+  P.riyaPro = await K.subscription(U.riya, 'pro', { days: 40, source: 'purchase' });
+  P.amitSoon = await K.subscription(U.amit, 'starter', { days: 3 });                  // ends in 3 days, given by staff
+  P.amitOld = await K.subscription(U.amit, 'premium', { days: -2 });                 // over, not yet marked by the nightly job
+  P.nehaLife = await K.subscription(U.neha, 'lifetime', { days: null, source: 'purchase' });
+  P.zoyaGone = await K.subscription(U.zoya, 'pro', { days: 30, status: 'revoked' });
+  P.zoyaDone = await K.subscription(U.zoya, 'starter', { days: -40, status: 'expired', source: 'promo' });
+  await K.run("UPDATE user_subscriptions SET order_id = NULL, created_at = ?2 WHERE id = ?1", P.zoyaDone, inDays(-70));
+});
+after(() => { S.srv.server.close(); });
+
+const subs = async (c, query = '') => { const r = await c('GET', '/api/console/subscriptions' + (query ? '?' + query : '')); assert.equal(r.status, 200, r.text); return r.body; };
+const ids = (d) => d.items.map((x) => x.id);
+const sub = (id) => K.one('SELECT * FROM user_subscriptions WHERE id = ?1', id);
+const reasons = { reason: 'Compensation for the outage on 12 Nov' };
+
+/* ================= subscriptions ================= */
+test('plans list: who may see it; states, counts and filters', async () => {
+  assert.equal((await K.client()('GET', '/api/console/subscriptions')).status, 401);
+  const d = await subs(support);
+  assert.equal(d.total, 6);
+  assert.deepEqual(d.counts, { active: 3, ending: 1, expired: 2, revoked: 1, extendable: 2 });
+  assert.deepEqual(d.packages.map((p) => p.id), ['starter', 'pro', 'premium', 'lifetime']);
+  const row = d.items.find((x) => x.id === P.riyaPro);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'customer', 'expiresAt', 'id', 'orderId', 'packageId', 'packageName', 'source', 'startsAt', 'status']);
+  assert.deepEqual([row.status, row.packageName, row.source, row.customer.email], ['active', 'Pro', 'purchase', 'riya.sharma@example.com']);
+  assert.equal(d.items.find((x) => x.id === P.amitOld).status, 'expired', 'over by date counts as ended');
+
+  assert.deepEqual(ids(await subs(admin, 'state=active')).sort(), [P.riyaPro, P.amitSoon, P.nehaLife].sort());
+  assert.deepEqual(ids(await subs(admin, 'state=ending')), [P.amitSoon]);
+  assert.deepEqual(ids(await subs(admin, 'state=expired')).sort(), [P.amitOld, P.zoyaDone].sort());
+  assert.deepEqual(ids(await subs(admin, 'state=revoked')), [P.zoyaGone]);
+  assert.deepEqual(ids(await subs(admin, 'package=lifetime')), [P.nehaLife]);
+  assert.deepEqual(ids(await subs(admin, 'source=promo')), [P.zoyaDone]);
+  assert.deepEqual(ids(await subs(admin, 'source=admin&state=active')), [P.amitSoon]);
+  assert.deepEqual(ids(await subs(admin, 'q=zoya')).sort(), [P.zoyaGone, P.zoyaDone].sort());
+  assert.deepEqual(ids(await subs(admin, 'q=' + U.neha)), [P.nehaLife]);
+  assert.deepEqual(ids(await subs(admin, 'q=' + P.amitOld)), [P.amitOld]);
+  assert.equal((await subs(admin, 'state=nope&source=__proto__')).total, 6, 'unknown values are no filter');
+
+  await K.setPermission('support', 'subscriptions.view', false);
+  try { assert.equal((await support('GET', '/api/console/subscriptions')).status, 403); } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'subscriptions.view'"); }
+});
+
+test('plans list: the plans ending soon come soonest first', async () => {
+  const later = await K.subscription(U.riya, 'starter', { days: 6 });
+  try {
+    assert.deepEqual(ids(await subs(admin, 'state=ending')), [P.amitSoon, later]);
+  } finally { await K.run('DELETE FROM user_subscriptions WHERE id = ?1', later); }
+});
+
+test('giving a plan: who may, what is checked, and it starts now', async () => {
+  const give = (c, id, body) => c('POST', `/api/console/customers/${id}/subscriptions`, body);
+  assert.equal((await give(support, U.zoya, { packageId: 'pro', ...reasons })).status, 403);
+  const field = async (body, name) => {
+    const r = await give(admin, U.zoya, { ...reasons, ...body });
+    assert.equal(r.status, 400, r.text); assert.ok(r.body.error.fields[name], `${name}: ${r.text}`);
+  };
+  for (const packageId of [undefined, 'free', 'nope', 'PRO', '../pro']) await field({ packageId }, 'packageId');
+  for (const days of [0, -1, 4000, 1.5, '30']) await field({ packageId: 'pro', days }, 'days');
+  await field({ packageId: 'pro', reason: '' }, 'reason');
+  assert.equal((await give(admin, '00000000-0000-0000-0000-000000000000', { packageId: 'pro', ...reasons })).status, 404);
+
+  const before = Date.now();
+  let r = await give(admin, U.zoya, { packageId: 'pro', ...reasons });
+  assert.equal(r.status, 201, r.text);
+  const s = r.body.subscription;
+  assert.deepEqual([s.packageId, s.source, s.status, s.orderId], ['pro', 'admin', 'active', null]);
+  assert.match(s.expiresAt, ISO);
+  const length = Date.parse(s.expiresAt) - Date.parse(s.startsAt);
+  assert.equal(length, 90 * DAY, "the package's usual length");
+  assert.ok(Date.parse(s.startsAt) >= before - 1000);
+  assert.deepEqual(r.body.plan, { id: 'pro', name: 'Pro', expiresAt: s.expiresAt });
+  const row = await sub(s.id);
+  assert.equal(row.features, (await K.one("SELECT features FROM packages WHERE id = 'pro'")).features, 'what the plan gives is copied in');
+
+  r = await give(owner, U.zoya, { packageId: 'starter', days: 10, ...reasons });
+  assert.equal(Date.parse(r.body.subscription.expiresAt) - Date.parse(r.body.subscription.startsAt), 10 * DAY);
+  assert.equal(r.body.plan.id, 'pro', 'the higher plan still shows');
+  r = await give(owner, U.zoya, { packageId: 'lifetime', ...reasons });
+  assert.equal(r.body.subscription.expiresAt, null);
+  assert.deepEqual(r.body.plan, { id: 'lifetime', name: 'Lifetime', expiresAt: null });
+
+  const log = (await K.audits('subscription.grant')).filter((a) => a.target === `user:${U.zoya}`);
+  assert.equal(log.length, 3);
+  assert.deepEqual(JSON.parse(log[0].detail), { subscriptionId: s.id, packageId: 'pro', days: 90, reason: reasons.reason });
+  assert.equal(log[0].actor_id, admin.who.id);
+  for (const a of log) await K.run('DELETE FROM user_subscriptions WHERE id = ?1', JSON.parse(a.detail).subscriptionId);
+});
+
+test('extending a plan: days are added exactly, a renewal queued after it moves too, and the reminder can go again', async () => {
+  const cust = await K.customer({ name: 'Extend Customer', email: 'extend@example.com' });
+  const end = inDays(20);
+  const first = await K.subscription(cust, 'pro', { days: 20, source: 'purchase' });
+  await K.run('UPDATE user_subscriptions SET expires_at = ?2, reminded_at = ?3 WHERE id = ?1', first, end, inDays(-1));
+  // a renewal bought before the first ended starts when it ends; a plan given by staff overlaps it
+  const queued = randomUUID(), overlap = await K.subscription(cust, 'starter', { days: 10 });
+  await K.run(`INSERT INTO user_subscriptions (id, user_id, package_id, order_id, status, source, features, limits, starts_at, expires_at, created_at, updated_at)
+               SELECT ?1, ?2, 'pro', NULL, 'active', 'purchase', features, limits, ?3, ?4, ?5, ?5 FROM packages WHERE id = 'pro'`, queued, cust, end, inDays(110), inDays(0));
+  const extend = (c, id, body) => c('POST', `/api/console/subscriptions/${id}/extend`, body);
+
+  assert.equal((await extend(support, first, { days: 7, ...reasons })).status, 403);
+  for (const days of [0, 366, 1.5, '7', null]) {
+    const r = await extend(admin, first, { days, ...reasons });
+    assert.equal(r.status, 400); assert.ok(r.body.error.fields.days, String(days));
+  }
+  assert.ok((await extend(admin, first, { days: 7 })).body.error.fields.reason);
+  const queuedBefore = await sub(queued);
+
+  const r = await extend(admin, first, { days: 7, ...reasons });
+  assert.equal(r.status, 200, r.text);
+  const after = await sub(first);
+  assert.match(after.expires_at, ISO);
+  assert.equal(Date.parse(after.expires_at) - Date.parse(end), 7 * DAY);
+  assert.equal(after.reminded_at, null, 'the renewal reminder can be sent again');
+  assert.equal(r.body.moved, 1);
+  const q = await sub(queued);
+  assert.equal(Date.parse(q.starts_at) - Date.parse(queuedBefore.starts_at), 7 * DAY);
+  assert.equal(Date.parse(q.expires_at) - Date.parse(queuedBefore.expires_at), 7 * DAY);
+  assert.equal(q.starts_at, after.expires_at, 'the renewal still starts when the first plan ends');
+  const o = await sub(overlap);
+  assert.ok(Date.parse(o.expires_at) < Date.parse(end), 'a plan that overlaps is not moved');
+  assert.equal(r.body.plan.expiresAt, q.expires_at, 'the customer now has access 7 days longer');
+  const log = (await K.audits('subscription.extend')).find((a) => JSON.parse(a.detail).subscriptionId === first);
+  assert.deepEqual(JSON.parse(log.detail), { subscriptionId: first, packageId: 'pro', days: 7, from: end, to: after.expires_at, moved: 1, reason: reasons.reason });
+
+  // what cannot be extended
+  for (const [id, code] of [[P.nehaLife, 'no_end_date'], [P.amitOld, 'not_active'], [P.zoyaGone, 'not_active'], [P.zoyaDone, 'not_active']]) {
+    const x = await extend(admin, id, { days: 7, ...reasons });
+    assert.equal(x.status, 400, id); assert.equal(x.body.error.code, code);
+  }
+  assert.equal((await extend(admin, 'nope-not-a-plan', { days: 7, ...reasons })).status, 404);
+});
+
+test('ending a plan: a reason is required, nothing is refunded, and the customer falls back at once', async () => {
+  const cust = await K.customer({ name: 'End Customer', email: 'end@example.com' });
+  const pro = await K.subscription(cust, 'pro', { days: 30, source: 'purchase' });
+  const order = await K.order(cust, 'pro');
+  await K.run('UPDATE user_subscriptions SET order_id = ?2 WHERE id = ?1', pro, order.id);
+  const starter = await K.subscription(cust, 'starter', { days: 5 });
+  const end = (c, id, body) => c('POST', `/api/console/subscriptions/${id}/revoke`, body);
+  assert.equal((await end(support, pro, reasons)).status, 403);
+  assert.ok((await end(admin, pro, {})).body.error.fields.reason);
+
+  let r = await end(admin, pro, reasons);
+  assert.equal(r.status, 200, r.text);
+  assert.equal(r.body.subscription.status, 'revoked');
+  assert.deepEqual([r.body.plan.id, r.body.plan.name], ['starter', 'Starter'], 'the other plan stays');
+  assert.equal((await K.one('SELECT status FROM orders WHERE id = ?1', order.id)).status, 'paid', 'nothing is refunded');
+  assert.equal((await K.one('SELECT COUNT(*) AS n FROM refunds WHERE order_id = ?1', order.id)).n, 0);
+  r = await end(admin, pro, reasons);
+  assert.equal(r.status, 400); assert.equal(r.body.error.code, 'not_active');
+  r = await end(owner, starter, reasons);
+  assert.equal(r.body.plan.id, 'free');
+  assert.equal((await end(admin, P.amitOld, reasons)).body.error.code, 'not_active', 'a plan over by date has already ended');
+  const log = (await K.audits('subscription.revoke')).filter((a) => a.target === `user:${cust}`).map((a) => JSON.parse(a.detail));
+  assert.deepEqual(log, [{ subscriptionId: pro, packageId: 'pro', bought: true, reason: reasons.reason }, { subscriptionId: starter, packageId: 'starter', bought: false, reason: reasons.reason }]);
+});
+
+test('extending every plan: only with its own permission and the password; plans without an end date, and plans that ended, stay', async () => {
+  const all = (c, body) => c('POST', '/api/console/subscriptions/extend-all', body);
+  assert.equal((await all(admin, { days: 3, ...reasons })).status, 403, 'off for Admin by default');
+  await K.stale(owner);
+  let r = await all(owner, { days: 3, ...reasons });
+  assert.equal(r.status, 403); assert.equal(r.body.error.code, 'reauth_required');
+  assert.equal((await owner('POST', '/api/admin/auth/reauth', { password: pw })).status, 200);
+  for (const days of [0, 31, '3']) assert.ok((await all(owner, { days, ...reasons })).body.error.fields.days);
+
+  const snapshot = async () => new Map((await K.many('SELECT id, status, starts_at, expires_at FROM user_subscriptions')).map((s) => [s.id, s]));
+  const was = await snapshot();
+  const now = new Date().toISOString();
+  const expect = [...was.values()].filter((s) => s.status === 'active' && s.expires_at && s.expires_at > now).map((s) => s.id);
+  r = await all(owner, { days: 3, ...reasons });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(r.body, { ok: true, plans: expect.length, days: 3 });
+  const is = await snapshot();
+  for (const [id, s] of was) {
+    const n = is.get(id);
+    if (expect.includes(id)) {
+      assert.equal(Date.parse(n.expires_at) - Date.parse(s.expires_at), 3 * DAY, id);
+      if (s.starts_at > now) assert.equal(Date.parse(n.starts_at) - Date.parse(s.starts_at), 3 * DAY, 'a plan that has not started yet starts later too');
+      else assert.equal(n.starts_at, s.starts_at);
+    } else assert.deepEqual(n, s, `${id} is not changed`);
+  }
+  assert.equal(is.get(P.nehaLife).expires_at, null);
+  r = await all(owner, { days: 3, ...reasons });
+  assert.equal(r.status, 429, 'not twice in a minute');
+  const log = await K.audits('subscription.extend_all');
+  assert.equal(log.length, 1);
+  assert.deepEqual(JSON.parse(log[0].detail), { days: 3, plans: expect.length, reason: reasons.reason });
+  await K.setPermission('admin', 'subscriptions.bulk', true);
+  try {
+    await K.run("DELETE FROM rate_limits WHERE key = 'extend-all'");
+    assert.equal((await all(admin, { days: 1, ...reasons })).status, 200, 'a Super Admin can give Admin this permission');
+  } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'subscriptions.bulk'"); }
+});
+
+test('the customer page carries what the plan dialogs need, only for who may use them', async () => {
+  const asAdmin = (await admin('GET', `/api/console/customers/${U.riya}`)).body;
+  assert.equal(asAdmin.can.plans, true);
+  assert.deepEqual(asAdmin.packages.map((p) => [p.id, p.validityDays, p.onSale]), [['starter', 30, true], ['pro', 90, true], ['premium', 180, true], ['lifetime', null, true]]);
+  const asSupport = (await support('GET', `/api/console/customers/${U.riya}`)).body;
+  assert.equal(asSupport.can.plans, false); assert.equal(asSupport.packages, null);
+  // a renewal queued after the current plan shows as starting later
+  const queued = randomUUID();
+  await K.run(`INSERT INTO user_subscriptions (id, user_id, package_id, order_id, status, source, features, limits, starts_at, expires_at, created_at, updated_at)
+               SELECT ?1, ?2, 'pro', NULL, 'active', 'purchase', features, limits, ?3, ?4, ?5, ?5 FROM packages WHERE id = 'pro'`, queued, U.riya, inDays(40), inDays(130), inDays(0));
+  const d = (await admin('GET', `/api/console/customers/${U.riya}`)).body;
+  assert.equal(d.subscriptions.find((s) => s.id === queued).status, 'upcoming');
+  await K.run('DELETE FROM user_subscriptions WHERE id = ?1', queued);
+});
+
+test('subscriptions page: the frame by permission', async () => {
+  const page = await admin('GET', '/console/subscriptions');
+  assert.equal(page.status, 200);
+  assertNoInlineCode(page.text);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/subscriptions" aria-current="page">/);
+  for (const name of ['q', 'state', 'package', 'source']) assert.ok(page.text.includes(`name="${name}"`), name);
+  assert.ok(page.text.includes('/site/console/plan-actions.js?v=') && page.text.includes('/site/console/subscriptions.js?v='));
+  assert.ok(!page.text.includes('id="extendAllBtn"'), 'only with subscriptions.bulk');
+  assert.ok((await owner('GET', '/console/subscriptions')).text.includes('id="extendAllBtn"'));
+  assert.ok((await admin('GET', `/console/customers/${U.riya}`)).text.includes('/site/console/plan-actions.js?v='));
+  for (const f of ['plan-actions.js', 'subscriptions.js']) {
+    const r = await K.client()('GET', `/site/console/${f}`);
+    assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
+  }
+});

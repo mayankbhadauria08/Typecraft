@@ -192,7 +192,7 @@ export const PAGES = [
   { key: 'customers', path: '/customers', title: 'Customers', crumbs: ['Core operations', 'Customers'],
     permission: 'customers.view', body: customersBody, scripts: ['customers.js'] },
   { key: 'customers', match: /^\/customers\/([\w-]{1,64})$/, names: ['id'], title: 'Customer', crumbs: ['Core operations', ['Customers', '/customers'], 'Customer'],
-    permission: 'customers.view', body: customerBody, scripts: ['customer.js'] },
+    permission: 'customers.view', body: customerBody, scripts: ['plan-actions.js', 'customer.js'] },
   ...CORE_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
