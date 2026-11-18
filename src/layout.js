@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '1';
+export const ASSET_VERSION = '2';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -26,6 +26,7 @@ const THEME_SCRIPT = "try{var s=JSON.parse(localStorage.getItem('typingMasterSet
 export const SITE_NAV = [
   ['/practice', 'Practice', 'practice'],
   ['/typing-test', 'Typing test', 'typing-test'],
+  ['/exam-practice', 'Exam practice', 'exam-practice'],
   ['/features', 'Features', 'features'],
   ['/pricing', 'Pricing', 'pricing'],
   ['/faq', 'FAQ', 'faq'],
@@ -34,6 +35,7 @@ export const ACCOUNT_NAV = [
   ['/dashboard', 'Dashboard', 'grid'],
   ['/app', 'Practice', 'keyboard'],
   ['/account/history', 'History', 'history'],
+  ['/account/certificates', 'Certificates', 'certificate'],
   ['/account/analytics', 'Analytics', 'chart'],
   ['/account/plans', 'Plans', 'package'],
   ['/account/payments', 'Payments', 'card'],
@@ -107,7 +109,7 @@ function siteFooter(ctx) {
   return `<footer class="site-foot"><div class="container">
   <div class="foot-grid">
     <div class="foot-brand">${brand('/')}<p class="muted">A calm, thorough typing course: 78 lessons, a coach that finds your weak keys, and an arcade to practise in. Made in India.</p></div>
-    <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/features">Features</a><a href="/pricing">Pricing</a></nav>
+    <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a></nav>
     <nav aria-label="Company"><h2 class="foot-h">Company</h2><a href="/about">About</a><a href="/contact">Contact</a><a href="/faq">FAQ</a></nav>
     <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a></nav>
   </div>

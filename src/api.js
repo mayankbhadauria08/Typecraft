@@ -319,6 +319,10 @@ export async function postReset(request, env) {
   if (body.confirm !== 'RESET') throw fieldError({ confirm: 'Type RESET to confirm.' });
   if (!(await hitLimit(env, `reset:${user.id}`, 5, 3600))) throw tooMany(60);
   await env.DB.batch(RESET_TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE user_id = ?1`).bind(user.id)));
+  // the speed certificates are gone, so are their codes (a certificate earned again gets a new one).
+  // Exam practice results are not course progress: they and their codes stay.
+  try { await env.DB.prepare("DELETE FROM certificate_codes WHERE user_id = ?1 AND kind = 'level'").bind(user.id).run(); }
+  catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
   return json({ reset: true, ...(await buildState(env, user.id, todayOf(body.today))) });
 }
 
@@ -345,6 +349,11 @@ export async function getExport(request, env) {
   const strip = (rows) => rows.map(({ user_id: _u, ...rest }) => rest);
   const out = { exportedAt: nowIso(), format: 'typecraft-export-1', profile: user, totals: res[0].results[0] || null, events };
   EXPORT_TABLES.forEach((t, i) => { out[t] = strip(res[i + 1].results); });
+  // exam practice and certificate codes (migration 0008; left out until it is applied)
+  for (const t of ['exam_results', 'certificate_codes']) {
+    try { out[t] = strip((await DB.prepare(`SELECT * FROM ${t} WHERE user_id = ?1`).bind(user.id).all()).results); }
+    catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
+  }
   return json(out, 200, { 'Content-Disposition': `attachment; filename="typecraft-export-${nowIso().slice(0, 10)}.json"` });
 }
 

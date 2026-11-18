@@ -244,13 +244,20 @@
     const wpm = round(cert.wpm), acc = round(cert.accuracy);
     const date = fmtDate(cert.date || cert.at) || fmtDate(new Date());
     const len = testLength(num(cert.seconds, 60));
-    const label = 'Certificate of typing speed: ' + wpm + ' words per minute at ' + acc + '% accuracy on a ' + len + ', awarded to ' + name + ' on ' + date;
+    // a code anyone can check (docs/EXAM-MODES.md): top left, and where to check it, top right
+    const code = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(cert.code || '') ? cert.code : '';
+    const where = code ? String(cert.verifyAt || ((root.location && root.location.host) || 'typecrafttyping.in') + '/verify').slice(0, 60) : '';
+    const label = 'Certificate of typing speed: ' + wpm + ' words per minute at ' + acc + '% accuracy on a ' + len + ', awarded to ' + name + ' on ' + date +
+      (code ? '. Certificate number ' + code : '');
     const nameSize = name.length > 26 ? 12 : name.length > 18 ? 13.5 : 15;
+    const codeLine = code ? '<text x="24" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="5.6" fill="#5f5848">No. ' + esc(code) + '</text>' +
+      '<text x="296" y="28" text-anchor="end" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="5.2" fill="#7b725e">Check at ' + esc(where) + '</text>' : '';
     return '<svg class="rw-cert" viewBox="0 0 320 210" role="img" aria-label="' + esc(label) + '" xmlns="http://www.w3.org/2000/svg">' +
       '<rect x="1" y="1" width="318" height="208" rx="6" fill="#f6f0e1" stroke="#cfc4aa"/>' +
       '<rect x="12" y="12" width="296" height="186" rx="3" fill="none" stroke="#0b6e63" stroke-width="1.5"/>' +
       '<rect x="17" y="17" width="286" height="176" rx="2" fill="none" stroke="#0b6e63" stroke-width=".6" stroke-dasharray="2 3"/>' +
       '<g fill="#0b6e63">' + [[12, 12], [308, 12], [12, 198], [308, 198]].map((p) => '<path transform="translate(' + p[0] + ' ' + p[1] + ')" d="M-3 0 0-3 3 0 0 3z"/>').join('') + '</g>' +
+      codeLine +
       '<text x="160" y="40" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-weight="500" font-size="8.5" letter-spacing="2.4" fill="#0b6e63">CERTIFICATE OF TYPING SPEED</text>' +
       '<text x="160" y="57" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-style="italic" font-size="10" fill="#6a6250">typecraft</text>' +
       '<text x="160" y="92" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="560" font-size="24" fill="#26221b">' + wpm + ' words per minute</text>' +
@@ -522,7 +529,7 @@
     const list = (certs || []).slice().sort((a, b) => num(a.wpm) - num(b.wpm));
     const have = new Set(list.map((c) => round(c.wpm)));
     const earned = list.map((c, i) => {
-      const data = { name, wpm: c.wpm, accuracy: c.accuracy, seconds: c.seconds, date: c.at || c.date };
+      const data = { name, wpm: c.wpm, accuracy: c.accuracy, seconds: c.seconds, date: c.at || c.date, level: c.level };
       return '<figure class="rw-certitem">' + certificate(data) + '<figcaption><span>' + round(c.wpm) + ' wpm · ' + esc(fmtDate(c.at || c.date)) + '</span>' +
         '<button type="button" class="rw-btn ghost small" data-action="print-certificate" data-cert-index="' + i + '" data-cert="' + esc(JSON.stringify(data)) + '">Print</button></figcaption></figure>';
     }).join('');

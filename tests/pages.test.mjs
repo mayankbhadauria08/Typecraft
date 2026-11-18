@@ -22,6 +22,7 @@ const EXPECTED = [
   ['/dashboard', 'user', 'account'],
   ['/account/profile', 'user', 'account'],
   ['/account/history', 'user', 'account'],
+  ['/account/certificates', 'user', 'account'],
   ['/account/analytics', 'user', 'account'],
   ['/account/plans', 'user', 'account'],
   ['/account/payments', 'user', 'account'],
@@ -184,6 +185,7 @@ const SAMPLE = [
   [/\/api\/admin\/packages\/\$\{[^}]+\}/, '/api/admin/packages/no-such-package'],
   [/\/api\/admin\/emails\/\$\{[^}]+\}/, '/api/admin/emails/em_none'],
   [/\/api\/admin\/contact\/\$\{[^}]+\}/, '/api/admin/contact/msg_none'],
+  [/\/api\/me\/certificates\/\$\{[^}]+\}/, '/api/me/certificates/ABCD-EFGH-JKLM'],
 ];
 function apiCalls() {
   const out = new Set();

@@ -214,6 +214,21 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   (client side) and saves as events with `lessonId: 'custom'`; the server accepts
   `custom` only with the feature.
 
+## 6b. Exam practice and certificates — `src/exams.js` (docs/EXAM-MODES.md)
+
+- `POST /api/exams/results` (signed in) `{ id: 'ex-…', mode, passageId, typed, seconds, path?, today }`
+  → 201 `{ saved, result, verdict, today }`; the Worker marks `typed` with `shared/exam-rules.js`
+  (checking `path`), stores the numbers only. 400 implausible (over 200 gross wpm), 409 id taken,
+  429 daily_limit (20 a day), 503 exams_not_ready before migration 0008.
+- `GET /api/exams/results` (signed in) → `{ results: [30 newest], best: { mode: … }, limit }`.
+- `POST /api/exams/results/:id/certificate` (signed in, passed only) → `{ code: 'XXXX-XXXX-XXXX', shared }`.
+- `GET /api/me/certificates` (signed in) → `{ ready, certificates: [{ kind: 'level'|'exam', title, test, wpm,
+  accuracy, seconds, at, code, shared, … }] }`; course certificates get their code here.
+- `PUT /api/me/certificates/:code` (signed in) `{ shared }`.
+- `GET /api/certificates/:code` (public, 60 a 10 minutes per address, `noindex`) → `{ certificate: { holder,
+  kind, title, test, wpm, accuracy, seconds, at, code, checkedAt } }`; 404 for unknown, unshared or a
+  disabled account (the same message for all three).
+
 ## 7. Roles and route protection (site + billing)
 
 - `src/roles.js`: `roleOf(env, user)` → `'owner'|'admin'|'support'|null`

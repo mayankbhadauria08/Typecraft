@@ -77,6 +77,9 @@
 .rw-certs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
 .rw-certitem{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
 .rw-certitem figcaption{display:flex;align-items:center;justify-content:space-between;gap:8px;font:500 12.5px/1.2 var(--mono);color:var(--muted)}
+.rw-certitem figcaption{flex-wrap:wrap}
+.rw-certcode{font:500 12px/1.2 var(--mono);color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.rw-certcode:hover{color:var(--ink,inherit)}
 .rw-print-host{display:none}
 @media print{
   html.rw-printing,html.rw-printing body{background:#fff!important;margin:0}

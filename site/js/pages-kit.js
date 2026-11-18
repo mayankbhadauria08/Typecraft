@@ -35,6 +35,14 @@
     return el;
   }
   K.h = h;
+  /** An SVG picture from our own renderers (js/rewards-ui.js escapes every piece of data), parsed as XML
+      rather than written as HTML. → an <svg> node, or null */
+  K.svg = (markup) => {
+    try {
+      const el = new DOMParser().parseFromString(String(markup || ''), 'image/svg+xml').documentElement;
+      return el && el.nodeName === 'svg' ? document.importNode(el, true) : null;
+    } catch (e) { return null; }
+  };
   K.append = (el, ...kids) => append(el, kids);
   K.mount = (el, ...kids) => { if (!el) return el; el.replaceChildren(); return append(el, kids); };
   K.$ = (sel, root) => (root || document).querySelector(sel);

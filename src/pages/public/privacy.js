@@ -1,4 +1,7 @@
-import { UPDATED, sellerBlock } from './legal-common.js';
+import { sellerBlock } from './legal-common.js';
+
+// its own date: exam practice and certificate checks were added on this day (docs/EXAM-MODES.md)
+const UPDATED = '19 November 2026';
 
 export const meta = {
   path: '/privacy',
@@ -19,6 +22,7 @@ export default `
       <li><b>Account details</b>: your name, email address, phone number and a securely hashed password (we never store the password itself).</li>
       <li><b>Learning data</b>: which lessons and games you completed, your speed, accuracy and errors, and per-key and letter-pair counts used by the coach. We store results and counts, not a recording of everything you type.</li>
       <li><b>Typing tests</b>: the length, speed, accuracy and error count of tests you take while signed in.</li>
+      <li><b>Exam practice</b>: for tests you save, the test, the time used, and the counts of key depressions and mistakes. What you typed is marked and then discarded, not stored.</li>
       <li><b>Payments</b>: the plan, amount, status, dates and the payment reference from Razorpay. Card numbers, UPI PINs and bank logins go directly to Razorpay and never reach us.</li>
       <li><b>Messages</b>: what you send through the contact form or by email, and a record of the emails we send you (type, time, delivery status).</li>
       <li><b>Security data</b>: your IP address and browser type, used to limit repeated sign-in attempts and to tell you about sign-ins from a new device.</li>
@@ -27,6 +31,7 @@ export default `
     <ul>
       <li>To run your account and save your progress across devices.</li>
       <li>To build your review drills, analytics and certificates.</li>
+      <li>To let anyone you give a certificate code check that certificate: the check shows your name, the result and the date, and nothing else. You can stop sharing a certificate at any time on your Certificates page.</li>
       <li>To take payments, activate plans and issue invoices, as required by law.</li>
       <li>To send account emails: verification codes, password resets, receipts, plan reminders and security alerts. Announcements are optional and you can turn them off in your account settings.</li>
       <li>To keep the service secure and to fix problems.</li>
