@@ -725,7 +725,7 @@ function renderDashboard(){
       card.addEventListener('click', () => openLesson(l.id));
       grid.appendChild(card);
     });
-    block.appendChild(grid); cardDashboard.appendChild(block);
+    block.appendChild(grid); Plan.decorateTier(block, L); cardDashboard.appendChild(block);
   });
 }
 function renderPlacementOffer(){
@@ -914,13 +914,20 @@ function openPlacement(){
   specialLesson = { id:'placement', isPlacement:true, title:'Placement test', tier:'Two minutes · find your level', keys:[], level:1 };
   openLesson('placement');
 }
+/* what the placement result means for the levels that open by progress (Plan.rules, docs/UNLOCK-RULES.md) */
+function placementNote(level){
+  const gated = LEVELS.some(L => L.n > 1 && (Plan.rules.progress[String(L.n)] || 'open') !== 'open');
+  if(!gated) return 'This is only a suggestion: you can start anywhere your plan includes.';
+  if(!Plan.rules.placement || level < 2) return 'This is a suggestion. The next levels open as you finish the ones before them.';
+  return `Level ${level} and the levels before it are open for you now. The ones after it open as you finish the levels before them.`;
+}
 function finishPlacement(wpm, acc, secs){
   const level = TC_RULES.placementLevel(wpm, acc);
   try{ localStorage.setItem(PLACEMENT_KEY, JSON.stringify({ level, wpm, accuracy:acc, at:new Date().toISOString() })); }catch(e){}
   emitEvent({ type:'placement', wpm, accuracy:acc, seconds:Math.max(1, secs) });
   const L = LEVELS.find(l => l.n === level);
   showResults({ placement: `<article class="results-card rw-card placement-card"><p class="eyebrow">Placement test</p><h2>Start at Level ${level}: ${esc(L.name)}</h2>
-    <p class="lede">You typed <b>${wpm} wpm</b> at <b>${acc}%</b> accuracy. This is only a suggestion: every lesson stays open.</p>
+    <p class="lede">You typed <b>${wpm} wpm</b> at <b>${acc}%</b> accuracy. ${placementNote(level)}</p>
     <div class="results-actions"><button class="btn primary" data-action="level" data-level="${esc(L.name)}">Show Level ${level}</button><button class="btn secondary" data-action="map">Back to the course</button></div></article>` });
 }
 
@@ -2107,12 +2114,16 @@ window.addEventListener('beforeunload', saveKeyStats);
 
 /* ==========================================================================
    16. PLANS — what the learner's plan unlocks (docs/SAAS-CONTRACTS.md §2, §3, §6)
-   Free: the first five lessons in course order, the placement test, the
-   problem-keys drill and the Daily Challenge. Anything else shows a lock and
+   Free: the lessons the Free package includes (at first the first five), the
+   placement test, the problem-keys drill and the Daily Challenge. Anything else shows a lock and
    opens the upgrade sheet (plans and prices come from GET /api/packages).
    Staff can also open or close one lesson or game for one learner
    (entitlements.overrides): closed wins over the plan, and a closed one says
-   so without talking about plans.
+   so without talking about plans. Which lessons a plan includes, lessons and
+   levels closed or open for everyone, and when each level opens by progress
+   come from shared/lesson-access.js (TC_ACCESS), the same rules the server
+   uses (docs/UNLOCK-RULES.md); the rules for everyone also reach learners
+   without an account (GET /api/learning-rules).
    The server enforces the same rules (events, content packs); this keeps the
    screen honest. Also here: practice packs and custom practice, which run in
    the lesson engine as a one-step special lesson saved with lessonId 'custom'.
@@ -2124,15 +2135,16 @@ window.addEventListener('beforeunload', saveKeyStats);
    ========================================================================== */
 const PLAN_CACHE_KEY = 'typingMasterPlan';
 const FREE_PLAN = { plan:'free', planName:'Free', expiresAt:null, features:['lessons.first5','arcade.daily','tests.basic'], limits:{ lessons:'first5', dailyTests:3, historyDays:7 } };
-const FREE_LESSONS = new Set(TC_META.ORDER.slice(0, 5));
-const ALWAYS_FREE = new Set(['placement', 'review']);
+const ACCESS = window.TC_ACCESS;
+const ALWAYS_FREE = new Set(ACCESS.ALWAYS_OPEN);
+const RULES_CACHE_KEY = 'typingMasterRules';
 /* who to name on a lock until the packages arrive (the sheet itself only shows what the server sends) */
 const PLAN_FALLBACK = { 'lessons.all':'Starter', 'arcade.all':'Starter', 'practice.custom':'Pro', 'exercises.premium':'Pro', 'certificates':'Premium' };
 const CUSTOM_MAX = 2000;
 const LOCK_SVG = '<svg class="plan-lock-svg" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="6.75" rx="1.75"/><path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7"/></svg>';
 
 const Plan = {
-  ent: FREE_PLAN, userId: null, loaded: false, loading: null, loadedAt: 0,
+  ent: FREE_PLAN, userId: null, loaded: false, loading: null, loadedAt: 0, rules: ACCESS.cleanRules(null), rulesAt: 0,
   packages: null, packagesLoading: null, autoShown: false, lastFocus: null,
   packs: null, packsState: '', openPack: null, packTexts: {}, practice: null,
 
@@ -2147,13 +2159,59 @@ const Plan = {
     if(Array.isArray(o.allow) && o.allow.includes(id)) return 'allow';
     return null;
   },
-  closed(kind, id){ return this.override(kind, id) === 'deny'; },
+  closed(kind, id){ return kind === 'lessons' ? this.lessonLock(id) === 'closed' : this.override(kind, id) === 'deny'; },
+  /* ---- one lesson: the plan, rules for everyone and exceptions, then progress ---- */
+  lessonAccess(id){
+    const on = this.enforced();
+    return ACCESS.access({ lessons: on ? (this.ent.limits && this.ent.limits.lessons) : 'all', all: on ? this.has('lessons.all') : true,
+      overrides: on && this.ent.overrides ? this.ent.overrides.lessons : null, rules: this.rules }, id);
+  },
+  placementLevel(){
+    const v = Progress.view && Progress.view.placement;
+    if(v && v.level) return v.level;
+    try{ const p = JSON.parse(localStorage.getItem(PLACEMENT_KEY) || 'null'); return (p && p.level) || null; }catch(e){ return null; }
+  },
+  progressOf(id){
+    return ACCESS.progress({ rules: this.rules, overrides: this.enforced() && this.ent.overrides ? this.ent.overrides.lessons : null,
+      done: lessonDone, placementLevel: this.placementLevel(), canOpen: (x) => this.lessonAccess(x).open }, id);
+  },
+  /** Why a lesson is locked: null when it is open, 'closed' (for this learner), 'closed-all' (for everyone), 'plan' or 'progress'. */
+  lessonLock(id){
+    if(ALWAYS_FREE.has(id)) return null;
+    const a = this.lessonAccess(id);
+    if(!a.open) return a.why === 'you-closed' ? 'closed' : a.why === 'all-closed' ? 'closed-all' : 'plan';
+    return ACCESS.levelOf(id) && !this.progressOf(id).open ? 'progress' : null;
+  },
   lessonAllowed(id){
-    if(!this.enforced() || ALWAYS_FREE.has(id)) return true;
+    if(ALWAYS_FREE.has(id)) return true;
     if(id === 'custom') return this.has('practice.custom');
     if(String(id).startsWith('pack:')) return this.has('exercises.premium');
-    const o = this.override('lessons', id); if(o) return o === 'allow';
-    return this.has('lessons.all') || (this.ent.limits && this.ent.limits.lessons === 'all') || FREE_LESSONS.has(id);
+    return !this.lessonLock(id);
+  },
+  /** "beat the Level 1 boss", "finish Level 2 (3 lessons to go)": what opens the next level. */
+  progressWords(p){
+    if(p.mode === 'bosses'){
+      const total = ACCESS.BOSSES_OF[p.level].length;
+      return total > 1 ? (p.left < total ? `beat the last Level ${p.level} boss` : `beat both Level ${p.level} bosses`) : `beat the Level ${p.level} boss`;
+    }
+    return `finish Level ${p.level}` + (p.left ? ` (${p.left} lesson${p.left === 1 ? '' : 's'} to go)` : '');
+  },
+  /** The cheapest plan on sale that includes this lesson. */
+  lessonPlanName(id){
+    const list = (this.packages || []).filter(p => (p.pricePaise || 0) > 0 && p.limits && ACCESS.covers(p.limits.lessons, id)).sort((a, b) => a.pricePaise - b.pricePaise);
+    return list.length ? list[0].name : (this.packages ? 'a paid plan' : (PLAN_FALLBACK['lessons.all'] || 'Paid'));
+  },
+  /* ---- the rules for everyone: with the plan when signed in, from GET /api/learning-rules for everyone ---- */
+  loadRules(){
+    try{ const c = JSON.parse(localStorage.getItem(RULES_CACHE_KEY) || 'null'); if(c) this.rules = ACCESS.cleanRules(c); }catch(e){}
+    this.rulesAt = Date.now();
+    api('GET', '/api/learning-rules').then(res => { if(res.ok && res.rules) this.setRules(res.rules, true); });
+  },
+  setRules(r, repaint){
+    const next = ACCESS.cleanRules(r), changed = JSON.stringify(next) !== JSON.stringify(this.rules);
+    this.rules = next; this.rulesAt = Date.now();
+    try{ localStorage.setItem(RULES_CACHE_KEY, JSON.stringify(next)); }catch(e){}
+    if(changed && repaint) this.refresh();
   },
   gameAllowed(id){
     if(id === 'daily') return true;
@@ -2194,6 +2252,7 @@ const Plan = {
       if(this.valid(e)){
         this.ent = { plan:e.plan || 'free', planName:e.planName || 'Free', expiresAt:e.expiresAt || null, features:e.features.slice(), limits:Object.assign({}, e.limits || {}),
           overrides:this.cleanOverrides(e.overrides) };
+        if(e.rules) this.setRules(e.rules, false);
         try{ localStorage.setItem(PLAN_CACHE_KEY, JSON.stringify({ userId:this.userId, ent:this.ent })); }catch(err){}
       } else if(!res.network) this.ent = FREE_PLAN;   // no entitlements yet (404) or an error: Free. Offline: the last known plan.
       this.loaded = true; this.loadedAt = Date.now();
@@ -2236,10 +2295,13 @@ const Plan = {
     o = o || {};
     if(o.closed) return this.closedSheet(o);
     const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
-    if(!el.classList.contains('hidden') && this.sheetFeature === o.feature && !o.force) return;
-    this.sheetFeature = o.feature;
+    const key = o.lesson ? 'lesson:' + o.lesson : o.feature;
+    if(!el.classList.contains('hidden') && this.sheetFeature === key && !o.force) return;
+    this.sheetFeature = key;
     if(el.classList.contains('hidden')) this.lastFocus = document.activeElement;
-    const list = (this.packages || []).filter(p => (p.pricePaise || 0) > 0 && (!o.feature || (p.features || []).some(f => (f.key || f) === o.feature)));
+    // a lesson: the plans that include it; anything else: the plans with the feature
+    const list = (this.packages || []).filter(p => (p.pricePaise || 0) > 0 && (o.lesson ? !!p.limits && ACCESS.covers(p.limits.lessons, o.lesson)
+      : (!o.feature || (p.features || []).some(f => (f.key || f) === o.feature))));
     const money = (paise) => '₹' + (paise / 100).toLocaleString('en-IN', { maximumFractionDigits: paise % 100 ? 2 : 0 });
     const term = (p) => p.validityDays ? `${p.validityDays} days` : 'never expires';
     const plans = list.length ? `<ul class="plan-options">${list.map(p => `<li class="plan-option${p.highlight ? ' recommended' : ''}">
@@ -2257,17 +2319,18 @@ const Plan = {
     document.documentElement.classList.add('plan-sheet-open');
     const first = body.querySelector('.plan-buy') || body.querySelector('a.btn'); if(first) first.focus();
     if(!this.packages && !this.packagesLoading) this.loadPackages();
-    if(this.packagesLoading) this.packagesLoading.then(() => { if(!el.classList.contains('hidden') && this.sheetFeature === o.feature) this.sheet(Object.assign({}, o, { force:true })); });
+    if(this.packagesLoading) this.packagesLoading.then(() => { if(!el.classList.contains('hidden') && this.sheetFeature === key) this.sheet(Object.assign({}, o, { force:true })); });
   },
-  /** A lesson or game staff closed for this learner: says so, with no plans to buy. */
+  /** A lesson or game staff closed for this learner (or, closed:'all', a lesson closed for everyone): says so, with no plans to buy. */
   closedSheet(o){
     const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
     this.sheetFeature = 'closed';
     if(el.classList.contains('hidden')) this.lastFocus = document.activeElement;
     body.innerHTML = `<button type="button" class="plan-x" data-plan-close aria-label="Close">&times;</button>
       <h2 id="upgradeTitle">${esc(o.title || 'This is closed')}</h2>
-      <p class="lede">This is closed on your account. If you think that is a mistake, write to us and we will look into it.</p>
-      <div class="results-actions plan-sheet-actions"><a class="btn secondary" href="/contact">Contact us</a><button type="button" class="btn primary" data-plan-close>OK</button></div>`;
+      ${o.closed === 'all' ? '<p class="lede">This lesson is closed for now. Please check back soon: everything else stays open as usual.</p>'
+        : '<p class="lede">This is closed on your account. If you think that is a mistake, write to us and we will look into it.</p>'}
+      <div class="results-actions plan-sheet-actions">${o.closed === 'all' ? '' : '<a class="btn secondary" href="/contact">Contact us</a>'}<button type="button" class="btn primary" data-plan-close>OK</button></div>`;
     el.classList.remove('hidden');
     document.documentElement.classList.add('plan-sheet-open');
     const ok = body.querySelector('.btn.primary'); if(ok) ok.focus();
@@ -2279,32 +2342,61 @@ const Plan = {
     document.documentElement.classList.remove('plan-sheet-open');
     if(this.lastFocus && this.lastFocus.focus) try{ this.lastFocus.focus(); }catch(e){}
   },
+  /** A lesson whose level has not opened yet: what opens it, and a way to the level before. */
+  progressSheet(id, title){
+    const p = this.progressOf(id), prev = LEVELS.find(x => x.n === p.level);
+    const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
+    this.sheetFeature = 'progress';
+    if(el.classList.contains('hidden')) this.lastFocus = document.activeElement;
+    body.innerHTML = `<button type="button" class="plan-x" data-plan-close aria-label="Close">&times;</button>
+      <p class="eyebrow">Level ${p.level + 1} is not open yet</p>
+      <h2 id="upgradeTitle">${esc(title)}</h2>
+      <p class="lede">Level ${p.level + 1} opens when you ${esc(this.progressWords(p))}.</p>
+      <div class="results-actions plan-sheet-actions">${prev ? `<button type="button" class="btn primary" data-plan-level="${esc(prev.name)}">Go to Level ${p.level}</button>` : ''}<button type="button" class="btn secondary" data-plan-close>OK</button></div>`;
+    el.classList.remove('hidden');
+    document.documentElement.classList.add('plan-sheet-open');
+    const first = body.querySelector('.btn'); if(first) first.focus();
+  },
   /** A locked thing was chosen. While the plan is still loading, wait for it and try again. */
-  blocked(feature, retry, title, text){
+  blocked(feature, retry, title, text, lesson){
     if(this.loading && retry) return this.loading.then(() => retry());
-    this.sheet({ feature, title, text });
+    this.sheet({ feature, title, text, lesson });
   },
 
   /* ---- lessons ---- */
   lockedLesson(id, retry){
     if(id === 'custom') return this.blocked('practice.custom', retry, 'Custom practice', `Custom practice is included with ${this.unlockName('practice.custom')} and above.`);
     if(String(id).startsWith('pack:')) return this.blocked('exercises.premium', retry, 'Practice packs', `Practice packs are included with ${this.unlockName('exercises.premium')} and above.`);
-    const l = TC_COURSE.byId(id);
-    if(this.closed('lessons', id)){
-      if(this.loading && retry) return this.loading.then(() => retry());
-      return this.sheet({ closed:true, title: l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is closed' });
-    }
-    const name = this.unlockName('lessons.all');
-    this.blocked('lessons.all', retry, l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is locked',
-      `Free includes the first ${FREE_LESSONS.size} lessons, the placement test, the problem-keys drill and the Daily Challenge. ${name} and above unlock all ${lessons.length} lessons.`);
+    const l = TC_COURSE.byId(id), title = l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is locked';
+    const lock = this.lessonLock(id);
+    if(lock !== 'plan' && this.loading && retry) return this.loading.then(() => retry());
+    if(lock === 'closed') return this.sheet({ closed:true, title });
+    if(lock === 'closed-all') return this.sheet({ closed:'all', title });
+    if(lock === 'progress') return this.progressSheet(id, title);
+    const mine = ACCESS.describe(this.ent.limits && this.ent.limits.lessons).text, free = !this.isPaid();
+    this.blocked('lessons.all', retry, title,
+      (free ? `Free includes ${mine}, the placement test, the problem-keys drill and the Daily Challenge.` : `Your plan, ${this.ent.planName}, includes ${mine}.`)
+      + ` This lesson is included with ${this.lessonPlanName(id)}.`, id);
   },
   decorateCard(card, id){
-    if(this.lessonAllowed(id)) return;
+    const lock = this.lessonLock(id); if(!lock) return;
     card.classList.add('is-locked');
-    const closed = this.closed('lessons', id);
-    card.insertAdjacentHTML('beforeend', closed ? `<span class="plan-tag">${LOCK_SVG}Closed</span>` : this.tag('lessons.all'));
+    let tag, said;
+    if(lock === 'closed'){ tag = 'Closed'; said = 'Closed on your account.'; }
+    else if(lock === 'closed-all'){ tag = 'Closed'; said = 'Closed for now.'; }
+    else if(lock === 'progress'){ const p = this.progressOf(id); tag = 'Locked'; said = `Opens when you ${this.progressWords(p)}.`; }
+    else { tag = this.lessonPlanName(id); said = `Locked: needs ${tag}.`; }
+    card.insertAdjacentHTML('beforeend', `<span class="plan-tag${lock === 'progress' ? ' plan-tag-progress' : ''}">${LOCK_SVG}${esc(tag)}</span>`);
     const t = card.querySelector('.ltitle');
-    card.setAttribute('aria-label', `${t ? t.textContent : 'Lesson'}. ${closed ? 'Closed on your account.' : `Locked: needs ${this.unlockName('lessons.all')}.`}`);
+    card.setAttribute('aria-label', `${t ? t.textContent : 'Lesson'}. ${said}`);
+  },
+  /** Under a level's heading: what opens it, while it is not open yet by progress. */
+  decorateTier(block, L){
+    const first = ACCESS.BY_LEVEL[L.n] && ACCESS.BY_LEVEL[L.n][0]; if(!first) return;
+    const p = ACCESS.progress({ rules: this.rules, done: lessonDone, placementLevel: this.placementLevel(), canOpen: (x) => this.lessonAccess(x).open }, first);
+    if(p.open) return;
+    const head = block.querySelector('.tier-head');
+    if(head) head.insertAdjacentHTML('afterend', `<p class="tier-lock">${LOCK_SVG}Level ${L.n} opens when you ${esc(this.progressWords(p))}.</p>`);
   },
   decorateMap(el){
     el.querySelectorAll('.route-node').forEach(b => {
@@ -2363,9 +2455,11 @@ const Plan = {
   /* ---- home: Continue for a locked next lesson, practice packs, custom practice ---- */
   renderHome(){
     const next = nextLessonInfo(), btn = document.getElementById('continueBtn');
-    if(next && btn && !this.lessonAllowed(next.lesson.id) && !btn.dataset.locked){
+    const lock = next && this.lessonLock(next.lesson.id);
+    if(next && btn && lock && !btn.dataset.locked){
       btn.dataset.locked = '1';
-      btn.innerHTML = this.closed('lessons', next.lesson.id) ? `${LOCK_SVG}Lesson ${lessonNumber(next.lesson)} is closed` : `${LOCK_SVG}Unlock lesson ${lessonNumber(next.lesson)}`;
+      btn.innerHTML = lock === 'closed' || lock === 'closed-all' ? `${LOCK_SVG}Lesson ${lessonNumber(next.lesson)} is closed`
+        : lock === 'progress' ? `${LOCK_SVG}Lesson ${lessonNumber(next.lesson)}: Level ${next.lesson.level} not open yet` : `${LOCK_SVG}Unlock lesson ${lessonNumber(next.lesson)}`;
     }
     this.renderPacks(); this.renderCustom();
   },
@@ -2490,6 +2584,8 @@ const Plan = {
 
 /* sheet: close on the button, the backdrop or Escape; keep Tab inside */
 document.getElementById('upgradeSheet').addEventListener('click', (e) => {
+  const lv = e.target.closest('[data-plan-level]');
+  if(lv){ Plan.closeSheet(); backToDashboard(); activeTier = lv.getAttribute('data-plan-level'); renderHome(); return; }
   if(e.target.closest('[data-plan-close]') || e.target.id === 'upgradeSheet') Plan.closeSheet();
 });
 document.addEventListener('keydown', (e) => {
@@ -2531,7 +2627,9 @@ document.getElementById('progressBody').addEventListener('click', (e) => {
 }, true);
 /* a plan bought in another tab shows up when you come back */
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible' && Account.user && Date.now() - Plan.loadedAt > 30000) Plan.load();
+  if(document.visibilityState !== 'visible') return;
+  if(Account.user && Date.now() - Plan.loadedAt > 30000) Plan.load();
+  else if(!Account.user && Date.now() - Plan.rulesAt > 60000) Plan.loadRules();
 });
 
 /* ---- init ---- */
@@ -2551,6 +2649,7 @@ document.addEventListener('visibilitychange', () => {
   hideExtraViews(); setNavCurrent('homeView');
   document.getElementById('arcadePlay').style.display='none';
   rebuildGuestProgress();
+  Plan.loadRules();   // the last known rules at once, the current ones when the server answers
   renderHome();
   initAccount(); // async: signs you back in and loads your account's progress, if there is a server
 })();

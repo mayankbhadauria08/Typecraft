@@ -5,6 +5,7 @@
 // Money rules: amounts are paise; a package is only activated after the payment is
 // confirmed by Razorpay itself (API fetch after a valid checkout signature, or a
 // signed webhook); fulfilment happens once (conditional UPDATE + unique indexes).
+import { packageView, catalogueView } from './package-view.js';
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { uuid, sha256Hex } from './crypto.js';
@@ -53,14 +54,7 @@ async function assertPayments(env) {
 }
 
 /* ---------------- GET /api/packages (public) ---------------- */
-export function packageView(p, labels) {
-  const features = parse(p.features, []);
-  return {
-    id: p.id, name: p.name, description: p.description, pricePaise: p.price_paise, currency: p.currency,
-    validityDays: p.validity_days, features: features.map((key) => ({ key, label: labels[key] || key })),
-    limits: parse(p.limits, {}), highlight: !!p.highlight,
-  };
-}
+export { packageView };
 
 export async function getPackages(request, env) {
   const [pk, ft] = await env.DB.batch([
@@ -68,7 +62,7 @@ export async function getPackages(request, env) {
     env.DB.prepare('SELECT key, label, description FROM package_features ORDER BY display_order'),
   ]);
   const labels = Object.fromEntries(ft.results.map((f) => [f.key, f.label]));
-  return json({ packages: pk.results.map((p) => packageView(p, labels)), features: ft.results }, 200, { 'Cache-Control': 'public, max-age=60' });
+  return json({ packages: pk.results.map((p) => packageView(p, labels)), features: catalogueView(ft.results) }, 200, { 'Cache-Control': 'public, max-age=60' });
 }
 
 /* ---------------- GET /api/me/entitlements ---------------- */

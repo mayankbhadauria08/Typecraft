@@ -6,10 +6,10 @@
   const K = window.TCK, h = K.h, $ = K.$;
   const SOURCE = { purchase: 'Purchased', admin: 'Granted by TypeCraft', promo: 'Promotion' };
 
-  function limitsText(l) {
+  function limitsText(l, words) {
     if (!l) return [];
     const out = [];
-    out.push(l.lessons === 'all' ? 'All lessons' : 'First 5 lessons');
+    out.push(words && words.Text ? words.Text : l.lessons === 'all' ? 'All lessons' : 'First 5 lessons');
     out.push(l.dailyTests == null ? 'Unlimited typing tests' : `${l.dailyTests} typing tests a day`);
     out.push(l.historyDays == null ? 'Full history' : `${l.historyDays} days of history`);
     return out;
@@ -23,7 +23,7 @@
     K.mount(el,
       h('p', null, h('span', { class: free ? 'badge badge-muted' : 'badge badge-brand', text: ent.planName || ent.plan || 'Free' })),
       h('p', null, free ? 'You are on the Free plan.' : ent.expiresAt ? ['Active until ', h('strong', { text: K.date(ent.expiresAt) }), left != null ? h('span', { class: 'muted', text: ` (${left} day${left === 1 ? '' : 's'} left)` }) : null] : 'Never expires.'),
-      h('ul', { class: 'muted' }, limitsText(ent.limits).map((t) => h('li', { text: t }))),
+      h('ul', { class: 'muted' }, limitsText(ent.limits, ent.lessonsWords).map((t) => h('li', { text: t }))),
       !free && ent.expiresAt ? h('div', { class: 'card-foot' }, h('a', { class: 'btn btn-primary', href: `/checkout?plan=${encodeURIComponent(ent.plan)}`, text: `Renew ${ent.planName || ''}`.trim() })) : null);
   }
 

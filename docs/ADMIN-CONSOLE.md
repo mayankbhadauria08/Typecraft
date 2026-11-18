@@ -12,7 +12,7 @@ work order, endpoints and rules: `docs/ADMIN-PHASE-2.md`.
 | --- | --- | --- |
 | 1 | Audit, admin sign-in, roles and permissions, migrations, the four-layer frame | built |
 | 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access, the search box | built |
-| 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | not started |
+| 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | Unlock conditions built (docs/UNLOCK-RULES.md); the rest not started |
 | 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | not started |
 | 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | not started |
 | 6 | Optimisation, full test pass, cutover, delivery report | not started |
@@ -48,7 +48,7 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 a link.
 
 1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
-2. **Learning operations**: Courses, Modules, Levels, Lessons, Exercises, Unlock conditions, Student progress, Learning analytics
+2. **Learning operations**: Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (built: docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth**: Coupons, Promotions, Email campaigns, Support, Notifications, Business reports
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
 
@@ -239,5 +239,6 @@ Phase 2: `tests/console-core.test.mjs` (customers), `console-payments` (payments
 with the fake Razorpay in `tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning
 access, packages), `console-overview` (dashboard, search); `tests/app-plan.test.mjs` covers
 what learning access changes for customers.
+Unlock conditions: `tests/unlock-rules.test.mjs` (docs/UNLOCK-RULES.md §7).
 The other test files still pass unchanged apart from two expectations that follow the new
 defaults (an Admin cannot change settings or refund until allowed).

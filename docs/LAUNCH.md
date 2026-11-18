@@ -68,6 +68,17 @@ Full notes: `docs/ADMIN-PHASE-2.md`.
    permissions. Real refunds and "Check with Razorpay" need the Razorpay keys; test them in Test
    Mode first.
 
+## 1d. Unlock conditions (which lessons learners can open)
+
+Full notes: `docs/UNLOCK-RULES.md`. No database change: the rules live in the existing
+`platform_settings` table, and nothing changes for learners until someone sets a rule.
+
+1. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
+2. To change what a plan includes: Console, Packages, open the plan, Lessons. To close or open a
+   lesson or level for everyone, or switch on unlock by progress: Console, Unlock conditions.
+3. If you change what Free includes, also check Free's description on its package page (it is your
+   own text, and says "the first five lessons" today). The site's other wording follows by itself.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

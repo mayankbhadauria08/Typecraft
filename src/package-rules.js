@@ -4,7 +4,19 @@
 // What a customer already bought does not change when a package changes: a subscription keeps a
 // copy of the features and limits it was sold with (user_subscriptions.features, .limits). The Free
 // package is different: it is read live, so changing it changes what every free user gets at once.
+// Lessons (limits.lessons) are the exception for paid packages too: a customer keeps the lessons they
+// bought with, and also gets any lessons the package gains later (src/entitlements.js).
+//
+// Which lessons a package includes lives only in limits.lessons ('all', 'first5' or
+// { levels, lessons }: shared/lesson-access.js). The two lesson features ('lessons.all',
+// 'lessons.first5') only label the two standard cases, so they are set from it on every save.
+import '../shared/course-meta.js';
+import '../shared/lesson-access.js';
 import { nowIso } from './http.js';
+
+const A = globalThis.TC_ACCESS;
+/** Features that only say which lessons a package has: derived from limits.lessons, never chosen. */
+export const LESSON_FEATURES = ['lessons.first5', 'lessons.all'];
 
 const parse = (text, def) => { try { const v = JSON.parse(text); return v == null ? def : v; } catch { return def; } };
 export const LIMIT_KEYS = ['lessons', 'dailyTests', 'historyDays'];
@@ -53,7 +65,7 @@ export function checkPackage(id, cur, body, keys) {
     const extra = Object.keys(L).filter((k) => !LIMIT_KEYS.includes(k));
     const okN = (x, max) => x === null || (Number.isInteger(x) && x >= 0 && x <= max);
     if (extra.length) f.limits = `Unknown limit: ${extra[0]}.`;
-    else if (!['all', 'first5'].includes(L.lessons)) f.limits = 'limits.lessons must be "all" or "first5".';
+    else if (!A.check(L.lessons).ok) f.limits = A.check(L.lessons).error;
     else if (!okN(L.dailyTests, 10000)) f.limits = 'limits.dailyTests must be a whole number or null (unlimited).';
     else if (!okN(L.historyDays, 3650) || L.historyDays === 0) f.limits = 'limits.historyDays must be 1–3650 or null (all history).';
   }
@@ -64,8 +76,14 @@ export function checkPackage(id, cur, body, keys) {
   if (Object.keys(f).length) return { v, fields: f, changed: [] };
   v.name = v.name.trim();
   v.description = v.description.trim();
-  v.limits = { lessons: L.lessons, dailyTests: L.dailyTests ?? null, historyDays: L.historyDays ?? null };
-  const changed = Object.keys(cur).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(v[k]));
+  v.limits = { lessons: A.check(L.lessons).value, dailyTests: L.dailyTests ?? null, historyDays: L.historyDays ?? null };
+  // the lesson features follow the lessons: 'lessons.all' for every lesson, 'lessons.first5' for the first five
+  const lessonFeature = v.limits.lessons === 'all' ? 'lessons.all' : v.limits.lessons === 'first5' ? 'lessons.first5' : null;
+  v.features = v.features.filter((k) => !LESSON_FEATURES.includes(k));
+  if (lessonFeature && keys.includes(lessonFeature)) v.features.unshift(lessonFeature);
+  const same = (k) => k === 'features' ? JSON.stringify([...(cur.features || [])].sort()) === JSON.stringify([...v.features].sort())
+    : JSON.stringify(cur[k]) === JSON.stringify(v[k]);
+  const changed = Object.keys(cur).filter((k) => !same(k));
   return { v, fields: f, changed };
 }
 

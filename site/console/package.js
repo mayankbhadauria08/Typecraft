@@ -3,7 +3,10 @@
    GET  /api/console/packages     → { items, features }            (a new package needs the features list)
    POST /api/console/packages     { id, name, description, pricePaise, validityDays, features, limits, highlight, active, displayOrder } → { package }
    PUT  /api/console/packages/:id { the same fields, confirmPriceChange? } → { package, changed }
-   A price change of more than half is answered 409 confirm_price: the page asks, then sends it again confirmed. */
+   A price change of more than half is answered 409 confirm_price: the page asks, then sends it again confirmed.
+   Lessons (limits.lessons): 'all', 'first5' or { levels, lessons }, chosen with the course from
+   /shared/course-meta.js and the words from /shared/lesson-access.js (window.TC_ACCESS), as learners get them.
+   The two lesson features follow from it on the server, so they are not ticked here. */
 (function () {
   'use strict';
   var AC = window.AC, el = AC.el, doc = document;
@@ -12,6 +15,8 @@
   var form = byId('pkgForm'), canEdit = !form.hasAttribute('data-readonly');
   var current = null;
   var F = function (name) { return form.elements[name]; };
+  var META = window.TC_META, ACCESS = window.TC_ACCESS;
+  var LESSON_FEATURES = ['lessons.first5', 'lessons.all'];
   var LABELS = { name: 'Name', description: 'Description', pricePaise: 'Price', validityDays: 'Length', features: 'What it includes', limits: 'Limits',
     highlight: 'Recommended', active: 'On sale', displayOrder: 'Place on the plans page' };
 
@@ -50,7 +55,7 @@
   /* ---------- filling the form ---------- */
   function features(list, on) {
     var host = AC.clear(byId('featureList'));
-    list.forEach(function (f) {
+    list.filter(function (f) { return LESSON_FEATURES.indexOf(f.key) === -1; }).forEach(function (f) {
       var box = el('input', { type: 'checkbox', id: 'feat-' + f.key, name: 'features', value: f.key, checked: on.indexOf(f.key) !== -1 });
       host.appendChild(el('label', { class: 'tick', for: 'feat-' + f.key }, [box, el('span', null, [el('span', { class: 'tick-label', text: f.label }), el('span', { class: 'tick-hint', text: f.description })])]));
     });
@@ -71,7 +76,7 @@
     F('validityDays').value = p.validityDays === null ? '' : String(p.validityDays);
     F('noEnd').checked = p.validityDays === null;
     features(list, p.features);
-    F('lessons').value = p.limits.lessons === 'all' ? 'all' : 'first5';
+    lessonsFill(p.features.indexOf('lessons.all') !== -1 ? 'all' : p.limits.lessons);
     F('dailyTests').value = p.limits.dailyTests === null || p.limits.dailyTests === undefined ? '' : String(p.limits.dailyTests);
     F('noTestLimit').checked = p.limits.dailyTests === null;
     F('historyDays').value = p.limits.historyDays === null || p.limits.historyDays === undefined ? '' : String(p.limits.historyDays);
@@ -86,8 +91,9 @@
     var host = AC.clear(byId('pkgNote'));
     if (!p) return;
     host.appendChild(p.id === 'free'
-      ? AC.notice('This is the Free plan. What it includes applies at once to everyone without a paid plan. It always costs nothing, never ends and stays on.', 'warn')
-      : AC.notice('Changes apply to new purchases. Customers who already bought ' + p.name + ' keep what it gave them when they bought it.'));
+      ? AC.notice('This is the Free plan. What it includes applies at once to everyone without a paid plan, lessons too. It always costs nothing, never ends and stays on.', 'warn')
+      : AC.notice('Changes apply to new purchases. Customers who already bought ' + p.name + ' keep what it gave them when they bought it. '
+        + 'Lessons you add here also reach them at once; lessons you take out only change what new buyers get.'));
   }
   function side(d) {
     var p = d.package;
@@ -100,6 +106,73 @@
     if (byId('historyBody') && d.history) AC.fill('historyBody', AC.timeline(d.history.map(function (h) {
       return { action: h.action, note: h.changed.length ? h.changed.map(function (k) { return LABELS[k] || k; }).join(', ') : null, actor: h.actor, createdAt: h.createdAt };
     }), { 'package.create': 'Created', 'package.update': 'Changed' }, 'No changes recorded yet.'));
+  }
+
+  /* ---------- lessons: every lesson, the first five, or chosen levels and lessons ---------- */
+  var levelsHost = byId('lessonLevels');
+  function lessonsBuild() {
+    if (levelsHost.childNodes.length) return;
+    META.LEVELS.forEach(function (L) {
+      var ids = ACCESS.BY_LEVEL[L.n];
+      var whole = el('input', { type: 'checkbox', id: 'lvl-' + L.n, 'data-level': String(L.n) });
+      var singles = el('div', { class: 'lesson-singles' }, ids.map(function (lid) {
+        var m = META.BY_ID[lid];
+        return el('label', { class: 'tick', for: 'les-' + lid }, [el('input', { type: 'checkbox', id: 'les-' + lid, 'data-lesson': lid }),
+          el('span', null, el('span', { class: 'tick-label', text: m.n + '. ' + m.title }))]);
+      }));
+      var more = el('details', { class: 'lesson-more' }, [el('summary', { text: 'Choose single lessons' }), singles]);
+      levelsHost.appendChild(el('div', { class: 'lesson-level' }, [
+        el('label', { class: 'tick', for: 'lvl-' + L.n }, [whole, el('span', null, [el('span', { class: 'tick-label', text: 'Level ' + L.n + ': ' + L.name }),
+          el('span', { class: 'tick-hint', id: 'lvl-' + L.n + '-count', text: ids.length + ' lessons' })])]),
+        more]));
+    });
+    levelsHost.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.hasAttribute('data-level')) {
+        // a whole level ticks (and locks) its lessons; unticking it clears them
+        ACCESS.BY_LEVEL[t.getAttribute('data-level')].forEach(function (lid) { var x = byId('les-' + lid); x.checked = t.checked; });
+      }
+      lessonsSync();
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="lessonsMode"]'), function (r) { r.addEventListener('change', lessonsSync); });
+  }
+  function lessonsFill(v) {
+    lessonsBuild();
+    var mode = v === 'all' ? 'all' : v === 'first5' || !v ? 'first5' : 'pick';
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="lessonsMode"]'), function (r) { r.checked = r.value === mode; });
+    var set = ACCESS.idsOf(mode === 'pick' ? v : 'first5');
+    if (mode !== 'pick') set = [];
+    ACCESS.ORDER.forEach(function (lid) { byId('les-' + lid).checked = set.indexOf(lid) !== -1; });
+    META.LEVELS.forEach(function (L) { byId('lvl-' + L.n).checked = mode === 'pick' && v.levels && v.levels.indexOf(L.n) !== -1; });
+    lessonsSync();
+  }
+  /** What the form says now: 'all', 'first5', { levels, lessons }, or null when "choose" has nothing chosen. */
+  function lessonsValue() {
+    var on = form.querySelector('input[name="lessonsMode"]:checked'), mode = on ? on.value : 'first5';
+    if (mode !== 'pick') return mode;
+    var levels = META.LEVELS.filter(function (L) { return byId('lvl-' + L.n).checked; }).map(function (L) { return L.n; });
+    var lessons = ACCESS.ORDER.filter(function (lid) { return byId('les-' + lid).checked && levels.indexOf(META.BY_ID[lid].level) === -1; });
+    if (!levels.length && !lessons.length) return null;
+    return ACCESS.check({ levels: levels, lessons: lessons }).value;
+  }
+  function lessonsSync() {
+    var on = form.querySelector('input[name="lessonsMode"]:checked'), pick = !!on && on.value === 'pick';
+    levelsHost.hidden = !pick;
+    META.LEVELS.forEach(function (L) {
+      var whole = byId('lvl-' + L.n), ids = ACCESS.BY_LEVEL[L.n];
+      var picked = ids.filter(function (lid) { return byId('les-' + lid).checked; }).length;
+      // a level with all its lessons ticked one by one counts as the whole level
+      if (!whole.checked && picked === ids.length) whole.checked = true;
+      ids.forEach(function (lid) { byId('les-' + lid).disabled = !canEdit || whole.checked; });
+      whole.disabled = !canEdit;
+      byId('lvl-' + L.n + '-count').textContent = whole.checked ? 'All ' + ids.length + ' lessons' : picked ? picked + ' of ' + ids.length + ' lessons' : ids.length + ' lessons';
+    });
+    var v = lessonsValue(), err = byId('f-lessons-err');
+    // the description is written by hand: once the lessons change, say so next to it
+    var saved = current ? (current.features.indexOf('lessons.all') !== -1 ? 'all' : current.limits.lessons) : null;
+    byId('lessonDescHint').hidden = !current || !current.id || JSON.stringify(v) === JSON.stringify(saved);
+    byId('lessonSummary').textContent = v === null ? 'Nothing chosen yet.' : 'Includes ' + ACCESS.describe(v).text + ', plus the placement test and the review drill.';
+    if (v !== null && !err.hidden) { err.hidden = true; err.textContent = ''; }
   }
 
   /* ---------- saving ---------- */
@@ -119,7 +192,9 @@
     var history = F('allHistory').checked ? null : whole(F('historyDays').value);
     if (Number.isNaN(tests)) fields.dailyTests = 'Enter a whole number, or tick No daily limit.';
     if (Number.isNaN(history)) fields.historyDays = 'Enter a whole number of days, or tick All history.';
-    body.limits = { lessons: F('lessons').value, dailyTests: tests, historyDays: history };
+    var lessons = lessonsValue();
+    if (lessons === null) fields.lessons = 'Choose at least one level or lesson, or another option.';
+    body.limits = { lessons: lessons, dailyTests: tests, historyDays: history };
     body.highlight = F('highlight').checked;
     var order = whole(F('displayOrder').value);
     if (isNaN(order)) fields.displayOrder = 'Enter a whole number.'; else body.displayOrder = order;

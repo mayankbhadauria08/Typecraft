@@ -52,7 +52,7 @@ const login = `
 const signup = `
 <section class="auth-card auth-wide" aria-labelledby="h">
   <div><h1 id="h">Create your free account</h1></div>
-  <p class="sub">Your lessons, stars and speed history are saved as you practise. The first five lessons are free; no card needed.</p>
+  <p class="sub">Your lessons, stars and speed history are saved as you practise. You start with {{free.lessons}} free; no card needed.</p>
   <form id="signupForm" class="form-stack" novalidate>
     <div data-msg></div>
     <div class="field"><label for="fullName">Full name</label><input id="fullName" name="fullName" autocomplete="name" maxlength="100" required autofocus><div class="err"></div></div>
@@ -127,7 +127,7 @@ const m = (path, title, description, access, extra = {}) => ({ path, title, desc
 
 export const PAGES = [
   { meta: m('/login', 'Sign in', 'Sign in to TypeCraft to continue your touch typing lessons.', 'guest', { sitemap: false }), body: login, scripts: S },
-  { meta: m('/signup', 'Create your free account', 'Create a free TypeCraft account: the first five lessons, the placement test and daily typing tests, saved to your account.', 'guest', { sitemap: false }), body: signup, scripts: S },
+  { meta: m('/signup', 'Create your free account', 'Create a free TypeCraft account: free lessons, the placement test and daily typing tests, saved to your account.', 'guest', { sitemap: false }), body: signup, scripts: S },
   { meta: m('/forgot-password', 'Reset your password', 'Get a link to reset your TypeCraft password.', 'guest', { noindex: true }), body: forgot, scripts: S },
   { meta: m('/reset-password', 'Choose a new password', 'Choose a new password for your TypeCraft account.', 'public', { noindex: true }), body: reset, scripts: S },
   { meta: m('/verify-email', 'Confirm your email', 'Confirm the email address on your TypeCraft account.', 'public', { noindex: true }), body: verifyEmail, scripts: S },

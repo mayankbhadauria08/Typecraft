@@ -73,11 +73,14 @@ entitlementsFor(env, userId) → {
   plan: 'pro', planName: 'Pro',             // the best active package (by display_order)
   expiresAt: '2027-02-13T…Z' | null,         // latest expiry; null = free or lifetime
   features: ['lessons.all', …],
-  limits: { lessons: 'all'|'first5', dailyTests: 20|null, historyDays: 7|null },
+  limits: { lessons: 'all'|'first5'|{levels,lessons}, dailyTests: 20|null, historyDays: 7|null },
+  lessonsWords: { text, Text, short, count, all },   // the lessons in words ("Level 1 (16 lessons)")
   subscriptions: [{ id, packageId, packageName, status, startsAt, expiresAt, source }],
+  overrides: { lessons: { allow, deny }, games: { allow, deny } },   // exceptions for this learner
+  rules: { closed, open, progress, placement },      // rules for everyone (docs/UNLOCK-RULES.md)
 }
 has(ent, 'analytics.advanced') → boolean
-lessonAllowed(ent, lessonId) → boolean      // first5 + 'placement' + 'review' when lessons = 'first5'
+lessonAllowed(ent, lessonId) → boolean      // shared/lesson-access.js access(): docs/UNLOCK-RULES.md §1
 gameAllowed(ent, gameId) → boolean          // 'daily' always; others need arcade.all
 ```
 
@@ -86,7 +89,8 @@ gameAllowed(ent, gameId) → boolean          // 'daily' always; others need arc
 **Enforcement on the server:**
 - `POST /api/user/events` (src/api.js): a `run`/`step` event for a lesson the user may not
   open, or a `game` event for a locked game, is rejected per event with reason
-  `plan_required` (the rest of the batch still counts). The billing part adds this check.
+  `plan_required` (the rest of the batch still counts), or `closed` when staff closed it for this
+  learner or for everyone. The billing part adds this check.
 - Typing tests: `POST /api/me/tests` refuses with 402 `plan_limit` past `dailyTests`.
 - Premium content (`/api/content/*`) and advanced analytics return 402 `plan_required`.
 - 402 body: `{ error: { code: 'plan_required'|'plan_limit', message, feature, upgradeUrl: '/pricing' } }`.
@@ -146,7 +150,11 @@ sendTemplate(env, ctx, { to, userId?, template, data, category }) → { id, stat
 Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 
 - `GET /api/packages` (public) → `{ packages:[{id,name,description,pricePaise,currency,
-  validityDays,features:[{key,label}],limits,highlight}], features:[{key,label,description}] }`
+  validityDays,features:[{key,label}],lessons:{text,Text,short,count,all},limits,highlight}],
+  features:[{key,label,description}] }`. The first item of each package's `features` is
+  `{ key:'lessons', label }` (its lessons in words); the two lesson features are left out of both
+  lists (docs/UNLOCK-RULES.md §2).
+- `GET /api/learning-rules` (public) → `{ rules: { closed, open, progress, placement } }`
 - `POST /api/checkout/order {packageId}` (signed in) → creates `orders` row + Razorpay order
   (`POST https://api.razorpay.com/v1/orders`, Basic auth, `receipt` = our order id,
   `notes` = {orderId, userId, packageId}) → `{ orderId, razorpayOrderId, amountPaise,

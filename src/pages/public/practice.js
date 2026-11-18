@@ -5,7 +5,7 @@ const M = globalThis.TC_META;
 export const meta = {
   path: '/practice',
   title: 'Typing practice: the full course',
-  description: 'Practise touch typing with a structured course: 78 lessons in 5 levels, five steps per lesson, stars for accuracy, crowns for speed and boss tests. First 5 lessons free.',
+  description: 'Practise touch typing with a structured course: 78 lessons in 5 levels, five steps per lesson, stars for accuracy, crowns for speed and boss tests. Start free.',
 };
 
 const STEPS = [
@@ -22,7 +22,7 @@ function levelBlock(L) {
   return `<article class="card">
     <div class="card-head"><div><span class="eyebrow">Level ${L.n}</span><h3 style="margin-top:8px">${esc(L.name)}: ${esc(L.sub.toLowerCase())}</h3></div><span class="badge badge-muted mono">${lessons.length} lessons</span></div>
     <ul class="ticks" style="gap:6px;font-size:14.5px">${shown.map((l) => `<li>${icon(l.kind === 'boss' ? 'crown' : 'chevronRight')}<span>${esc(l.title)}</span></li>`).join('')}${lessons.length > shown.length ? `<li class="muted">${icon('plus')}<span>and ${lessons.length - shown.length} more</span></li>` : ''}</ul>
-    <div class="card-foot"><span class="muted" style="font-size:14px">Target speed: <b class="mono">${L.target} wpm</b></span>${L.n === 1 ? '<span class="badge badge-ok">First 5 free</span>' : ''}</div>
+    <div class="card-foot"><span class="muted" style="font-size:14px">Target speed: <b class="mono">${L.target} wpm</b></span>{{free.level${L.n}}}</div>
   </article>`;
 }
 
@@ -64,7 +64,7 @@ export default `
 <section class="section">
   <div class="container">
     <div class="cta-band">
-      <div><h2>Start on the home row today</h2><p>The placement test, the first five lessons and the daily review drill are free, with your progress saved to your account.</p></div>
+      <div><h2>Start on the home row today</h2><p>The placement test, {{free.lessons}} and the daily review drill are free, with your progress saved to your account.</p></div>
       <div class="actions"><a class="btn btn-primary btn-lg" href="/signup?next=%2Fapp" data-auth-swap>Start free ${icon('arrowRight')}</a></div>
     </div>
   </div>

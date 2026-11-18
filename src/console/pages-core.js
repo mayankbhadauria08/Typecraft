@@ -142,8 +142,17 @@ ${field('description', 'Description', '<textarea id="f-description" name="descri
 
 <section class="block" aria-labelledby="pkgIncludesTitle"><div class="block-head"><h2 id="pkgIncludesTitle">What it includes</h2></div>
 <fieldset class="field ticks" data-field="features"><legend class="vh">Features</legend><div class="tick-grid" id="featureList">${lines(4)}</div><p class="err" id="f-features-err" hidden></p></fieldset>
+<fieldset class="choices lesson-pick" id="lessonPick" aria-describedby="lessonSummary">
+<legend>Lessons</legend>
+<label class="choice"><input type="radio" name="lessonsMode" value="all"><span><span class="choice-label">Every lesson</span><span class="choice-hint">All five levels.</span></span></label>
+<label class="choice"><input type="radio" name="lessonsMode" value="first5"><span><span class="choice-label">The first 5 lessons</span><span class="choice-hint">The first five home-row lessons, as Free has always had.</span></span></label>
+<label class="choice"><input type="radio" name="lessonsMode" value="pick"><span><span class="choice-label">Choose levels and lessons</span><span class="choice-hint">Whole levels, and single lessons from other levels.</span></span></label>
+<div class="lesson-levels" id="lessonLevels" hidden></div>
+<p class="lesson-summary" id="lessonSummary" aria-live="polite"></p>
+<p class="hint" id="lessonDescHint" hidden>The description above is your own words: check it still matches the lessons this plan includes.</p>
+<p class="err" id="f-lessons-err" hidden></p>
+</fieldset>
 <div class="form-grid" data-field="limits">
-${field('lessons', 'Lessons', '<select id="f-lessons" name="lessons"><option value="first5">The first 5 lessons</option><option value="all">All 78 lessons</option></select>')}
 ${field('dailyTests', 'Saved typing tests a day', input('dailyTests', { mode: 'numeric', max: 5 }))}
 ${field('historyDays', 'Days of history shown', input('historyDays', { mode: 'numeric', max: 4 }))}
 </div>
@@ -166,6 +175,34 @@ ${panel('stats', 'Customers and sales', 3)}
 ${me.permissions.includes('audit.view') ? panel('history', 'History', 3) : ''}
 </aside>`}
 </div>
+</div>`;
+}
+
+/* ---------- Unlock conditions ---------- */
+// The course and its rules, the same files the trainer runs (shared/), so the page says exactly what learners get.
+const COURSE_SCRIPTS = ['/shared/course-meta.js', '/shared/lesson-access.js'];
+function unlockBody(me) {
+  const canEdit = me.permissions.includes('unlock.manage');
+  return `<div class="page-head"><h1>Unlock conditions</h1>
+<p class="page-sub">Which lessons learners can open: what each plan includes, lessons and levels closed or open for everyone, and when each level opens.</p></div>
+<div id="unlockNote"></div>
+<div id="unlockPage" aria-busy="true">
+${section('plans', 'What each plan includes', lines(4), '<span class="panel-meta">Change it on the plan in Packages</span>')}
+${section('everyone', 'Closed or open for everyone', lines(4), '<span class="panel-meta">Overrides the plans</span>')}
+<section class="block" aria-labelledby="progressTitle"><div class="block-head"><h2 id="progressTitle">Unlock by progress</h2><span class="panel-meta">When each level opens</span></div>
+<form id="progressForm" novalidate${canEdit ? '' : ' data-readonly'}><div id="progressBody">${lines(4)}</div>
+${canEdit ? `<div class="field" data-field="reason"><label for="f-progressReason">Reason</label><textarea id="f-progressReason" name="reason" rows="2" maxlength="300"></textarea>
+<p class="hint">Kept in the activity log. Learners do not see it.</p><p class="err" id="f-reason-err" hidden></p></div>
+<div class="form-actions"><button type="submit" class="btn btn-primary" id="progressSave">Save progress rules</button></div>` : ''}
+</form></section>
+<section class="block" aria-labelledby="orderTitle"><div class="block-head"><h2 id="orderTitle">Which rule wins</h2></div>
+<ol class="rule-order">
+<li><b>The placement test and the review drill</b> are always open.</li>
+<li><b>An exception for one customer</b> (Learning access, on the customer's page).</li>
+<li><b>A rule for one lesson</b>, then <b>a rule for its level</b>, from this page.</li>
+<li><b>The customer's plan.</b> A customer who paid keeps the lessons their plan had when they bought it.</li>
+<li>Last, <b>unlock by progress</b> decides whether the lesson's level has opened yet for them.</li>
+</ol></section>
 </div>`;
 }
 
@@ -214,7 +251,9 @@ export const CORE_PAGES = [
   { key: 'packages', path: '/packages', title: 'Packages', crumbs: ['Core operations', 'Packages'],
     permission: 'packages.view', body: packagesBody, scripts: ['packages.js'] },
   { key: 'packages', path: '/packages/new', title: 'New package', crumbs: ['Core operations', ['Packages', '/packages'], 'New package'],
-    permission: 'packages.manage', body: packageBody, scripts: ['package.js'] },
+    permission: 'packages.manage', body: packageBody, scripts: [...COURSE_SCRIPTS, 'package.js'] },
   { key: 'packages', match: /^\/packages\/([a-z][a-z0-9-]{0,30})$/, names: ['id'], title: 'Package', crumbs: ['Core operations', ['Packages', '/packages'], 'Package'],
-    permission: 'packages.view', body: packageBody, scripts: ['package.js'] },
+    permission: 'packages.view', body: packageBody, scripts: [...COURSE_SCRIPTS, 'package.js'] },
+  { key: 'access-rules', path: '/unlock', title: 'Unlock conditions', crumbs: ['Learning operations', 'Unlock conditions'],
+    permission: 'unlock.view', body: unlockBody, scripts: [...COURSE_SCRIPTS, 'unlock.js'] },
 ];

@@ -124,7 +124,13 @@ test('GET /api/packages is public and reads prices from the packages table', asy
   const pro = r.body.packages.find((p) => p.id === 'pro');
   assert.equal(pro.pricePaise, 19900); assert.equal(pro.validityDays, 90); assert.equal(pro.highlight, true);
   assert.ok(pro.features.some((f) => f.key === 'analytics.advanced' && f.label === 'Advanced analytics'));
-  assert.equal(r.body.features.length, 13);
+  // the two lesson features are not in the catalogue: each package says its lessons in words instead
+  assert.equal(r.body.features.length, 11);
+  assert.ok(!r.body.features.some((f) => f.key.startsWith('lessons.')));
+  assert.deepEqual(pro.lessons, { text: 'all 78 lessons', Text: 'All 78 lessons', short: 'All lessons', count: 78, all: true });
+  assert.deepEqual(pro.features[0], { key: 'lessons', label: 'All 78 lessons' });
+  const free = r.body.packages.find((p) => p.id === 'free');
+  assert.equal(free.lessons.Text, 'The first 5 lessons'); assert.equal(free.limits.lessons, 'first5');
 });
 
 test('order creation: Razorpay order with our receipt and notes; reused for 30 minutes; free and unknown plans refused', async () => {

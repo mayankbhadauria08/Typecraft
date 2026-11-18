@@ -11,7 +11,8 @@
   const keys = (p) => (p.features || []).map((f) => f.key);
   const testsLine = (l) => l && l.dailyTests != null ? l.dailyTests + ' typing tests a day' : 'Unlimited typing tests';
   const historyLine = (l) => l && l.historyDays != null ? l.historyDays + ' days of test history' : 'Full history, kept as long as your account';
-  const HIDDEN = ['tests.basic']; // shown as the tests limit instead
+  const HIDDEN = ['tests.basic', 'lessons']; // shown as the tests limit, and the lessons line, instead
+  const lessonsOf = (p) => p.lessons || { Text: '', short: '', count: 0, all: false };
 
   function validity(p) {
     if (!p.pricePaise) return { per: 'free, forever', line: 'No card needed' };
@@ -28,12 +29,19 @@
     const label = Object.fromEntries((p.features || []).map((f) => [f.key, f.label]));
     let items = '';
     if (prev && prev.pricePaise) items += '<li>' + TC.icon('check') + '<span>Everything in ' + TC.esc(prev.name) + ', plus:</span></li>';
+    // which lessons: always on a first card, and on the others when they differ from the card before
+    const L = lessonsOf(p);
+    if (L.Text && (!prev || !prev.pricePaise || lessonsOf(prev).Text !== L.Text)) items += '<li>' + TC.icon('check') + '<span>' + TC.esc(L.Text) + '</span></li>';
     items += fresh.map((k) => '<li>' + TC.icon('check') + '<span>' + TC.esc(label[k] || k) + '</span></li>').join('');
     const lim = p.limits || {};
     const prevLim = (prev && prev.limits) || {};
     if (!prev || !prev.pricePaise || lim.dailyTests !== prevLim.dailyTests) items += '<li' + (lim.dailyTests != null ? ' class="limit"' : '') + '>' + TC.icon(lim.dailyTests != null ? 'clock' : 'check') + '<span>' + TC.esc(testsLine(lim)) + '</span></li>';
     if (!prev || !prev.pricePaise || lim.historyDays !== prevLim.historyDays) items += '<li' + (lim.historyDays != null ? ' class="limit"' : '') + '>' + TC.icon(lim.historyDays != null ? 'history' : 'check') + '<span>' + TC.esc(historyLine(lim)) + '</span></li>';
-    if (lim.lessons === 'first5') items += '<li class="limit">' + TC.icon('lock') + '<span>Lessons 6–78 and 7 arcade games need a plan</span></li>';
+    if (!p.pricePaise) {
+      const total = 78, rest = L.all ? 0 : total - (L.count || 0), games = keys(p).indexOf('arcade.all') === -1;
+      const parts = [rest && !L.all ? 'the other ' + rest + ' lesson' + (rest === 1 ? '' : 's') : null, games ? '7 arcade games' : null].filter(Boolean);
+      if (parts.length) items += '<li class="limit">' + TC.icon('lock') + '<span>' + TC.esc(parts.join(' and ').replace(/^t/, 'T')) + ' need a plan</span></li>';
+    }
 
     let href, text, cls = p.highlight ? 'btn btn-brass btn-block' : 'btn btn-ghost btn-block';
     if (!p.pricePaise) {
@@ -63,6 +71,7 @@
     const txt = (s) => '<td>' + TC.esc(s) + '</td>';
     let rows = '<tr><th scope="row">Price</th>' + list.map((p) => '<td class="mono">' + TC.esc(TC.money(p.pricePaise, p.currency)) + '</td>').join('') + '</tr>';
     rows += '<tr><th scope="row">Access</th>' + list.map((p) => txt(!p.pricePaise ? 'Forever' : p.validityDays ? p.validityDays + ' days' : 'Lifetime')).join('') + '</tr>';
+    rows += '<tr><th scope="row">Lessons</th>' + list.map((p) => txt(lessonsOf(p).short || '')).join('') + '</tr>';
     rows += '<tr><th scope="row">Typing tests</th>' + list.map((p) => txt(p.limits && p.limits.dailyTests != null ? p.limits.dailyTests + ' a day' : 'Unlimited')).join('') + '</tr>';
     rows += '<tr><th scope="row">Test history</th>' + list.map((p) => txt(p.limits && p.limits.historyDays != null ? p.limits.historyDays + ' days' : 'Full')).join('') + '</tr>';
     const feats = (data.features || []).filter((f) => HIDDEN.indexOf(f.key) === -1);

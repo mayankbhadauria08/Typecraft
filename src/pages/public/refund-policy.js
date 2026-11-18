@@ -15,7 +15,7 @@ export default `
     <p class="updated mono muted">Last updated: ${UPDATED}</p></header>
   <div class="prose" style="padding-bottom:40px">
     <h2>1. Changed your mind: 7-day refund on your first purchase</h2>
-    <p>You can ask for a full refund within <b>${REFUND_DAYS} days of your first paid purchase</b> on your account, as long as you have completed fewer than <b>${REFUND_LESSON_LIMIT} lessons</b> beyond the five free ones since buying. When the refund is made, the plan is removed from your account; your learning progress stays.</p>
+    <p>You can ask for a full refund within <b>${REFUND_DAYS} days of your first paid purchase</b> on your account, as long as you have completed fewer than <b>${REFUND_LESSON_LIMIT} lessons</b> beyond the lessons the Free plan includes since buying. When the refund is made, the plan is removed from your account; your learning progress stays.</p>
     <p>Later purchases (including buying again to extend a plan) are not refundable once the plan is active, except as described in sections 2 and 3.</p>
     <h2>2. Failed, duplicate or wrong charges</h2>
     <ul>

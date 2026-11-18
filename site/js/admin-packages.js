@@ -23,7 +23,7 @@
       pricePaise: Math.round(Number(f.elements.price.value || 0) * 100),
       validityDays: num('validityDays'),
       features: K.$$('input[name=feature]:checked', f).map((i) => i.value),
-      limits: { lessons: f.elements.lessons.value, dailyTests: num('dailyTests'), historyDays: num('historyDays') },
+      limits: { lessons: f.elements.lessons.value === 'keep' ? currentLessons() : f.elements.lessons.value, dailyTests: num('dailyTests'), historyDays: num('historyDays') },
       highlight: f.elements.highlight.checked,
       active: f.elements.active.checked,
       displayOrder: Number(f.elements.displayOrder.value || 0),
@@ -42,6 +42,7 @@
       h('span', { class: 'btn btn-primary btn-block', 'aria-hidden': 'true', text: v.pricePaise ? `Buy ${v.name}` : 'Start free' })));
   }
 
+  function currentLessons() { const lim = typeof current.limits === 'string' ? JSON.parse(current.limits || '{}') : current.limits || {}; return lim.lessons; }
   function field(id, lbl, input, hint) { input.id = id; return h('div', { class: 'field' }, h('label', { for: id, text: lbl }), input, hint ? h('p', { class: 'hint', text: hint }) : null); }
 
   function renderForm() {
@@ -64,7 +65,10 @@
           h('label', { for: `ap-f-${f.key}` }, h('span', { text: f.label }), ' ', h('span', { class: 'muted mono', text: f.key }))))),
       h('fieldset', { class: 'field' }, h('legend', { text: 'Limits' }),
         h('div', { class: 'field-row' },
-          field('ap-lessons', 'Lessons', h('select', { name: 'lessons' }, h('option', { value: 'first5', text: 'First 5', selected: lim.lessons !== 'all' }), h('option', { value: 'all', text: 'All', selected: lim.lessons === 'all' }))),
+          field('ap-lessons', 'Lessons', h('select', { name: 'lessons' },
+            // levels and lessons chosen in the new console stay as they are unless another choice is made here
+            lim.lessons && typeof lim.lessons === 'object' ? h('option', { value: 'keep', text: `As chosen in the console: ${(p.lessons && p.lessons.short) || 'some lessons'}`, selected: true }) : null,
+            h('option', { value: 'first5', text: 'First 5', selected: lim.lessons === 'first5' || lim.lessons === undefined }), h('option', { value: 'all', text: 'All', selected: lim.lessons === 'all' }))),
           field('ap-tests', 'Tests per day', h('input', { name: 'dailyTests', type: 'number', min: 0, max: 1000, value: lim.dailyTests ?? '' }), 'Empty = unlimited.'),
           field('ap-hist', 'History (days)', h('input', { name: 'historyDays', type: 'number', min: 1, max: 3650, value: lim.historyDays ?? '' }), 'Empty = full history.'))),
       h('div', { class: 'field-row' },

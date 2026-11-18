@@ -1,4 +1,5 @@
 // Data the site part reads straight from D1 while rendering pages (no HTTP round trip).
+import { packageView, catalogueView } from './package-view.js';
 /* ---------- data pages read on the server ---------- */
 const parseJson = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 /** Same shape as GET /api/packages (docs §5), straight from D1. Used for JSON-LD and as the
@@ -10,13 +11,9 @@ export async function loadPackages(env) {
       env.DB.prepare('SELECT * FROM packages WHERE active = 1 ORDER BY display_order, price_paise'),
       env.DB.prepare('SELECT key, label, description FROM package_features ORDER BY display_order'),
     ]);
-    const features = ft.results.map((f) => ({ key: f.key, label: f.label, description: f.description }));
-    const label = Object.fromEntries(features.map((f) => [f.key, f.label]));
-    const packages = pk.results.map((p) => ({
-      id: p.id, name: p.name, description: p.description, pricePaise: p.price_paise, currency: p.currency,
-      validityDays: p.validity_days, features: parseJson(p.features, []).map((k) => ({ key: k, label: label[k] || k })),
-      limits: parseJson(p.limits, {}), highlight: !!p.highlight,
-    }));
+    const label = Object.fromEntries(ft.results.map((f) => [f.key, f.label]));
+    const packages = pk.results.map((p) => packageView(p, label));
+    const features = catalogueView(ft.results).map((f) => ({ key: f.key, label: f.label, description: f.description }));
     return { packages, features };
   } catch { return null; }
 }

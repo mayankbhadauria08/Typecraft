@@ -6,7 +6,7 @@ import { requireSession, hitLimit, tooMany } from './session.js';
 import { uuid } from './crypto.js';
 import { cleanState } from './progress.js';
 import { META, RULES, loadStored, rowsToState, ensureUser, processEvents, countRejects } from './pipeline.js';
-import { entitlementsFor, eventAllowed, eventClosed } from './entitlements.js';
+import { entitlementsFor, eventAllowed, eventClosed, lessonClosed } from './entitlements.js';
 import { takeCustomEvents } from './content.js'; // app part: lessonId 'custom'
 
 const DAY_MS = 86400000;
@@ -86,13 +86,14 @@ export async function getState(request, env) {
 
 /* ---------------- plan gate (docs/SAAS-CONTRACTS.md §3) ---------------- */
 /** Splits events into those the learner's plan allows and per-event rejections (counted like other rejects):
- *  'plan_required', or 'closed' when staff closed that lesson or game for this learner. */
+ *  'plan_required', or 'closed' when staff closed that lesson or game, for this learner or for everyone. */
 export async function gateEvents(env, userId, events) {
   const ent = await entitlementsFor(env, userId);
   const allowed = [], rejected = [];
   for (const e of events) {
     if (eventAllowed(ent, e)) allowed.push(e);
-    else if (eventClosed(ent, e)) rejected.push({ id: e && typeof e.id === 'string' ? e.id.slice(0, 100) : null, code: 'closed', message: 'This lesson or game is closed on this account.' });
+    else if (eventClosed(ent, e)) rejected.push({ id: e && typeof e.id === 'string' ? e.id.slice(0, 100) : null, code: 'closed',
+      message: e.type !== 'game' && lessonClosed(ent, e.lessonId) === 'all' ? 'This lesson is closed for now.' : 'This lesson or game is closed on this account.' });
     else rejected.push({ id: e && typeof e.id === 'string' ? e.id.slice(0, 100) : null, code: 'plan_required', message: 'This lesson or game needs a paid plan.' });
   }
   if (rejected.length) await countRejects(env, userId, rejected.map((r) => r.code));

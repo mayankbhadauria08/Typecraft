@@ -13,6 +13,9 @@ import { PAGES as ACCOUNT_PAGES } from './pages/account.js';
 import { PAGES as PAYMENT_PAGES } from './pages/payment.js';
 import { PAGES as ADMIN_PAGES } from './pages/admin.js';
 import { loadSettings } from './site-data.js';
+import { freeLessons } from './package-view.js';
+import '../shared/course-meta.js';
+import '../shared/lesson-access.js';
 import notFoundBody, { meta as notFoundMeta } from './pages/public/not-found.js';
 import { serveConsole, isConsolePath } from './console/router.js'; // the new admin console (docs/ADMIN-CONSOLE.md)
 
@@ -143,6 +146,22 @@ async function whoFor(env, session) {
 }
 
 /** {{seller.legalName}}-style tokens in a page body, filled from platform_settings (escaped). */
+/* {{free.lessons}} ("the first 5 lessons"), {{free.Lessons}} (with a capital) and {{free.badge}} ("First 5 lessons
+   free"): what the Free plan includes, read live (docs/UNLOCK-RULES.md). {{free.level1}} … {{free.level5}}: a "free"
+   badge for that level on the practice page, or nothing. Filled in the whole page, so the FAQ's structured data
+   says the same as the page. The words are plain letters, digits and dashes, safe in HTML and in JSON. */
+async function fillFree(env, html) {
+  if (!html.includes('{{free.')) return html;
+  const A = globalThis.TC_ACCESS, d = await freeLessons(env), set = new Set(A.idsOf(d.value));
+  const vals = { lessons: d.text, Lessons: d.Text, badge: d.all ? 'Every lesson free' : d.short + ' free' };
+  for (const n of A.LEVELS) {
+    const ids = A.BY_LEVEL[n], k = ids.filter((id) => set.has(id)).length;
+    const first = ids.slice(0, k).every((id) => set.has(id));
+    vals['level' + n] = !k ? '' : `<span class="badge badge-ok">${k === ids.length ? 'Free' : first ? 'First ' + k + ' free' : k + ' free'}</span>`;
+  }
+  return html.replace(/\{\{free\.(\w+)\}\}/g, (all, k) => (Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : all));
+}
+
 async function fillTokens(env, html, url) {
   if (!html.includes('{{')) return html;
   const s = await loadSettings(env);
@@ -237,7 +256,7 @@ async function render(env, url, page, params, who, status) {
   if (ld) ctx.jsonld = Array.isArray(ld) ? ld : [ld];
   let body = typeof page.body === 'function' ? page.body(ctx) : String(page.body || '');
   body = await fillTokens(env, body, url);
-  return { nonce, text: renderPage(page, ctx, body) };
+  return { nonce, text: await fillFree(env, renderPage(page, ctx, body)) };
 }
 
 async function notFound(request, env, url, session, who) {

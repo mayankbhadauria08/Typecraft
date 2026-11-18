@@ -9,7 +9,7 @@ export const meta = {
 const free = '<span class="badge badge-ok">Free</span>';
 const paid = (name) => `<span class="badge badge-warn">${name}</span>`;
 const F = [
-  ['book', 'A real course', 'Five levels and 78 lessons: home row, top row and numbers, bottom row with capitals and symbols, mastery, and optional Pro tracks.', `${free} first 5 lessons · ${paid('All plans')} the rest`],
+  ['book', 'A real course', 'Five levels and 78 lessons: home row, top row and numbers, bottom row with capitals and symbols, mastery, and optional Pro tracks.', `${free} {{free.lessons}} · ${paid('Paid plans')} the rest`],
   ['target', 'Placement test', 'Checks which keys you already type by touch and suggests where to start, so you skip what you know.', free],
   ['keyboard', 'Five-step lessons', 'Watch the reach, practise each key, mix them into words, then a challenge. On-screen hands show which finger to use.', free],
   ['refresh', 'Coach and review drills', 'Every missed key and slow letter pair is counted. Review drills are built from words full of exactly those keys.', free],

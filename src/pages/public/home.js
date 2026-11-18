@@ -47,7 +47,7 @@ export default `
         <a class="btn btn-primary btn-lg" href="/signup" data-auth-swap>Start free ${icon('arrowRight')}</a>
         <a class="btn btn-ghost btn-lg" href="/typing-test">Take a typing test</a>
       </div>
-      <div class="hero-facts"><span>${icon('check')}First 5 lessons free</span><span>${icon('check')}No card needed</span><span>${icon('check')}Progress saved to your account</span></div>
+      <div class="hero-facts"><span>${icon('check')}{{free.badge}}</span><span>${icon('check')}No card needed</span><span>${icon('check')}Progress saved to your account</span></div>
     </div>
     <div class="demo" id="demo" aria-label="Try typing: a short demo">
       <div class="demo-sheet" id="demoSheet">
@@ -94,7 +94,7 @@ export default `
 <section class="section" aria-labelledby="levels-h">
   <div class="container">
     <div class="section-head"><span class="eyebrow">The course</span><h2 id="levels-h">Five levels, home row to full speed</h2>
-      <p class="lede">The first 5 lessons are free, along with the placement test and review drills. A plan unlocks the rest.</p></div>
+      <p class="lede">You can start free with {{free.lessons}}, the placement test and review drills. A plan unlocks the rest.</p></div>
     <div class="levels">
       ${META_.LEVELS.map((L) => `<div class="level${L.n === 5 ? ' pro' : ''}"><div class="node" aria-hidden="true">${L.n}</div><div><h3>${L.name} <span class="muted" style="font:400 15px var(--sans)">· ${L.sub}</span></h3><p>${LEVEL_TEXT[L.n]}</p></div><div class="meta"><span class="mono">${count(L.n)} lessons</span><span class="badge ${L.n === 1 ? 'badge-ok' : 'badge-muted'}">${L.n === 1 ? 'Starts free' : `target ${L.target} wpm`}</span></div></div>`).join('')}
     </div>
@@ -154,7 +154,7 @@ export default `
 <section class="section">
   <div class="container">
     <div class="cta-band">
-      <div><h2>Your first five lessons are waiting</h2><p>Create a free account, take the placement test and start on the home row today. It takes under a minute.</p></div>
+      <div><h2>Your free lessons are waiting</h2><p>Create a free account, take the placement test and start on the home row today. It takes under a minute.</p></div>
       <div class="actions"><a class="btn btn-primary btn-lg" href="/signup" data-auth-swap>Start free ${icon('arrowRight')}</a></div>
     </div>
   </div>
