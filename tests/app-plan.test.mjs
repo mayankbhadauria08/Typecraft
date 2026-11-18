@@ -182,3 +182,53 @@ test('custom events: accepted with practice.custom (Pro) or exercises.premium al
   assert.equal(rb.differences, 0);
   assert.equal(rb.errors, 0);
 });
+
+/* ---------------- lessons and games staff opened or closed for one learner (admin console, Phase 2) ---------------- */
+async function exception(userId, kind, target, effect, { expiresAt = null, ended = false } = {}) {
+  const now = new Date().toISOString();
+  await env.DB.prepare(`INSERT INTO access_overrides (id, user_id, kind, target, effect, reason, expires_at, created_by, created_at, ended_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, 'test', ?6, NULL, ?7, ?8)`).bind(`ao-${userId}-${kind}-${target}-${effect}-${++n}`, userId, kind, target, effect, expiresAt, now, ended ? now : null).run();
+}
+const game = (gameId) => ({ id: id(), type: 'game', gameId, score: 120, xp: 5, seconds: 60, at: new Date().toISOString() });
+
+test('staff exceptions: an opened lesson or game is saved on Free; ended or run-out ones change nothing', async () => {
+  const a = await signup('opened@example.com');
+  await exception(a.user.id, 'lesson', 'l4', 'allow');
+  await exception(a.user.id, 'game', 'storm', 'allow');
+  await exception(a.user.id, 'lesson', 'l27', 'allow', { ended: true });
+  await exception(a.user.id, 'lesson', 'l28', 'allow', { expiresAt: '2020-01-01T00:00:00.000Z' });
+  const ok = [run('l4'), game('storm')], locked = [run('l27'), run('l28'), game('beat')];
+  const r = await send(a, [...ok, ...locked]);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.sync.accepted.sort(), ok.map((e) => e.id).sort());
+  assert.deepEqual(r.body.sync.rejected.map((x) => x.code), ['plan_required', 'plan_required', 'plan_required']);
+  const ent = (await a('GET', '/api/me/entitlements')).body;
+  assert.deepEqual(ent.overrides, { lessons: { allow: ['l4'], deny: [] }, games: { allow: ['storm'], deny: [] } });
+  assert.equal(ent.plan, 'free', 'the plan itself does not change');
+});
+
+test('staff exceptions: a closed lesson or game is refused as closed, not as a plan matter, whatever the plan', async () => {
+  const a = await signup('closed@example.com');
+  await grant(a.user.id, 'premium');
+  await exception(a.user.id, 'lesson', 'l7', 'deny');
+  await exception(a.user.id, 'game', 'storm', 'deny');
+  await exception(a.user.id, 'game', 'daily', 'deny');              // never applies: the Daily Challenge is always open
+  await exception(a.user.id, 'lesson', 'placement', 'deny');        // nor to the placement test
+  const closed = [run('l7'), game('storm')], open = [run('l8'), game('beat'), game('daily')];
+  const r = await send(a, [...closed, ...open]);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.sync.rejected.map((x) => [x.id, x.code]), closed.map((e) => [e.id, 'closed']));
+  assert.ok(r.body.sync.rejected.every((x) => !/plan/i.test(x.message)), 'the message does not talk about plans');
+  for (const e of open) assert.ok(r.body.sync.accepted.includes(e.id), e.lessonId || e.gameId);
+  const ent = (await a('GET', '/api/me/entitlements')).body;
+  assert.deepEqual(ent.overrides.lessons.deny.sort(), ['l7', 'placement'], 'the placement row is read, and still never applies (src/entitlements.js)');
+  const rej = await env.DB.prepare("SELECT n FROM event_rejects WHERE user_id = ?1 AND reason = 'closed'").bind(a.user.id).first();
+  assert.equal(rej.n, 2);
+  // the older lesson route says the same
+  const done = await a('POST', '/api/user/progress/lesson-complete', { lessonId: 'l7', eventId: 'ev-closed-l7', stars: 2, wpm: 30, accuracy: 95, seconds: 60 });
+  assert.equal(done.status, 403); assert.equal(done.body.error.code, 'closed');
+  // when staff open it again, it is saved
+  await env.DB.prepare("UPDATE access_overrides SET ended_at = ?2 WHERE user_id = ?1 AND target = 'l7'").bind(a.user.id, new Date().toISOString()).run();
+  const again = await send(a, [run('l7')]);
+  assert.equal(again.body.sync.accepted.length, 1);
+});

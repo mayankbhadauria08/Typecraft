@@ -73,9 +73,8 @@ export async function getStaff(request, env) {
   });
 }
 
-/** Which services are set up. Only yes/no and the names of settings: never a secret's value. */
-export async function getSetup(request, env) {
-  await requireAdmin(env, request, 'settings.view');
+/** Which services are set up: yes or no, and the names of settings. Never a secret's value. Also used by the dashboard. */
+export function setupItems(env) {
   const smtpSupported = typeof mail.providerOf === 'function'; // sending through Google Workspace arrives with src/smtp.js
   const emailOn = emailEnabled(env);
   const provider = smtpSupported ? mail.providerOf(env) : (env.RESEND_API_KEY ? 'resend' : null);
@@ -100,7 +99,12 @@ export async function getSetup(request, env) {
     { key: 'webhook', label: 'Razorpay webhook secret', ready: !!env.RAZORPAY_WEBHOOK_SECRET,
       detail: 'Lets Razorpay confirm a payment even if the customer closes the page.', fix: 'Add RAZORPAY_WEBHOOK_SECRET.' },
   ];
-  return json({ items, session: { idleMinutes: Math.round(IDLE_MS / 60000), maxHours: Math.round(MAX_MS / 3600000) } });
+  return items;
+}
+
+export async function getSetup(request, env) {
+  await requireAdmin(env, request, 'settings.view');
+  return json({ items: setupItems(env), session: { idleMinutes: Math.round(IDLE_MS / 60000), maxHours: Math.round(MAX_MS / 3600000) } });
 }
 
 export const ROUTES = {

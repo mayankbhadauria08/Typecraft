@@ -3,6 +3,10 @@
 // that has not expired (contract §2: a stacked renewal counts from the moment it is
 // bought, so an upgrade bought during a cheaper plan gives its features at once).
 // Feature checks use feature keys only.
+// On top of the plan, staff can open or close one lesson or game for one customer
+// (access_overrides, migration 0006; docs/ADMIN-PHASE-2.md §9): a closed one stays closed
+// whatever the plan, an opened one is open whatever the plan. The placement test, the
+// review drill and the Daily Challenge are never closed.
 import '../shared/course-meta.js';
 import { nowIso } from './http.js';
 
@@ -29,6 +33,36 @@ export function mergeLimits(a, b) {
   return out;
 }
 
+const noOverrides = () => ({ lessons: { allow: [], deny: [] }, games: { allow: [], deny: [] } });
+
+/** The lessons and games staff opened or closed for this customer, still in force. */
+async function overridesFor(env, userId, now) {
+  const out = noOverrides();
+  let rows = [];
+  try {
+    rows = (await env.DB.prepare(
+      `SELECT kind, target, effect FROM access_overrides
+        WHERE user_id = ?1 AND ended_at IS NULL AND (expires_at IS NULL OR expires_at > ?2)`
+    ).bind(userId, now).all()).results;
+  } catch (err) {
+    if (!/no such table/i.test(String(err && err.message))) throw err;   // before migration 0006: there are none
+  }
+  for (const r of rows) {
+    const bucket = r.kind === 'lesson' ? out.lessons : r.kind === 'game' ? out.games : null;
+    if (bucket && (r.effect === 'allow' || r.effect === 'deny') && !bucket[r.effect].includes(r.target)) bucket[r.effect].push(r.target);
+  }
+  return out;
+}
+
+/** 'allow', 'deny' or null: what staff decided about this lesson ('lessons') or game ('games') for this customer. */
+export function overrideOf(ent, kind, id) {
+  const o = ent && ent.overrides && ent.overrides[kind];
+  if (!o) return null;
+  if (Array.isArray(o.deny) && o.deny.includes(id)) return 'deny';
+  if (Array.isArray(o.allow) && o.allow.includes(id)) return 'allow';
+  return null;
+}
+
 export async function entitlementsFor(env, userId, now = nowIso()) {
   const DB = env.DB;
   const [freeRes, subsRes] = await DB.batch([
@@ -47,6 +81,7 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
     features: free ? parse(free.features, FREE.features) : [...FREE.features],
     limits: { ...FREE.limits, ...(free ? parse(free.limits, {}) : {}) },
     subscriptions: [],
+    overrides: await overridesFor(env, userId, now),
   };
   let best = null, latest = null, lifetime = false;
   const features = new Set(ent.features);
@@ -70,13 +105,25 @@ export function has(ent, feature) {
 export function lessonAllowed(ent, lessonId) {
   if (lessonId === 'custom') return has(ent, 'practice.custom');
   if (ALWAYS_OPEN.has(lessonId)) return true;
+  const o = overrideOf(ent, 'lessons', lessonId);
+  if (o) return o === 'allow';
   if ((ent.limits && ent.limits.lessons === 'all') || has(ent, 'lessons.all')) return true;
   return FIRST5.includes(lessonId);
 }
 
 export function gameAllowed(ent, gameId) {
   if (gameId === 'daily') return true;
+  const o = overrideOf(ent, 'games', gameId);
+  if (o) return o === 'allow';
   return has(ent, 'arcade.all');
+}
+
+/** True when this browser event is refused because staff closed its lesson or game (not because of the plan). */
+export function eventClosed(ent, e) {
+  if (!e || typeof e !== 'object') return false;
+  if (e.type === 'run' || e.type === 'step') return overrideOf(ent, 'lessons', e.lessonId) === 'deny';
+  if (e.type === 'game') return overrideOf(ent, 'games', e.gameId) === 'deny';
+  return false;
 }
 
 /**

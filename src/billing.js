@@ -305,24 +305,49 @@ export async function getOrder(request, env, ctx, params) {
 }
 
 /* ---------------- refunds ---------------- */
-/** Recomputes a payment's refund state from its processed refunds; a full refund revokes the order's subscription. */
+/**
+ * What the administrator chose for the plan on the latest processed refund of a payment:
+ * 'keep', 'end', or null for the usual rule (a full refund ends the plan). The choice sits in
+ * refund_choices (migration 0006); until that table exists the usual rule applies.
+ */
+async function refundPlanChoice(env, paymentRowId) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT c.plan_action FROM refunds r LEFT JOIN refund_choices c ON c.razorpay_refund_id = r.razorpay_refund_id
+        WHERE r.payment_id = ?1 AND r.status = 'processed' ORDER BY r.processed_at DESC, r.created_at DESC LIMIT 1`
+    ).bind(paymentRowId).first();
+    return (row && row.plan_action) || null;
+  } catch (err) {
+    if (/no such table/i.test(String(err && err.message))) return null;
+    throw err;
+  }
+}
+
+/**
+ * Recomputes a payment's refund state from its processed refunds. A full refund revokes the
+ * order's subscription, unless the administrator chose otherwise for the latest refund
+ * ('keep': never; 'end': also on a part refund). A plan that was ended is never switched back on here.
+ */
 async function applyRefunds(env, ctx, paymentRowId, { actorId = null } = {}) {
   const DB = env.DB;
   const pay = await DB.prepare('SELECT * FROM payments WHERE id = ?1').bind(paymentRowId).first();
   if (!pay) return null;
   const sum = (await DB.prepare("SELECT COALESCE(SUM(amount_paise), 0) AS s FROM refunds WHERE payment_id = ?1 AND status = 'processed'").bind(pay.id).first()).s;
-  if (!sum) return { refundedPaise: 0, full: false };
+  if (!sum) return { refundedPaise: 0, full: false, planEnded: false };
   const full = sum >= pay.amount_paise;
+  const choice = await refundPlanChoice(env, pay.id);
+  const endPlan = choice === 'end' || (full && choice !== 'keep');
   const now = nowIso();
   const st = full ? 'refunded' : 'partially_refunded';
   const stmts = [
     DB.prepare("UPDATE payments SET status = ?2, updated_at = ?3 WHERE id = ?1 AND status IN ('captured', 'partially_refunded', 'refunded')").bind(pay.id, st, now),
     DB.prepare("UPDATE orders SET status = ?2, updated_at = ?3 WHERE id = ?1 AND status IN ('paid', 'partially_refunded', 'refunded')").bind(pay.order_id, st, now),
   ];
-  if (full) stmts.push(DB.prepare("UPDATE user_subscriptions SET status = 'revoked', updated_at = ?2 WHERE order_id = ?1 AND status = 'active'").bind(pay.order_id, now));
+  if (endPlan) stmts.push(DB.prepare("UPDATE user_subscriptions SET status = 'revoked', updated_at = ?2 WHERE order_id = ?1 AND status = 'active'").bind(pay.order_id, now));
   const res = await DB.batch(stmts);
-  if (full && res[2].meta.changes) await audit(env, { actorId, action: 'subscription.revoke', target: `order:${pay.order_id}`, detail: { reason: 'full_refund' } });
-  return { refundedPaise: sum, full };
+  const planEnded = endPlan && res[2].meta.changes > 0;
+  if (planEnded) await audit(env, { actorId, action: 'subscription.revoke', target: `order:${pay.order_id}`, detail: { reason: full ? 'full_refund' : 'refund' } });
+  return { refundedPaise: sum, full, planEnded };
 }
 
 /** Saves a refund Razorpay reported (from our refund call or a webhook) and applies it once processed. */
@@ -336,6 +361,7 @@ async function settleRefund(env, ctx, pay, r, { reason = null, requestedBy = nul
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
      ON CONFLICT (razorpay_refund_id) DO UPDATE SET
        status = CASE WHEN refunds.status = 'processed' THEN 'processed' ELSE excluded.status END,
+       reason = COALESCE(refunds.reason, excluded.reason), requested_by = COALESCE(refunds.requested_by, excluded.requested_by),
        processed_at = COALESCE(refunds.processed_at, excluded.processed_at), updated_at = excluded.updated_at`
   ).bind(uuid(), pay.id, pay.order_id, pay.user_id, r.id, r.amount, status, reason, requestedBy, status === 'processed' ? now : null, now).run();
   if (status !== 'processed' || (before && before.status === 'processed')) return { status, applied: false };
@@ -344,11 +370,14 @@ async function settleRefund(env, ctx, pay, r, { reason = null, requestedBy = nul
   const u = await DB.prepare('SELECT u.email, u.full_name, p.name FROM users u JOIN orders o ON o.user_id = u.id JOIN packages p ON p.id = o.package_id WHERE o.id = ?1').bind(pay.order_id).first();
   if (u) await email(env, ctx, { to: u.email, userId: pay.user_id, template: 'refund_processed',
     data: { name: u.full_name, packageName: u.name, amountPaise: r.amount, amount: money(r.amount), orderId: pay.order_id, full: !!(out && out.full) } });
-  return { status, applied: true, full: !!(out && out.full) };
+  return { status, applied: true, full: !!(out && out.full), planEnded: !!(out && out.planEnded) };
 }
 
-/** Admin refund through Razorpay. amountPaise defaults to everything still refundable. */
-export async function refund(env, ctx, pay, { amountPaise, reason, actorId, ip }) {
+/**
+ * Admin refund through Razorpay. amountPaise defaults to everything still refundable.
+ * planAction: 'auto' (a full refund ends the plan), 'keep' or 'end'.
+ */
+export async function refund(env, ctx, pay, { amountPaise, reason, actorId, ip, planAction = 'auto' }) {
   if (!['captured', 'partially_refunded'].includes(pay.status)) throw new HttpError(400, 'not_refundable', 'Only captured payments can be refunded.');
   if (!rzp.configured(env)) throw new HttpError(503, 'payments_unavailable', 'Payments are not configured, so refunds cannot be made.');
   const used = (await env.DB.prepare("SELECT COALESCE(SUM(amount_paise), 0) AS s FROM refunds WHERE payment_id = ?1 AND status IN ('processed', 'pending')").bind(pay.id).first()).s;
@@ -360,9 +389,49 @@ export async function refund(env, ctx, pay, { amountPaise, reason, actorId, ip }
   if (!cleanReason) throw fieldError({ reason: 'Give a reason for the refund.' });
   const r = await rzp.refundPayment(env, pay.razorpay_payment_id, { amount, notes: { orderId: pay.order_id, reason: cleanReason.slice(0, 200) } });
   if (!r || typeof r.id !== 'string') throw new HttpError(502, 'payment_provider_error', 'The payment provider gave an unexpected answer.');
-  await audit(env, { actorId, action: 'payment.refund', target: `payment:${pay.id}`, detail: { amountPaise: amount, reason: cleanReason, refundId: r.id, status: r.status }, ip });
+  const chosen = planAction === 'keep' || planAction === 'end';
+  let choiceKept = true;
+  if (chosen) {
+    // kept beside the refund, so the choice also holds when Razorpay confirms the refund later.
+    // The money has already moved: if this cannot be written, the refund is still recorded, under the usual rule.
+    try {
+      await env.DB.prepare('INSERT INTO refund_choices (razorpay_refund_id, plan_action, created_by, created_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (razorpay_refund_id) DO NOTHING')
+        .bind(r.id, planAction, actorId, nowIso()).run();
+    } catch (err) {
+      choiceKept = false;
+      console.error('refund plan choice was not saved:', err && err.name);
+    }
+  }
+  await audit(env, { actorId, action: 'payment.refund', target: `payment:${pay.id}`,
+    detail: { amountPaise: amount, reason: cleanReason, refundId: r.id, status: r.status, ...(chosen ? { planAction, ...(choiceKept ? {} : { planActionSaved: false }) } : {}) }, ip });
   const s = await settleRefund(env, ctx, pay, { id: r.id, amount: r.amount || amount, status: r.status }, { reason: cleanReason, requestedBy: actorId });
-  return { refundId: r.id, amountPaise: amount, status: s.status };
+  let planEnded = !!s.planEnded;
+  // Razorpay's notice of this refund can, in a rare race, be handled before the choice above was saved:
+  // then the refund is already recorded, and the choice is applied now
+  if (chosen && choiceKept && s.status === 'processed' && !s.applied) planEnded = !!((await applyRefunds(env, ctx, pay.id, { actorId })) || {}).planEnded;
+  return { refundId: r.id, amountPaise: amount, status: s.status, planEnded };
+}
+
+/**
+ * Asks Razorpay about a refund that is still on its way and records the answer.
+ * → { status: 'processed' | 'failed' | 'pending' }. Throws when Razorpay cannot be asked.
+ */
+export async function recheckRefund(env, ctx, row) {
+  const pay = await env.DB.prepare('SELECT * FROM payments WHERE id = ?1').bind(row.payment_id).first();
+  const r = await rzp.fetchRefund(env, row.razorpay_refund_id);
+  if (!pay || !r || r.id !== row.razorpay_refund_id || r.payment_id !== pay.razorpay_payment_id) {
+    throw new HttpError(502, 'payment_provider_error', 'Razorpay answered about a different refund. Nothing was changed.');
+  }
+  if (r.status === 'processed') {
+    await settleRefund(env, ctx, pay, { id: r.id, amount: row.amount_paise, status: 'processed' }, { reason: row.reason, requestedBy: row.requested_by });
+    return { status: 'processed' };
+  }
+  if (r.status === 'failed') {
+    const done = await env.DB.prepare("UPDATE refunds SET status = 'failed', updated_at = ?2 WHERE razorpay_refund_id = ?1 AND status = 'pending'").bind(r.id, nowIso()).run();
+    if (done.meta.changes) await audit(env, { action: 'refund.failed', target: `payment:${pay.id}`, detail: { refundId: r.id } });
+    return { status: 'failed' };
+  }
+  return { status: 'pending' };
 }
 
 /* ---------------- POST /api/webhooks/razorpay ---------------- */
@@ -628,6 +697,35 @@ export async function getAnalytics(request, env) {
 }
 
 /* ---------------- crons ---------------- */
+/**
+ * Asks Razorpay what happened to one order and acts on the answer: used by the scheduled
+ * check below and by "Check with Razorpay" in the admin console. Only a payment Razorpay
+ * reports as captured for this order and this amount can make it paid.
+ * → { outcome: 'paid' | 'pending' | 'failed' | 'mismatch' | 'cancelled' | 'waiting', attempts, counts }
+ *   attempts: payments Razorpay has for the order; counts: the scheduled check's counter to raise, or null.
+ * Throws when Razorpay cannot be asked.
+ */
+export async function reconcileOrder(env, ctx, o, now = Date.now()) {
+  const list = await rzp.fetchOrderPayments(env, o.razorpay_order_id);
+  const items = (list && Array.isArray(list.items) ? list.items : []).filter((p) => p && p.order_id === o.razorpay_order_id);
+  const attempts = items.length;
+  const good = items.find((p) => p.status === 'captured') || items.find((p) => p.status === 'authorized');
+  if (good) {
+    const r = await handlePayment(env, ctx, o, good, 'api');
+    return { outcome: r.status, attempts, counts: r.status === 'paid' ? 'paid' : null };
+  }
+  if (attempts && items.every((p) => p.status === 'failed')) {
+    for (const p of items) if (p.amount === o.amount_paise) await recordPayment(env, o, p, 'api');
+    const changed = await markFailed(env, ctx, o, items[items.length - 1].error_description || 'The payment did not go through.');
+    return { outcome: 'failed', attempts, counts: changed ? 'failed' : null };
+  }
+  if (!attempts && Date.parse(o.created_at) < now - DAY_MS) {
+    await env.DB.prepare("UPDATE orders SET status = 'cancelled', updated_at = ?2 WHERE id = ?1 AND status IN ('created', 'attempted')").bind(o.id, nowIso()).run();
+    return { outcome: 'cancelled', attempts, counts: 'cancelled' };
+  }
+  return { outcome: 'waiting', attempts, counts: null };
+}
+
 /** Every 10 minutes: orders waiting for a payment result are checked with Razorpay. */
 export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
   const DB = env.DB;
@@ -641,19 +739,8 @@ export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
     for (const o of rows) {
       out.checked++;
       try {
-        const list = await rzp.fetchOrderPayments(env, o.razorpay_order_id);
-        const items = (list && Array.isArray(list.items) ? list.items : []).filter((p) => p && p.order_id === o.razorpay_order_id);
-        const good = items.find((p) => p.status === 'captured') || items.find((p) => p.status === 'authorized');
-        if (good) {
-          const r = await handlePayment(env, ctx, o, good, 'api');
-          if (r.status === 'paid') out.paid++;
-        } else if (items.length && items.every((p) => p.status === 'failed')) {
-          for (const p of items) if (p.amount === o.amount_paise) await recordPayment(env, o, p, 'api');
-          if (await markFailed(env, ctx, o, items[items.length - 1].error_description || 'The payment did not go through.')) out.failed++;
-        } else if (!items.length && Date.parse(o.created_at) < now - DAY_MS) {
-          await DB.prepare("UPDATE orders SET status = 'cancelled', updated_at = ?2 WHERE id = ?1 AND status IN ('created', 'attempted')").bind(o.id, nowIso()).run();
-          out.cancelled++;
-        }
+        const r = await reconcileOrder(env, ctx, o, now);
+        if (r.counts) out[r.counts]++;
       } catch (err) {
         console.error('reconcile failed for an order:', err && err.code);
       }

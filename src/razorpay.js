@@ -44,6 +44,7 @@ export const fetchPayment = (env, paymentId) => call(env, 'GET', `/payments/${en
 export const fetchOrderPayments = (env, rzpOrderId) => call(env, 'GET', `/orders/${encodeURIComponent(rzpOrderId)}/payments`);
 export const capturePayment = (env, paymentId, amount, currency) => call(env, 'POST', `/payments/${encodeURIComponent(paymentId)}/capture`, { amount, currency });
 export const refundPayment = (env, paymentId, { amount, notes }) => call(env, 'POST', `/payments/${encodeURIComponent(paymentId)}/refund`, { amount, notes });
+export const fetchRefund = (env, refundId) => call(env, 'GET', `/refunds/${encodeURIComponent(refundId)}`);
 
 /* ---------------- signatures ---------------- */
 export async function hmacHex(secret, message) {

@@ -51,6 +51,23 @@ Lives at `/console` beside the current `/admin`. Full notes: `docs/ADMIN-CONSOLE
 3. Sign in at `/console/login` with your TypeCraft email and password. With `SESSION_SECRET` and
    email sending set up, it also asks for a code sent to your email; until then it is password only.
 
+## 1c. The admin console, Phase 2 (core operations)
+
+Full notes: `docs/ADMIN-PHASE-2.md`.
+
+1. **[Claude] Database**: take a restore bookmark in the D1 console (`/bookmark`, write it down
+   here), then apply `migrations/0006_admin_core.sql` (three new tables, plus three indexes on existing tables; adds only, no row changes).
+   The live database has no `d1_migrations` table: never run `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('customer_notes', 'access_overrides', 'refund_choices')`.
+   **Done 19 Nov 2026, 00:50 IST.** Restore bookmark taken just before:
+   `0000025b-00000004-00005127-a9f38cd8e4f349ba5bd941b62dc57df7` (D1 console:
+   `/restore <bookmark>`). Checked after: the three tables and six indexes exist; users 2,
+   refunds 0, audit_logs 1, the same as before.
+2. **[You] Merge the Phase 2 PR.** Learners see "Update ready, reload" once (`sw.js` changed).
+3. Refunds stay a Super Admin task until you switch `payments.refund` on for Admin in Roles and
+   permissions. Real refunds and "Check with Razorpay" need the Razorpay keys; test them in Test
+   Mode first.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

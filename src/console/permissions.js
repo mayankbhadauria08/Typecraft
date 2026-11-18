@@ -28,12 +28,21 @@ export const PERMISSIONS = [
   // ----- Layer 1: core operations -----
   P('dashboard.view', 'core', 'Dashboard', 'See the business dashboard', 'Totals for users, plans, payments and email health.', 1, 1),
   P('customers.view', 'core', 'Customers', 'See customers', 'Customer list and profiles: plan, purchases and progress.', 1, 1),
-  P('customers.manage', 'core', 'Customers', 'Suspend and restore accounts', 'Disable a customer account or switch it back on.', 1, 0),
-  P('subscriptions.manage', 'core', 'Subscriptions', 'Grant and revoke plans', 'Give a customer a plan by hand, or take a granted plan away.', 1, 0),
+  P('customers.manage', 'core', 'Customers', 'Suspend and restore accounts', 'Disable a customer account, switch it back on, or sign a customer out everywhere.', 1, 0),
+  P('customers.notes', 'core', 'Customers', 'Write notes on a customer', 'Private notes on a customer profile. Only staff see them.', 1, 1),
+  P('customers.export', 'core', 'Customers', 'Download the customer list', 'A spreadsheet of names, emails and phone numbers. Asks for your password again.', 1, 0, { sensitive: true }),
+  P('subscriptions.view', 'core', 'Subscriptions', 'See plans', "Every customer's plans: which, until when, and how they got them.", 1, 1),
+  P('subscriptions.manage', 'core', 'Subscriptions', 'Grant, extend and end plans', 'Give a customer a plan, add days to one, or end one early. Ending a plan does not refund it.', 1, 0),
+  P('subscriptions.bulk', 'core', 'Subscriptions', 'Extend every plan at once', 'Add days to every active plan, for example after an outage. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('access.view', 'core', 'Learning access', 'See lesson and game exceptions', 'Lessons and arcade games opened or closed for one customer, whatever their plan says.', 1, 1),
+  P('access.manage', 'core', 'Learning access', 'Open or close a lesson or game for a customer', 'Open a lesson or game their plan does not include, or close one it does.', 1, 0),
   P('packages.view', 'core', 'Packages', 'See packages and prices', 'The plans on sale and what each includes.', 1, 1),
   P('packages.manage', 'core', 'Packages', 'Change packages and prices', 'Edit price, validity, features and which plans are on sale.', 1, 0),
   P('payments.view', 'core', 'Payments', 'See payments', 'Orders, payment status and Razorpay references.', 1, 1),
+  P('payments.recheck', 'core', 'Payments', 'Check a payment with Razorpay', 'Ask Razorpay what happened to an order that is not paid. The order becomes paid only if Razorpay confirms it.', 1, 1),
+  P('payments.export', 'core', 'Payments', 'Download the payments list', 'A spreadsheet of orders with customer names and emails. Asks for your password again.', 1, 0, { sensitive: true }),
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
 
   // ----- Layer 3: business growth -----
   P('revenue.view', 'growth', 'Business reports', 'See revenue reports', 'Revenue by day and by package, refunds and net totals.', 1, 0),

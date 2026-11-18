@@ -317,9 +317,10 @@ test('defaults: Support cannot refund, manage administrators, or touch settings;
   for (const k of ['payments.refund', 'admins.manage', 'roles.manage', 'settings.view', 'settings.manage', 'audit.view', 'customers.manage', 'subscriptions.manage', 'packages.manage']) {
     assert.ok(!support.includes(k), `support must not have ${k}`);
   }
-  assert.deepEqual(support.sort(), ['customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.view', 'support.manage', 'support.view']);
+  assert.deepEqual(support.sort(), ['access.view', 'customers.notes', 'customers.view', 'dashboard.view', 'emails.view', 'packages.view', 'payments.recheck', 'payments.view', 'refunds.view', 'subscriptions.view', 'support.manage', 'support.view']);
+  for (const k of ['customers.export', 'customers.manage', 'payments.export']) assert.ok(!support.includes(k), `support must not have ${k}`);
   for (const k of ['payments.refund', 'settings.manage', 'roles.manage', 'admins.manage']) assert.ok(!admin.includes(k), `admin must not have ${k} by default`);
-  assert.equal(admin.length, 16);
+  assert.equal(admin.length, 24);
   assert.deepEqual(await keys('learner'), []); assert.deepEqual(await keys(null), []);
   await assert.rejects(() => can(A.env, 'admin', 'no.such.permission'), /unknown permission/);
   // every permission belongs to one of the four layers
@@ -580,13 +581,13 @@ test('console pages: sign-in first, strict headers, no inline code, and nothing 
 test('the sidebar remembers which layers you opened or closed; a made-up cookie changes nothing', async () => {
   const owner = await consoleLogin(A, await ownerOf(A));
   const openGroups = (html) => [...html.matchAll(/<details class="nav-group" data-group="(\w+)"( open)?>/g)].filter((m) => m[2]).map((m) => m[1]);
-  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['infra'], 'by default: the layers that have something built');
-  owner.jar.set('tc_console_nav', 'core-open.learning-shut.infra-shut');
-  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['core']);
-  assert.deepEqual(openGroups((await owner('GET', '/console/roles')).text), ['core', 'infra'], 'the layer you are in is always open');
-  owner.jar.set('tc_console_nav', 'core-open"><script>.x-open.growth-maybe');
+  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['core', 'infra'], 'by default: the layers that have something built');
+  owner.jar.set('tc_console_nav', 'core-shut.learning-open.infra-shut');
+  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['learning']);
+  assert.deepEqual(openGroups((await owner('GET', '/console/roles')).text), ['learning', 'infra'], 'the layer you are in is always open');
+  owner.jar.set('tc_console_nav', 'core-shut"><script>.x-open.growth-maybe');
   const html = (await owner('GET', '/console')).text;
-  assert.deepEqual(openGroups(html), ['infra']);
+  assert.deepEqual(openGroups(html), ['core', 'infra']);
   assert.ok(!html.includes('<script>.x'));
 });
 
