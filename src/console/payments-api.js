@@ -10,7 +10,7 @@
 // Nothing here marks an order paid by itself: only a payment Razorpay reports as captured
 // for that order and amount does (reconcileOrder() in src/billing.js).
 import { HttpError, json, nowIso, clientIp } from '../http.js';
-import { hitLimit } from '../session.js';
+import { hitLimit, emailEnabled } from '../session.js';
 import * as rzp from '../razorpay.js';
 import { audit, reconcileOrder } from '../billing.js';
 import { requireAdmin } from './session.js';
@@ -158,12 +158,19 @@ export async function getPayment(request, env, ctx, params) {
         WHERE a.target = ?1 OR a.target IN (SELECT 'payment:' || y.id FROM payments y WHERE y.order_id = ?2)
         ORDER BY a.created_at DESC LIMIT 30`).bind(`order:${o.id}`, o.id);
   }
-  const keys = Object.keys(stmts);
-  const answers = await DB.batch(keys.map((k) => stmts[k]));
-  const R = Object.fromEntries(keys.map((k, i) => [k, answers[i].results]));
+  const names = Object.keys(stmts);
+  const answers = await DB.batch(names.map((k) => stmts[k]));
+  const R = Object.fromEntries(names.map((k, i) => [k, answers[i].results]));
 
   const inv = R.invoice[0] || null, sub = R.plan[0] || null;
   const block = recheckBlock(env, o);
+  const keys = rzp.configured(env);
+  const attempts = R.attempts.map((y) => ({
+    id: y.id, razorpayPaymentId: y.razorpay_payment_id, amountPaise: y.amount_paise, currency: y.currency, status: y.status, method: y.method || null,
+    error: y.status === 'failed' ? (y.error_description || null) : null, verifiedBy: y.verified_by, capturedAt: y.captured_at, createdAt: y.created_at,
+    refundedPaise: y.refunded, refundablePaise: ['captured', 'partially_refunded'].includes(y.status) ? Math.max(0, y.amount_paise - y.refunded - y.refunding) : 0,
+  }));
+  const refundable = attempts.some((y) => y.refundablePaise > 0);
   return json({
     order: {
       id: o.id, status: o.status, amountPaise: o.amount_paise, currency: o.currency, packageId: o.package_id, packageName: o.package_name,
@@ -172,11 +179,7 @@ export async function getPayment(request, env, ctx, params) {
       refundedPaise: R.refunds.reduce((sum, r) => sum + (r.status === 'processed' ? r.amount_paise : 0), 0),
     },
     customer: { id: o.user_id, fullName: o.full_name, email: o.email, status: o.account_status },
-    attempts: R.attempts.map((y) => ({
-      id: y.id, razorpayPaymentId: y.razorpay_payment_id, amountPaise: y.amount_paise, currency: y.currency, status: y.status, method: y.method || null,
-      error: y.status === 'failed' ? (y.error_description || null) : null, verifiedBy: y.verified_by, capturedAt: y.captured_at, createdAt: y.created_at,
-      refundedPaise: y.refunded, refundablePaise: ['captured', 'partially_refunded'].includes(y.status) ? Math.max(0, y.amount_paise - y.refunded - y.refunding) : 0,
-    })),
+    attempts,
     refunds: R.refunds.map((r) => ({
       id: r.id, paymentId: r.payment_id, razorpayRefundId: r.razorpay_refund_id || null, amountPaise: r.amount_paise, status: r.status,
       reason: r.reason || null, requestedBy: r.requester || null, processedAt: r.processed_at, createdAt: r.created_at,
@@ -189,7 +192,13 @@ export async function getPayment(request, env, ctx, params) {
       return { action: a.action, reason: typeof d.reason === 'string' ? d.reason : null, amountPaise: Number.isInteger(d.amountPaise) ? d.amountPaise : null,
         actor: a.actor || 'System', createdAt: a.created_at };
     }) : null,
-    can: { recheck: has('payments.recheck') && !block, recheckBlock: has('payments.recheck') && RECHECKABLE.includes(o.status) ? block : null },
+    can: {
+      recheck: has('payments.recheck') && !block, recheckBlock: has('payments.recheck') && RECHECKABLE.includes(o.status) ? block : null,
+      refund: has('payments.refund') && keys && refundable,
+      refundBlock: has('payments.refund') && !keys && refundable ? 'The Razorpay keys are not set, so refunds cannot be sent.' : null,
+      recheckRefund: has('payments.recheck') && keys,
+    },
+    emailsOn: emailEnabled(env),
   });
 }
 

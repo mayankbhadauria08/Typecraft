@@ -14,7 +14,7 @@ nothing is applied to the live database, without the owner's yes.
 | 0 | Plan, migration 0006, pages with an id in the address, shared kit | built |
 | 1 | Customers | built |
 | 2 | Payments | built |
-| 3 | Refunds | not started |
+| 3 | Refunds | built |
 | 4 | Subscriptions | not started |
 | 5 | Learning access | not started |
 | 6 | Packages | not started |
@@ -158,27 +158,35 @@ Never marks anything paid unless Razorpay reports a captured payment of the same
 503 `payments_unavailable` without Razorpay keys. Audit `payment.recheck` with before and
 after. Customer names link to the customer page and the customer page's payments link here.
 
-## 7. Step 3: Refunds
+## 7. Step 3: Refunds (built)
 
-Page: `/console/refunds`; the refund dialog opens from a payment page.
+Page: `/console/refunds`; the refund dialog opens from a payment's page ("Refund").
 
 | Method and path | Permission | What |
 | --- | --- | --- |
-| `GET /api/console/refunds` | `refunds.view` (new) | `status`, `from`, `to`, `page` |
-| `POST /api/console/refunds` | `payments.refund` (password check) | `{ paymentId, amountPaise or null, reason, planAction }` |
-| `POST /api/console/refunds/:id/recheck` | `payments.recheck` | Ask Razorpay about a pending refund (add `fetchRefund` to `src/razorpay.js`) |
+| `GET /api/console/refunds` | `refunds.view` (new, on for Admin and Support) | `q`, `status` (`pending`, `processed`, `failed`), `from`, `to`, `page` |
+| `POST /api/console/refunds` | `payments.refund` (password check; off for Admin and Support) | `{ paymentId, amountPaise or null, reasonCode, reasonText, planAction }` |
+| `POST /api/console/refunds/:id/recheck` | `payments.recheck` | Ask Razorpay about a refund that is on its way (`fetchRefund` in `src/razorpay.js`) |
 
-- Uses `refund()` in `src/billing.js`, extended with an optional `planAction`
-  (`auto`, `keep`, `end`). When it is not `auto`, a `refund_choices` row is written after
-  Razorpay returns the refund id and before `settleRefund()` runs. `applyRefunds()` reads the
-  choice of the latest processed refund through a query that tolerates a missing table:
-  `keep` never ends the plan, `end` always does, `auto` ends it only on a full refund (as
-  today). A plan already ended is not restored by a later `keep`.
-- At most one refund request per payment per 10 seconds (429), so a double click cannot send
-  two partial refunds.
-- Reason: a preset (duplicate payment, customer request, technical problem, unauthorised,
-  other) plus free text, stored together in `refunds.reason`.
-- The dialog shows the customer, the amount still refundable and what happens to the plan.
+- Everything is checked before any money moves: the payment went through, something is left
+  to refund, the amount, the reason, the plan choice, the Razorpay keys.
+- `refund()` in `src/billing.js` takes an optional `planAction` (`auto`, `keep`, `end`). When it
+  is not `auto`, a `refund_choices` row is written after Razorpay returns the refund id and
+  before `settleRefund()` runs; before migration 0006 such a refund is refused (503) before
+  Razorpay is called. `applyRefunds()` reads the choice of the latest processed refund through
+  a query that tolerates a missing table: `keep` never ends the plan, `end` always does, `auto`
+  ends it only on a full refund (as before). A plan already ended is not restored by a later
+  `keep`. If Razorpay's notice of the refund is handled before the choice is saved, the choice
+  is applied right after, and the refund keeps who sent it and why.
+- At most one refund request per payment per 10 seconds (429): a double click sends one.
+- Reason: `reasonCode` is `duplicate`, `request`, `technical`, `unauthorised` or `other`;
+  `reasonText` (up to 250 characters, required for `other`) is added: "Customer request:
+  bought the wrong plan". Stored in `refunds.reason`, sent to Razorpay as a note, never
+  emailed to the customer.
+- A refund on its way changes nothing until Razorpay sends it; the check applies what was
+  chosen. A failed refund frees its amount to be refunded again.
+- The dialog shows who gets the money, how much is left, what happens to the plan, and
+  whether the customer is emailed (only once email sending is switched on).
 
 ## 8. Step 4: Subscriptions
 

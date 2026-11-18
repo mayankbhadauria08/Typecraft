@@ -35,9 +35,27 @@ function paymentBody(me) {
   });
 }
 
+/* ---------- Refunds ---------- */
+function refundsBody() {
+  return listFrame({
+    title: 'Refunds',
+    sub: 'Money sent back to customers through Razorpay. To send a refund, open the payment it belongs to.',
+    label: 'Find refunds',
+    search: { label: 'Search refunds', placeholder: 'Email, name, refund or order ID' },
+    filters: [
+      select('status', 'Status', [['', 'All refunds'], ['pending', 'On its way'], ['processed', 'Sent'], ['failed', 'Failed']]),
+      dayField('from', 'From'),
+      dayField('to', 'To'),
+    ].join('\n'),
+    heads: [['Date', 'col-wide'], ['Customer'], ['Amount', 'num'], ['Status', 'col-fit'], ['Reason', 'col-wide'], ['Sent by', 'col-wide']],
+  });
+}
+
 export const CORE_PAGES = [
   { key: 'payments', path: '/payments', title: 'Payments', crumbs: ['Core operations', 'Payments'],
     permission: 'payments.view', body: paymentsBody, scripts: ['payments.js'] },
   { key: 'payments', match: /^\/payments\/([\w-]{1,64})$/, names: ['id'], title: 'Payment', crumbs: ['Core operations', ['Payments', '/payments'], 'Payment'],
     permission: 'payments.view', body: paymentBody, scripts: ['payment.js'] },
+  { key: 'refunds', path: '/refunds', title: 'Refunds', crumbs: ['Core operations', 'Refunds'],
+    permission: 'refunds.view', body: refundsBody, scripts: ['refunds.js'] },
 ];

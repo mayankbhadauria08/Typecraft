@@ -67,7 +67,7 @@
     payment: { created: ['Started', ''], authorized: ['Not captured yet', 'warn'], captured: ['Paid', 'ok'], failed: ['Failed', 'bad'],
       refunded: ['Refunded', ''], partially_refunded: ['Partly refunded', ''] },
     refund: { pending: ['On its way', 'warn'], processed: ['Sent', 'ok'], failed: ['Failed', 'bad'] },
-    plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended by staff', 'bad'] },
+    plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended early', 'bad'] },
     email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] }
   };
   /** A badge for a state: AC.status('order', 'paid'). */
@@ -201,7 +201,7 @@
    * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
    * opts: { title, text, submitLabel, danger, submit(values) → Promise,
    *         fields: [{ name, label, type: 'text' | 'textarea' | 'number' | 'select' | 'radio', value, required,
-   *                    maxlength, min, max, placeholder, hint, options: [{ value, label, hint }] }] }
+   *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint }] }] }
    */
   function formDialog(opts) {
     return openDialog(function (close) {
@@ -218,14 +218,21 @@
           });
           controls[f.name] = { read: function () { var on = row.querySelector('input:checked'); return on ? on.value : ''; }, node: null, first: function () { return row.querySelector('input'); } };
           row = el('fieldset', { class: 'field choices' }, [el('legend', { text: f.label }), radios, f.hint ? el('p', { class: 'field-hint', text: f.hint }) : null, err]);
+          Array.prototype.forEach.call(row.querySelectorAll('input'), function (input) { clearOnChange(f.name, input); });
           return row;
         }
         if (f.type === 'textarea') control = el('textarea', { id: id, rows: f.rows || 3, maxlength: f.maxlength, placeholder: f.placeholder });
         else if (f.type === 'select') control = el('select', { id: id }, f.options.map(function (o) { return el('option', { value: o.value, text: o.label }); }));
-        else control = el('input', { id: id, type: f.type === 'number' ? 'number' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder, inputmode: f.type === 'number' ? 'numeric' : null, autocomplete: 'off' });
+        else control = el('input', { id: id, type: f.type === 'number' ? 'number' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
+          inputmode: f.inputmode || (f.type === 'number' ? 'numeric' : null), autocomplete: 'off' });
         if (f.value !== undefined && f.value !== null) control.value = String(f.value);
         controls[f.name] = { read: function () { return control.value; }, node: control, first: function () { return control; } };
+        clearOnChange(f.name, control);
         return el('div', { class: 'field' }, [el('label', { for: id, text: f.label }), control, f.hint ? el('p', { class: 'field-hint', id: id + '-hint', text: f.hint }) : null, err]);
+      }
+      // a field's error goes as soon as the field is changed
+      function clearOnChange(name, node) {
+        node.addEventListener(node.tagName === 'SELECT' || node.type === 'radio' ? 'change' : 'input', function () { if (!errors[name].hidden) showError(name, ''); });
       }
       function showError(name, text) {
         var c = controls[name], err = errors[name];

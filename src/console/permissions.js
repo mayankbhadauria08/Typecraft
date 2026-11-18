@@ -38,6 +38,7 @@ export const PERMISSIONS = [
   P('payments.recheck', 'core', 'Payments', 'Check a payment with Razorpay', 'Ask Razorpay what happened to an order that is not paid. The order becomes paid only if Razorpay confirms it.', 1, 1),
   P('payments.export', 'core', 'Payments', 'Download the payments list', 'A spreadsheet of orders with customer names and emails. Asks for your password again.', 1, 0, { sensitive: true }),
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
 
   // ----- Layer 3: business growth -----
   P('revenue.view', 'growth', 'Business reports', 'See revenue reports', 'Revenue by day and by package, refunds and net totals.', 1, 0),

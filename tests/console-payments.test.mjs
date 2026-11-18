@@ -3,17 +3,18 @@
 //   node --test tests/console-payments.test.mjs
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { makeEnv, startServer } from './server.mjs';
 import { kit, OWNER, assertNoInlineCode } from './console-kit.mjs';
 import { fakeRazorpay } from './fake-razorpay.mjs';
 
-const KEY_ID = 'rzp_test_console', KEY_SECRET = 'console-key-secret';
+const KEY_ID = 'rzp_test_console', KEY_SECRET = 'console-key-secret', WH_SECRET = 'console-webhook-secret';
 const iso = (msAgo) => new Date(Date.now() - msAgo).toISOString();
 const MIN = 60000, HOUR = 3600000, DAY = 86400000;
 
 let S, K, fake, owner, admin, support, P = {}, O = {};
 before(async () => {
-  const env = makeEnv({ OWNER_EMAILS: OWNER, SITE_URL: 'https://typecraft.test', RAZORPAY_KEY_ID: KEY_ID, RAZORPAY_KEY_SECRET: KEY_SECRET });
+  const env = makeEnv({ OWNER_EMAILS: OWNER, SITE_URL: 'https://typecraft.test', RAZORPAY_KEY_ID: KEY_ID, RAZORPAY_KEY_SECRET: KEY_SECRET, RAZORPAY_WEBHOOK_SECRET: WH_SECRET });
   fake = fakeRazorpay({ keyId: KEY_ID, keySecret: KEY_SECRET });
   fake.install();
   S = { env, srv: await startServer(env, 8795) };
@@ -127,7 +128,8 @@ test('payment page: the order, its attempts, refunds, invoice and plan; history 
   assert.equal(d.invoice.number, O.paid.invoiceNumber);
   assert.deepEqual([d.plan.id, d.plan.status, d.plan.source], [P.riyaPlan, 'active', 'purchase']);
   assert.deepEqual(d.refunds, []); assert.deepEqual(d.activity, []);
-  assert.deepEqual(d.can, { recheck: false, recheckBlock: null }, 'a paid order has nothing to check');
+  assert.deepEqual(d.can, { recheck: false, recheckBlock: null, refund: true, refundBlock: null, recheckRefund: true }, 'a paid order has nothing to check, and can be refunded');
+  assert.equal(d.emailsOn, false);
 
   const failed = (await owner('GET', `/api/console/payments/${O.failed.id}`)).body;
   assert.equal(failed.order.failureReason, 'Payment declined by the bank');
@@ -235,7 +237,9 @@ test('check with Razorpay: refused when the order never reached Razorpay or the 
     r = await admin('POST', `/api/console/payments/${O.open.id}/recheck`, {});
     assert.equal(r.status, 503); assert.equal(r.body.error.code, 'payments_unavailable');
     const page = (await admin('GET', `/api/console/payments/${O.open.id}`)).body;
-    assert.deepEqual(page.can, { recheck: false, recheckBlock: 'The Razorpay keys are not set, so this order cannot be checked.' });
+    assert.deepEqual(page.can, { recheck: false, recheckBlock: 'The Razorpay keys are not set, so this order cannot be checked.', refund: false, refundBlock: null, recheckRefund: false });
+    const paidPage = (await owner('GET', `/api/console/payments/${O.paid.id}`)).body;
+    assert.deepEqual([paidPage.can.refund, paidPage.can.refundBlock], [false, 'The Razorpay keys are not set, so refunds cannot be sent.']);
   } finally { S.env.RAZORPAY_KEY_SECRET = secret; }
   assert.equal((await admin('POST', '/api/console/payments/ord_000000000000000000000000/recheck', {})).status, 404);
   await K.run('DELETE FROM orders WHERE id = ?1', never.id);
@@ -307,4 +311,243 @@ test('payment pages: frames by permission, the sidebar shows where you are, stri
     const r = await K.client()('GET', `/site/console/${f}`);
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), `${f}: data is placed as text only`);
   }
+});
+
+/* ================= refunds (§7) ================= */
+let buyerN = 0;
+/** A plan bought through the real checkout, paid at the fake Razorpay. → { buyer, orderId, paymentId (our row), rzpPaymentId, amount } */
+async function bought(packageId = 'pro') {
+  const buyer = await K.account({ name: 'Refund Customer', email: `buyer${++buyerN}@example.com` });
+  const o = (await buyer.learner('POST', '/api/checkout/order', { packageId })).body;
+  const p = fake.pay(o.razorpayOrderId);
+  const sig = createHmac('sha256', KEY_SECRET).update(`${o.razorpayOrderId}|${p.id}`).digest('hex');
+  const v = await buyer.learner('POST', '/api/checkout/verify', { orderId: o.orderId, razorpay_order_id: o.razorpayOrderId, razorpay_payment_id: p.id, razorpay_signature: sig });
+  assert.equal(v.body.status, 'paid', v.text);
+  await K.settle();
+  const row = await K.one('SELECT id FROM payments WHERE razorpay_payment_id = ?1', p.id);
+  return { buyer, orderId: o.orderId, paymentId: row.id, rzpPaymentId: p.id, amount: o.amountPaise };
+}
+const send = (c, body) => c('POST', '/api/console/refunds', { reasonCode: 'request', ...body });
+const refundCalls = () => fake.calls.filter((x) => /^POST \/payments\/\w+\/refund$/.test(x)).length;
+const planOf = async (orderId) => (await K.one('SELECT status FROM user_subscriptions WHERE order_id = ?1', orderId)).status;
+const orderOf = async (orderId) => (await K.one('SELECT status FROM orders WHERE id = ?1', orderId)).status;
+const unblock = (key) => K.run('DELETE FROM rate_limits WHERE key = ?1', key);
+
+test('refunds list: who may see it, search and filters', async () => {
+  assert.equal((await K.client()('GET', '/api/console/refunds')).status, 401);
+  const d = (await support('GET', '/api/console/refunds')).body;
+  assert.equal(d.total, 2);
+  assert.deepEqual(d.items.map((r) => r.id), [O.backRefund.id, O.partRefund.id], 'newest first');
+  const part = d.items[1];
+  assert.deepEqual(Object.keys(part).sort(), ['amountPaise', 'createdAt', 'currency', 'customer', 'id', 'orderId', 'packageName', 'processedAt', 'razorpayRefundId', 'reason', 'requestedBy', 'status']);
+  assert.deepEqual([part.amountPaise, part.status, part.reason, part.requestedBy, part.orderId, part.packageName], [4000, 'processed', 'Duplicate payment: charged twice', 'Kavita Ops', O.part.id, 'Starter']);
+  assert.equal(d.items[0].requestedBy, null);
+  const ids = async (query) => (await admin('GET', '/api/console/refunds?' + query)).body.items.map((r) => r.id);
+  assert.deepEqual(await ids('q=neha'), [O.backRefund.id]);
+  for (const term of [O.partRefund.razorpayRefundId, O.part.id, O.part.razorpayPaymentId, O.part.razorpayOrderId, P.riya]) assert.deepEqual(await ids('q=' + term), [O.partRefund.id], term);
+  assert.deepEqual(await ids('status=pending'), []);
+  assert.deepEqual(await ids('status=processed'), [O.backRefund.id, O.partRefund.id]);
+  assert.deepEqual(await ids('from=' + new Date(Date.now() - 20 * DAY).toISOString().slice(0, 10)), [O.backRefund.id]);
+  await K.setPermission('support', 'refunds.view', false);
+  try { assert.equal((await support('GET', '/api/console/refunds')).status, 403); } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'refunds.view'"); }
+});
+
+test('sending a refund: who may, and everything checked before any money moves', async () => {
+  const b = await bought('pro');
+  const calls = refundCalls();
+  // Admin and Support cannot by default; a Super Admin must have confirmed the password in the last 10 minutes
+  for (const c of [admin, support]) assert.equal((await send(c, { paymentId: b.paymentId })).status, 403);
+  await K.stale(owner);
+  let r = await send(owner, { paymentId: b.paymentId });
+  assert.equal(r.status, 403); assert.equal(r.body.error.code, 'reauth_required');
+  assert.equal((await owner('POST', '/api/admin/auth/reauth', { password: 'correct horse 9' })).status, 200);
+
+  const field = async (body, name) => {
+    const x = await send(owner, { paymentId: b.paymentId, ...body });
+    assert.equal(x.status, 400, JSON.stringify(body)); assert.ok(x.body.error.fields && x.body.error.fields[name], `${name}: ${x.text}`);
+    return x.body.error.fields[name];
+  };
+  assert.equal((await owner('POST', '/api/console/refunds', { reasonCode: 'request' })).body.error.fields.paymentId, 'Choose the payment to refund.');
+  assert.equal((await send(owner, { paymentId: 'pay_row_nothing_like_this' })).status, 404);
+  r = await send(owner, { paymentId: O.failed.paymentRowId });
+  assert.equal(r.status, 400); assert.equal(r.body.error.code, 'not_refundable');
+  for (const bad of [0, -5, 1.5, '100']) await field({ amountPaise: bad }, 'amountPaise');
+  assert.equal(await field({ amountPaise: 19901 }, 'amountPaise'), 'At most ₹199 can still be refunded for this payment.');
+  await field({ reasonCode: undefined }, 'reasonCode');
+  await field({ reasonCode: 'because' }, 'reasonCode');
+  await field({ reasonCode: 'other' }, 'reasonText');
+  await field({ reasonCode: 'other', reasonText: '  ok ' }, 'reasonText');
+  await field({ reasonText: 'x'.repeat(251) }, 'reasonText');
+  await field({ planAction: 'later' }, 'planAction');
+  const secret = S.env.RAZORPAY_KEY_SECRET;
+  S.env.RAZORPAY_KEY_SECRET = '';
+  try {
+    r = await send(owner, { paymentId: b.paymentId });
+    assert.equal(r.status, 503); assert.equal(r.body.error.code, 'payments_unavailable');
+  } finally { S.env.RAZORPAY_KEY_SECRET = secret; }
+  assert.equal(refundCalls(), calls, 'no refund reached Razorpay');
+  assert.equal(await planOf(b.orderId), 'active');
+});
+
+test('a full refund with the usual rule: the money moves once, the plan ends, and it is all recorded', async () => {
+  const b = await bought('pro');
+  const calls = refundCalls();
+  const r = await send(owner, { paymentId: b.paymentId, amountPaise: null, reasonText: '  bought the   wrong plan ' });
+  assert.equal(r.status, 201, r.text);
+  assert.deepEqual([r.body.status, r.body.amountPaise, r.body.planEnded, r.body.orderStatus, r.body.emailsOn], ['processed', 19900, true, 'refunded', false]);
+  assert.equal(refundCalls(), calls + 1);
+  const row = await K.one('SELECT * FROM refunds WHERE razorpay_refund_id = ?1', r.body.refundId);
+  assert.deepEqual([row.amount_paise, row.status, row.reason, row.requested_by], [19900, 'processed', 'Customer request: bought the wrong plan', owner.who.id]);
+  assert.equal(await planOf(b.orderId), 'revoked');
+  assert.equal((await b.buyer.learner('GET', '/api/me/entitlements')).body.plan, 'free');
+  assert.equal(await K.one('SELECT COUNT(*) AS n FROM refund_choices').then((x) => x.n), 0, 'the usual rule needs no stored choice');
+  const logged = await K.many(`SELECT action, actor_id, detail FROM audit_logs WHERE target IN (?1, ?2) ORDER BY created_at, rowid`, `payment:${b.paymentId}`, `order:${b.orderId}`);
+  assert.deepEqual(logged.map((a) => a.action).filter((a) => a !== 'order.paid'), ['payment.refund', 'subscription.revoke', 'refund.processed']);
+  assert.deepEqual(JSON.parse(logged.find((a) => a.action === 'payment.refund').detail), { amountPaise: 19900, reason: 'Customer request: bought the wrong plan', refundId: r.body.refundId, status: 'processed' });
+  // nothing is left to refund
+  const again = await send(owner, { paymentId: b.paymentId });
+  assert.equal(again.status, 400); assert.equal(again.body.error.code, 'not_refundable');
+  const page = (await owner('GET', `/api/console/payments/${b.orderId}`)).body;
+  assert.equal(page.can.refund, false); assert.equal(page.order.refundedPaise, 19900);
+  assert.deepEqual([page.refunds[0].requestedBy, page.refunds[0].reason, page.plan.status], ['Mayank Owner', 'Customer request: bought the wrong plan', 'revoked']);
+  assert.deepEqual(page.activity.map((a) => a.action).sort(), ['order.paid', 'payment.refund', 'refund.processed', 'subscription.revoke']);
+});
+
+test('part refunds and the choice for the plan: keep, end, and a double click sends one', async () => {
+  const b = await bought('pro');
+  const calls = refundCalls();
+  let r = await send(owner, { paymentId: b.paymentId, amountPaise: 5000, reasonCode: 'technical', planAction: 'auto' });
+  assert.equal(r.status, 201, r.text);
+  assert.deepEqual([r.body.planEnded, r.body.orderStatus], [false, 'partially_refunded']);
+  assert.equal(await planOf(b.orderId), 'active', 'a part refund keeps the plan under the usual rule');
+  // a second click within 10 seconds is refused, and Razorpay sees one refund
+  r = await send(owner, { paymentId: b.paymentId, amountPaise: 5000 });
+  assert.equal(r.status, 429); assert.equal(refundCalls(), calls + 1);
+  await unblock(`refund:${b.paymentId}`);
+  // a part refund that ends the plan
+  r = await send(owner, { paymentId: b.paymentId, amountPaise: 5000, reasonCode: 'duplicate', planAction: 'end' });
+  assert.deepEqual([r.status, r.body.planEnded, r.body.orderStatus], [201, true, 'partially_refunded']);
+  assert.equal(await planOf(b.orderId), 'revoked');
+  assert.deepEqual(await K.one('SELECT plan_action, created_by FROM refund_choices WHERE razorpay_refund_id = ?1', r.body.refundId), { plan_action: 'end', created_by: owner.who.id });
+  let page = (await owner('GET', `/api/console/payments/${b.orderId}`)).body;
+  assert.equal(page.attempts[0].refundablePaise, 9900);
+  // keeping the plan afterwards does not switch an ended plan back on
+  await unblock(`refund:${b.paymentId}`);
+  r = await send(owner, { paymentId: b.paymentId, amountPaise: 9900, planAction: 'keep' });
+  assert.deepEqual([r.status, r.body.orderStatus], [201, 'refunded']);
+  assert.equal(await planOf(b.orderId), 'revoked');
+
+  // a full refund that keeps the plan
+  const k = await bought('starter');
+  r = await send(owner, { paymentId: k.paymentId, reasonCode: 'other', reasonText: 'Goodwill: the course was down for a week', planAction: 'keep' });
+  assert.deepEqual([r.status, r.body.amountPaise, r.body.planEnded, r.body.orderStatus], [201, 9900, false, 'refunded']);
+  assert.equal(await planOf(k.orderId), 'active');
+  assert.equal((await k.buyer.learner('GET', '/api/me/entitlements')).body.plan, 'starter');
+  const log = (await K.audits('payment.refund')).find((a) => JSON.parse(a.detail).refundId === r.body.refundId);
+  assert.deepEqual(JSON.parse(log.detail), { amountPaise: 9900, reason: 'Goodwill: the course was down for a week', refundId: r.body.refundId, status: 'processed', planAction: 'keep' });
+  page = (await owner('GET', `/api/console/payments/${k.orderId}`)).body;
+  assert.equal(page.plan.status, 'active'); assert.equal(page.can.refund, false);
+});
+
+test('a refund on its way: nothing changes until Razorpay sends it; checking applies the choice made', async () => {
+  fake.refundAs = 'pending';
+  try {
+    const b = await bought('pro');
+    let r = await send(owner, { paymentId: b.paymentId, amountPaise: 3000, planAction: 'end' });
+    assert.deepEqual([r.status, r.body.status, r.body.planEnded, r.body.orderStatus], [201, 'pending', false, 'paid']);
+    assert.equal(await planOf(b.orderId), 'active', 'nothing changes while the money is on its way');
+    let page = (await owner('GET', `/api/console/payments/${b.orderId}`)).body;
+    assert.deepEqual([page.refunds[0].status, page.attempts[0].refundablePaise, page.can.recheckRefund], ['pending', 16900, true]);
+    const row = await K.one('SELECT id FROM refunds WHERE razorpay_refund_id = ?1', r.body.refundId);
+    const check = (c = support) => c('POST', `/api/console/refunds/${row.id}/recheck`, {});
+
+    // Razorpay still has it on its way
+    r = await check();
+    assert.deepEqual([r.status, r.body.status, r.body.changed], [200, 'pending', false]);
+    r = await check();
+    assert.equal(r.status, 429, 'once per refund per 30 seconds');
+    await unblock(`recheck:${row.id}`);
+    // Razorpay has sent it: the choice made with the refund applies, though only part was refunded
+    fake.refunds.get((await K.one('SELECT razorpay_refund_id AS x FROM refunds WHERE id = ?1', row.id)).x).status = 'processed';
+    r = await check();
+    assert.deepEqual([r.status, r.body.status, r.body.changed], [200, 'processed', true]);
+    assert.equal(await planOf(b.orderId), 'revoked');
+    assert.equal(await orderOf(b.orderId), 'partially_refunded');
+    await unblock(`recheck:${row.id}`);
+    r = await check();
+    assert.equal(r.status, 400); assert.equal(r.body.error.code, 'not_needed');
+    const trail = (await K.audits('refund.recheck')).filter((a) => a.target === `payment:${b.paymentId}`).map((a) => [a.actor_id, JSON.parse(a.detail).before, JSON.parse(a.detail).after]);
+    assert.deepEqual(trail, [[support.who.id, 'pending', 'pending'], [support.who.id, 'pending', 'processed']]);
+
+    // a refund Razorpay could not send: the amount can be refunded again, and the plan stays
+    const f = await bought('starter');
+    r = await send(owner, { paymentId: f.paymentId, planAction: 'end' });
+    assert.equal(r.body.status, 'pending');
+    fake.refunds.get(r.body.refundId).status = 'failed';
+    const failed = await K.one('SELECT id FROM refunds WHERE razorpay_refund_id = ?1', r.body.refundId);
+    r = await admin('POST', `/api/console/refunds/${failed.id}/recheck`, {});
+    assert.deepEqual([r.status, r.body.status], [200, 'failed']);
+    page = (await owner('GET', `/api/console/payments/${f.orderId}`)).body;
+    assert.deepEqual([page.refunds[0].status, page.attempts[0].refundablePaise, page.order.status, page.plan.status, page.can.refund], ['failed', 9900, 'paid', 'active', true]);
+    assert.equal((await K.audits('refund.failed')).filter((a) => a.target === `payment:${f.paymentId}`).length, 1);
+
+    // who may check, and when there is nothing to check
+    await K.setPermission('support', 'payments.recheck', false);
+    try { assert.equal((await support('POST', `/api/console/refunds/${row.id}/recheck`, {})).status, 403); } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'payments.recheck'"); }
+    assert.equal((await admin('POST', `/api/console/refunds/${O.partRefund.id}/recheck`, {})).body.error.code, 'not_needed');
+    assert.equal((await admin('POST', '/api/console/refunds/00000000-0000-0000-0000-000000000000/recheck', {})).status, 404);
+  } finally { fake.refundAs = 'processed'; }
+});
+
+test('before migration 0006: a refund under the usual rule works; a choice for the plan is refused before any money moves', async () => {
+  const b = await bought('pro');
+  await K.run('ALTER TABLE refund_choices RENAME TO refund_choices_away');
+  try {
+    const calls = refundCalls();
+    let r = await send(owner, { paymentId: b.paymentId, amountPaise: 1000, planAction: 'keep' });
+    assert.equal(r.status, 503); assert.equal(r.body.error.code, 'console_not_ready');
+    assert.equal(refundCalls(), calls, 'no money moved');
+    r = await send(owner, { paymentId: b.paymentId, amountPaise: 1000 });
+    assert.deepEqual([r.status, r.body.status, r.body.planEnded], [201, 'processed', false]);
+    assert.equal(await planOf(b.orderId), 'active');
+  } finally { await K.run('ALTER TABLE refund_choices_away RENAME TO refund_choices'); }
+});
+
+test('refunds page: the frame by permission; the payment page offers a refund only to who may send one', async () => {
+  const page = await support('GET', '/console/refunds');
+  assert.equal(page.status, 200);
+  assertNoInlineCode(page.text);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/refunds" aria-current="page">/);
+  for (const name of ['q', 'status', 'from', 'to']) assert.ok(page.text.includes(`name="${name}"`), name);
+  assert.ok(!page.text.includes('id="exportBtn"') && page.text.includes('/site/console/refunds.js?v='));
+  assert.equal((await K.client()('GET', '/console/refunds')).status, 302);
+  // the button is drawn by the page's script from can.refund
+  assert.equal((await admin('GET', `/api/console/payments/${O.paid.id}`)).body.can.refund, false, 'Admin has no payments.refund by default');
+  await K.setPermission('admin', 'payments.refund', true);
+  try { assert.equal((await admin('GET', `/api/console/payments/${O.paid.id}`)).body.can.refund, true); } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'payments.refund'"); }
+  const r = await K.client()('GET', '/site/console/refunds.js');
+  assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text));
+});
+
+test("Razorpay's notice of a refund handled before the console saved its choice: the choice still applies, and who sent it is kept", async () => {
+  const b = await bought('pro');
+  let eventN = 0;
+  fake.onRefund = async (refund) => {
+    fake.onRefund = null;
+    const raw = JSON.stringify({ entity: 'event', event: 'refund.processed', payload: { refund: { entity: { ...refund, status: 'processed' } } } });
+    const res = await fetch(S.base + '/api/webhooks/razorpay', { method: 'POST', body: raw, headers: { 'Content-Type': 'application/json',
+      'X-Razorpay-Signature': createHmac('sha256', WH_SECRET).update(raw).digest('hex'), 'X-Razorpay-Event-Id': `evt_console_${++eventN}` } });
+    assert.equal(res.status, 200, await res.text());
+  };
+  try {
+    const r = await send(owner, { paymentId: b.paymentId, amountPaise: 2000, reasonCode: 'duplicate', planAction: 'end' });
+    assert.deepEqual([r.status, r.body.status, r.body.planEnded], [201, 'processed', true]);
+    assert.equal(await planOf(b.orderId), 'revoked');
+    const row = await K.one('SELECT requested_by, reason, status FROM refunds WHERE razorpay_refund_id = ?1', r.body.refundId);
+    assert.deepEqual(row, { requested_by: owner.who.id, reason: 'Duplicate payment', status: 'processed' });
+    // the notice did come first: it recorded the refund (no one signed in sent it), and the console then ended the plan
+    const trail = await K.many("SELECT action, actor_id FROM audit_logs WHERE target IN (?1, ?2) AND action IN ('refund.processed', 'subscription.revoke') ORDER BY created_at, rowid",
+      `payment:${b.paymentId}`, `order:${b.orderId}`);
+    assert.deepEqual(trail.map((a) => [a.action, a.actor_id]), [['refund.processed', null], ['subscription.revoke', owner.who.id]]);
+  } finally { fake.onRefund = null; }
 });

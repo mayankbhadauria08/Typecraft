@@ -3,8 +3,9 @@
 //   const fake = fakeRazorpay({ keyId, keySecret }); fake.install(); … fake.restore();
 export function fakeRazorpay({ keyId, keySecret }) {
   const realFetch = globalThis.fetch;
-  // refundAs: the status the next refunds get ('processed' | 'pending'); down: every call fails as if Razorpay were unreachable
-  const fake = { orders: new Map(), payments: new Map(), refunds: new Map(), calls: [], n: 0, refundAs: 'processed', down: false };
+  // refundAs: the status the next refunds get ('processed' | 'pending'); down: every call fails as if Razorpay were unreachable;
+  // onRefund(refund): awaited before a refund is answered (to send a webhook first, as Razorpay sometimes does)
+  const fake = { orders: new Map(), payments: new Map(), refunds: new Map(), calls: [], n: 0, refundAs: 'processed', down: false, onRefund: null };
   const rid = (p) => `${p}_${(++fake.n).toString(36).padStart(8, '0')}FAKE`;
   const reply = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
   const bad = (description) => reply(400, { error: { code: 'BAD_REQUEST_ERROR', description } });
@@ -41,6 +42,7 @@ export function fakeRazorpay({ keyId, keySecret }) {
       if (!p || p.status !== 'captured') return bad('cannot refund');
       const r = { id: rid('rfnd'), entity: 'refund', amount: body.amount ?? p.amount, payment_id: p.id, notes: body.notes, status: fake.refundAs };
       fake.refunds.set(r.id, r);
+      if (fake.onRefund) await fake.onRefund(r);
       return reply(200, r);
     }
     if (method === 'GET' && (m = path.match(/^\/refunds\/(\w+)$/))) {

@@ -39,6 +39,9 @@ export class Binder {
   }
 }
 
+/** ₹1,499 or ₹99.50 from an amount in paise. */
+export const money = (paise) => `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
 /* ---------- India-time days ---------- */
 export const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v + 'T00:00:00Z'));
 /** 'YYYY-MM-DD' in India for a moment (default: now). */

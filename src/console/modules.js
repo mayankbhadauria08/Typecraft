@@ -14,7 +14,7 @@ export const LAYERS = [
       { key: 'dashboard', label: 'Dashboard', icon: 'chart', phase: 2 },
       { key: 'customers', label: 'Customers', icon: 'users', path: '/customers', permission: 'customers.view' },
       { key: 'payments', label: 'Payments', icon: 'card', path: '/payments', permission: 'payments.view' },
-      { key: 'refunds', label: 'Refunds', icon: 'refresh', phase: 2 },
+      { key: 'refunds', label: 'Refunds', icon: 'refresh', path: '/refunds', permission: 'refunds.view' },
       { key: 'packages', label: 'Packages', icon: 'package', phase: 2 },
       { key: 'subscriptions', label: 'Subscriptions', icon: 'calendar', phase: 2 },
       { key: 'access', label: 'Learning access', icon: 'unlock', phase: 2 },
