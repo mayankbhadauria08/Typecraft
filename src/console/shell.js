@@ -8,7 +8,7 @@ import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '8';
+export const CONSOLE_ASSETS = '9';
 const asset = (name) => `/site/console/${name}?v=${CONSOLE_ASSETS}`;
 
 const FONTS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap';
@@ -69,6 +69,11 @@ function sidebar(permissions, currentKey, prefs) {
   return `<aside class="side" id="side" aria-label="Admin navigation">
 <div class="side-head"><a class="brand" href="${esc(CONSOLE_BASE)}" aria-label="TypeCraft admin home">${MARK}<span class="brand-name">TypeCraft</span><span class="brand-tag">Admin</span></a>
 <button type="button" class="icon-btn nav-close" id="navClose" aria-label="Close navigation">${icon('x')}</button></div>
+<div class="nav-search" id="navSearch">
+<label class="vh" for="consoleSearch">Search customers, payments and pages</label>
+<div class="nav-search-box">${icon('search')}<input id="consoleSearch" type="text" role="combobox" aria-expanded="false" aria-controls="consoleSearchList" aria-autocomplete="list" aria-describedby="consoleSearchKey" placeholder="Search" autocomplete="off" spellcheck="false" maxlength="80"><kbd id="consoleSearchKey" aria-label="Shortcut: Control K">Ctrl K</kbd></div>
+<div class="nav-search-pop" id="consoleSearchPop" hidden><ul id="consoleSearchList" role="listbox" aria-label="Search results"></ul><p class="nav-search-note" id="consoleSearchNote" role="status"></p></div>
+</div>
 <nav class="side-nav" aria-label="Sections">
 <div class="nav-list nav-top">${navItem(HOME, currentKey)}</div>
 ${groups}

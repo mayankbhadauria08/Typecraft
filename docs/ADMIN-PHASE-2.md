@@ -19,7 +19,7 @@ nothing is applied to the live database, without the owner's yes.
 | 5 | Learning access | built |
 | 6 | Packages | built |
 | 7 | Dashboard | built |
-| 8 | Search box | not started |
+| 8 | Search box | built |
 | 9 | Full check, docs, pull request | not started |
 
 Update this table in the same commit as each step.
@@ -279,15 +279,19 @@ Page: `/console/dashboard`. `GET /api/console/dashboard?range=today|7d|30d`
 - The Home page notice (what is ready here, what is still in `/admin`) is read from
   `src/console/modules.js`: giving a module a `path` is all it needs.
 
-## 12. Step 8: Search box
+## 12. Step 8: Search box (built)
 
-`GET /api/console/search?q=` (2 to 80 characters): customers (with `customers.view`, up to
-5) and payments by exact or starting id (with `payments.view`, up to 5). Page names are
-matched in the browser from the sidebar. 60 searches a minute per session. The search text
-is not logged.
+`GET /api/console/search?q=` (2 to 80 characters; any console session): customers (with
+`customers.view`, up to 5: name, email or phone containing the text, or the customer ID) and
+payments (with `payments.view`, up to 5: an order, Razorpay order or payment ID, or an
+invoice number starting with the text, matched as an index-friendly range). Page names are
+matched in the browser from the sidebar the role sees. 60 searches a minute per person. The
+search text is not logged or stored.
 
-A field above Home in the sidebar, opened with Ctrl+K or Cmd+K, built as a combobox with a
-listbox (arrow keys, Enter, Escape), 250 ms pause before asking, older answers ignored.
+A field above Home in the sidebar (in the drawer on a phone), opened with Ctrl+K or Cmd+K,
+built as a combobox with a listbox (arrow keys, Enter, Escape; a second Escape clears it),
+250 ms pause before asking, older answers ignored. The sidebar sits above the page so the
+results can open over it.
 
 ## 13. Step 9: Finish
 

@@ -130,3 +130,63 @@ test('dashboard page: the frame by permission', async () => {
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
   }
 });
+
+/* ================= the search box ================= */
+const find = async (c, q) => { const r = await c('GET', '/api/console/search?q=' + encodeURIComponent(q)); assert.equal(r.status, 200, r.text); return r.body; };
+
+test('search: customers by name, email, phone or ID; payments by the start of an ID or invoice number', async () => {
+  assert.equal((await K.client()('GET', '/api/console/search?q=riya')).status, 401);
+  const riya = await K.customer({ name: 'Riya Search', email: 'riya.search@example.com', phone: '+91 98111 77777', lastLoginAt: new Date().toISOString() });
+  const other = await K.customer({ name: 'Another Riya', email: 'another@example.com' });
+  await K.subscription(riya, 'pro', { days: 30 });
+  const order = await K.order(riya, 'pro', { invoice: true });
+
+  let d = await find(admin, 'riya');
+  assert.deepEqual(d.customers.map((c) => c.id).sort(), [riya, other].sort());
+  assert.deepEqual(d.customers.find((c) => c.id === riya), { id: riya, fullName: 'Riya Search', email: 'riya.search@example.com', plan: 'Pro', disabled: false });
+  assert.deepEqual(d.payments, [], 'no order ID starts with riya');
+  assert.deepEqual((await find(admin, 'riya.search@example.com')).customers.map((c) => c.id), [riya]);
+  assert.deepEqual((await find(admin, '98111 77777')).customers.map((c) => c.id), [riya]);
+  assert.deepEqual((await find(admin, riya)).customers.map((c) => c.id), [riya]);
+  assert.deepEqual((await find(admin, '%')).customers, null, 'too short');
+  assert.deepEqual((await find(admin, '%%')).customers, [], '% is an ordinary character');
+
+  d = await find(admin, order.id.slice(0, 12));
+  assert.deepEqual(d.payments.map((p) => p.id), [order.id]);
+  assert.deepEqual(Object.keys(d.payments[0]).sort(), ['amountPaise', 'createdAt', 'currency', 'customer', 'id', 'invoiceNumber', 'packageName', 'status']);
+  for (const q of [order.razorpayOrderId, order.razorpayPaymentId.slice(0, 10), order.invoiceNumber, order.invoiceNumber.toLowerCase()]) {
+    assert.deepEqual((await find(admin, q)).payments.map((p) => p.id), [order.id], q);
+  }
+  assert.deepEqual((await find(admin, 'ord_zzzz')).payments, []);
+  assert.equal((await find(admin, 'x'.repeat(81))).customers, null, 'more than 80 characters is not searched');
+});
+
+test('search: each part only with its permission; 60 a minute; the text is never logged', async () => {
+  await K.setPermission('support', 'customers.view', false);
+  await K.setPermission('support', 'payments.view', false);
+  try {
+    const d = await find(support, 'riya');
+    assert.deepEqual([d.customers, d.payments], [null, null]);
+  } finally { await K.run("DELETE FROM role_permissions WHERE permission IN ('customers.view', 'payments.view')"); }
+  assert.ok((await find(support, 'riya')).customers.length >= 1);
+
+  const before = (await K.one('SELECT COUNT(*) AS n FROM audit_logs')).n;
+  await K.run('DELETE FROM rate_limits WHERE key = ?1', `search:${support.who.id}`);
+  for (let i = 0; i < 60; i++) assert.equal((await support('GET', '/api/console/search?q=ri' + i)).status, 200, String(i));
+  const r = await support('GET', '/api/console/search?q=riya');
+  assert.equal(r.status, 429, 'the 61st in a minute');
+  assert.equal((await K.one('SELECT COUNT(*) AS n FROM audit_logs')).n, before, 'searches are not logged');
+  assert.equal((await K.one("SELECT COUNT(*) AS n FROM audit_logs WHERE detail LIKE '%riya%'")).n, 0);
+  await K.run('DELETE FROM rate_limits WHERE key = ?1', `search:${support.who.id}`);
+});
+
+test('the search box is on every console page, above Home', async () => {
+  for (const p of ['/console', '/console/customers', '/console/dashboard']) {
+    const page = await support('GET', p);
+    assert.equal(page.status, 200);
+    assertNoInlineCode(page.text);
+    const box = page.text.indexOf('id="consoleSearch"'), home = page.text.indexOf('class="nav-list nav-top"');
+    assert.ok(box > 0 && box < home, `${p}: above Home`);
+    assert.ok(page.text.includes('role="combobox"') && page.text.includes('aria-controls="consoleSearchList"') && page.text.includes('role="listbox"'));
+  }
+});

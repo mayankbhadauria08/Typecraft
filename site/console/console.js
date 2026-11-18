@@ -549,6 +549,108 @@
     return { load: load };
   }
 
+  /* ---------- the search box above Home (a combobox: arrow keys, Enter, Escape; Ctrl+K or Cmd+K) ----------
+     Pages are matched here, from the sidebar this role sees; customers and payments come from
+     GET /api/console/search?q= after a 250 ms pause, and an older answer never replaces a newer one. */
+  function initSearch(drawer) {
+    var input = doc.getElementById('consoleSearch'), pop = doc.getElementById('consoleSearchPop');
+    if (!input || !pop) return;
+    var listbox = doc.getElementById('consoleSearchList'), note = doc.getElementById('consoleSearchNote'), key = doc.getElementById('consoleSearchKey');
+    var mac = /Mac|iPhone|iPad/.test(navigator.platform || '') || /Mac OS/.test(navigator.userAgent || '');
+    if (mac && key) { key.textContent = '\u2318K'; key.setAttribute('aria-label', 'Shortcut: Command K'); }
+    var pages = Array.prototype.map.call(doc.querySelectorAll('.side-nav a.nav-item'), function (a) {
+      return { label: a.querySelector('.nav-label').textContent, href: a.getAttribute('href') };
+    });
+    var options = [], active = -1, seq = 0, timer = null, last = '';
+
+    function open(on) { pop.hidden = !on; input.setAttribute('aria-expanded', on ? 'true' : 'false'); if (!on) setActive(-1); }
+    function setActive(i) {
+      active = i;
+      options.forEach(function (o, n) { o.node.setAttribute('aria-selected', n === i ? 'true' : 'false'); o.node.classList.toggle('is-active', n === i); });
+      if (i >= 0) { input.setAttribute('aria-activedescendant', options[i].node.id); options[i].node.scrollIntoView({ block: 'nearest' }); }
+      else input.removeAttribute('aria-activedescendant');
+    }
+    function go(o) { if (o) location.assign(o.href); }
+    function render(groups, message) {
+      clear(listbox); options = [];
+      groups.forEach(function (g) {
+        if (!g.items.length) return;
+        listbox.appendChild(el('li', { class: 'nav-search-group', role: 'presentation', text: g.title }));
+        g.items.forEach(function (it) {
+          var id = 'acs-' + options.length;
+          var node = el('li', { id: id, role: 'option', class: 'nav-search-option', 'aria-selected': 'false' }, [
+            el('span', { class: 'nav-search-main', text: it.main }), it.sub ? el('span', { class: 'nav-search-sub', text: it.sub }) : null
+          ]);
+          var o = { node: node, href: it.href };
+          node.addEventListener('mousedown', function (e) { e.preventDefault(); });   // keep the focus in the field
+          node.addEventListener('click', function () { go(o); });
+          options.push(o);
+          listbox.appendChild(node);
+        });
+      });
+      note.textContent = message || (options.length ? options.length + (options.length === 1 ? ' result. ' : ' results. ') + 'Use the arrow keys, then Enter.' : '');
+      setActive(options.length ? 0 : -1);
+    }
+    function matchPages(q) {
+      var t = q.toLowerCase();
+      return pages.filter(function (p) { return p.label.toLowerCase().indexOf(t) !== -1; }).slice(0, 5).map(function (p) { return { main: p.label, sub: 'Page', href: p.href }; });
+    }
+    function search() {
+      var q = input.value.trim().replace(/\s+/g, ' ');
+      if (q === last && !pop.hidden) return;
+      last = q;
+      clearTimeout(timer);
+      if (!q) { open(false); return; }
+      var pageItems = matchPages(q);
+      open(true);
+      if (q.length < 2) { render([{ title: 'Pages', items: pageItems }], pageItems.length ? '' : 'Type at least two letters to search customers and payments.'); return; }
+      render([{ title: 'Pages', items: pageItems }], 'Searching\u2026');
+      var mine = ++seq;
+      timer = setTimeout(function () {
+        request('GET', '/api/console/search?q=' + encodeURIComponent(q)).then(function (d) {
+          if (mine !== seq) return;   // a newer search has been sent since
+          var customers = (d.customers || []).map(function (c) {
+            return { main: c.fullName || c.email, sub: c.email + (c.plan ? ' \u00b7 ' + c.plan : '') + (c.disabled ? ' \u00b7 disabled' : ''), href: base + '/customers/' + encodeURIComponent(c.id) };
+          });
+          var payments = (d.payments || []).map(function (p) {
+            return { main: money(p.amountPaise, p.currency) + ' for ' + p.packageName, sub: p.customer + ' \u00b7 ' + fmt.date(p.createdAt) + (p.invoiceNumber ? ' \u00b7 ' + p.invoiceNumber : ''),
+              href: base + '/payments/' + encodeURIComponent(p.id) };
+          });
+          var none = !pageItems.length && !customers.length && !payments.length;
+          render([{ title: 'Pages', items: pageItems }, { title: 'Customers', items: customers }, { title: 'Payments', items: payments }], none ? 'Nothing found for \u201c' + q + '\u201d.' : '');
+        }, function (err) {
+          if (mine !== seq) return;
+          if (signedOut(err)) return;
+          render([{ title: 'Pages', items: pageItems }], err.message);
+        });
+      }, 250);
+    }
+    input.addEventListener('input', search);
+    input.addEventListener('focus', function () { if (input.value.trim()) { last = ''; search(); } });
+    input.addEventListener('blur', function () { setTimeout(function () { open(false); }, 120); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (pop.hidden) { last = ''; search(); return; }
+        if (!options.length) return;
+        setActive((active + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!pop.hidden && active >= 0) go(options[active]);
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        if (!pop.hidden) open(false); else { input.value = ''; last = ''; input.blur(); }
+      }
+    });
+    doc.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (getComputedStyle(doc.getElementById('side')).visibility === 'hidden' && drawer) drawer(true);
+        input.focus(); input.select();
+      }
+    });
+  }
+
   /* ---------- the frame ---------- */
   function setTheme(theme) {
     root.setAttribute('data-theme', theme);
@@ -574,6 +676,7 @@
       openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
       (open ? closeBtn : openBtn).focus();
     }
+    initSearch(function (open) { drawer(open); });
     if (openBtn) openBtn.addEventListener('click', function () { drawer(true); });
     if (closeBtn) closeBtn.addEventListener('click', function () { drawer(false); });
     if (scrim) scrim.addEventListener('click', function () { drawer(false); });
