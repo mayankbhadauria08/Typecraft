@@ -17,7 +17,7 @@ nothing is applied to the live database, without the owner's yes.
 | 3 | Refunds | built |
 | 4 | Subscriptions | built |
 | 5 | Learning access | built |
-| 6 | Packages | not started |
+| 6 | Packages | built |
 | 7 | Dashboard | not started |
 | 8 | Search box | not started |
 | 9 | Full check, docs, pull request | not started |
@@ -237,21 +237,25 @@ with "Open or close" and End. Shared dialogs: `site/console/access-actions.js` (
   shows "Closed" and a sheet that says it is closed on the account, with Contact us and no
   plans. `sw.js` VERSION is `typecraft-next-5`. Cases in `tests/app-plan.test.mjs`.
 
-## 10. Step 6: Packages
+## 10. Step 6: Packages (built)
 
-Pages: `/console/packages`, `/console/packages/new`, `/console/packages/:id`.
+Pages: `/console/packages`, `/console/packages/new`, `/console/packages/:id` (a form on its
+own page; read-only without `packages.manage`).
 
 | Method and path | Permission | What |
 | --- | --- | --- |
-| `GET /api/console/packages` | `packages.view` | Every package with active subscribers and sales in the last 30 days |
-| `POST /api/console/packages` | `packages.manage` | Create (id: lower-case letters, digits, hyphens) |
-| `PUT /api/console/packages/:id` | `packages.manage` | Update |
+| `GET /api/console/packages` | `packages.view` | Every package with its customers now and sales in the last 30 days (money only with `revenue.view`) |
+| `GET /api/console/packages/:id` | `packages.view` | One package, the features list, its history (`audit.view`) |
+| `POST /api/console/packages` | `packages.manage` | Create (id: 2 to 31 lower-case letters, digits, hyphens; not `new` or `free`) |
+| `PUT /api/console/packages/:id` | `packages.manage` | Update; `confirmPriceChange: true` when the price moves by more than half (else 409 `confirm_price`) |
 
-Share the validation with `putPackage` in `src/admin-api.js` (move it into one function).
-No delete: a package goes off sale. Free stays ₹0, without an end date and on. Only one
-package is highlighted. A price change touches new purchases only (subscriptions keep a copy
-of features and limits); changing Free changes what every free user gets at once, and the
-dialog says so. Confirm when a price changes by more than half. Audit with before and after.
+The rules live in `src/package-rules.js`, used by the console and by `putPackage` in
+`src/admin-api.js`. No delete: a package goes off sale. A new package starts off sale. Free
+stays ₹0, without an end date and on. Only one package is highlighted: highlighting one takes
+it off the others (also in the current admin), recorded as `highlightTakenFrom`. A change
+touches new purchases only (subscriptions keep a copy of features and limits); changing Free
+changes what every free user gets at once, and the page says so. Audit `package.create` and
+`package.update` with before and after.
 
 ## 11. Step 7: Dashboard
 

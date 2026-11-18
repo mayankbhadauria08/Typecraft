@@ -8,7 +8,7 @@ import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '6';
+export const CONSOLE_ASSETS = '7';
 const asset = (name) => `/site/console/${name}?v=${CONSOLE_ASSETS}`;
 
 const FONTS = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap';

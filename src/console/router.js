@@ -115,5 +115,5 @@ export async function serveConsole(request, env, ctx) {
     return html(request, url, 403, renderShell(me, { key: 'forbidden', title: 'No access',
       body: messageBody('forbidden', "Your role doesn't include this page", `${page.title} isn't part of the ${me.roleLabel} role. A Super Admin can change that under Roles and permissions.`) }, prefs));
   }
-  return html(request, url, 200, renderShell(me, { key: page.key, title: page.title, crumbs: page.crumbs, body: page.body(me, found.params), scripts: page.scripts, params: found.params }, prefs));
+  return html(request, url, 200, renderShell(me, { key: page.key, title: page.title, crumbs: page.crumbs, body: page.body(me, found.params || {}), scripts: page.scripts, params: found.params }, prefs));
 }

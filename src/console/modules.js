@@ -15,7 +15,7 @@ export const LAYERS = [
       { key: 'customers', label: 'Customers', icon: 'users', path: '/customers', permission: 'customers.view' },
       { key: 'payments', label: 'Payments', icon: 'card', path: '/payments', permission: 'payments.view' },
       { key: 'refunds', label: 'Refunds', icon: 'refresh', path: '/refunds', permission: 'refunds.view' },
-      { key: 'packages', label: 'Packages', icon: 'package', phase: 2 },
+      { key: 'packages', label: 'Packages', icon: 'package', path: '/packages', permission: 'packages.view' },
       { key: 'subscriptions', label: 'Subscriptions', icon: 'calendar', path: '/subscriptions', permission: 'subscriptions.view' },
       { key: 'access', label: 'Learning access', icon: 'unlock', path: '/access', permission: 'access.view' },
     ],

@@ -9,11 +9,12 @@ import { requirePermission, assertCan } from './console/session.js';
 import { isOwner, healthNumbers } from './admin.js';
 import { entitlementsFor } from './entitlements.js';
 import { audit, getSetting, refund, packageView } from './billing.js';
+import { packageFields, checkPackage, featureKeys, saveStatements, highlightTakenFrom } from './package-rules.js';
 
 const PAGE_SIZE = 25;
 const DAY_MS = 86400000;
-const parse = (text, def) => { try { const v = JSON.parse(text); return v == null ? def : v; } catch { return def; } };
 const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v));
+const parse = (text, def) => { try { const v = JSON.parse(text); return v == null ? def : v; } catch { return def; } };
 const pageOf = (q) => Math.max(1, Math.min(10000, parseInt(q.get('page') || '1', 10) || 1));
 const paged = (items, page, total) => ({ items, page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)), total });
 const like = (s) => `%${String(s).replace(/[\\%_]/g, (c) => '\\' + c)}%`;
@@ -201,43 +202,14 @@ export async function putPackage(request, env, ctx, params) {
   const p = await DB.prepare('SELECT * FROM packages WHERE id = ?1').bind(params.id).first();
   if (!p) throw new HttpError(404, 'not_found', 'Package not found.');
   const body = await readJson(request);
-  const keys = (await DB.prepare('SELECT key FROM package_features').all()).results.map((r) => r.key);
-  const cur = { name: p.name, description: p.description, pricePaise: p.price_paise, validityDays: p.validity_days, features: parse(p.features, []),
-    limits: parse(p.limits, {}), highlight: !!p.highlight, active: !!p.active, displayOrder: p.display_order };
-  const v = { ...cur };
-  for (const k of Object.keys(cur)) if (body[k] !== undefined) v[k] = body[k];
-  const f = {};
-  if (typeof v.name !== 'string' || !v.name.trim() || v.name.trim().length > 60) f.name = 'Name: 1–60 characters.';
-  if (typeof v.description !== 'string' || v.description.length > 500) f.description = 'Description: at most 500 characters.';
-  const isFree = p.id === 'free';
-  if (!Number.isInteger(v.pricePaise) || v.pricePaise < 0 || v.pricePaise > 100000000) f.pricePaise = 'Price must be whole paise from 0 to 10,00,00,000.';
-  else if (isFree && v.pricePaise !== 0) f.pricePaise = 'The Free plan must cost 0.';
-  else if (!isFree && v.pricePaise < 100) f.pricePaise = 'A paid plan must cost at least ₹1 (100 paise).';
-  if (v.validityDays !== null && (!Number.isInteger(v.validityDays) || v.validityDays < 1 || v.validityDays > 3650)) f.validityDays = 'Validity: whole days from 1 to 3650, or empty for no expiry.';
-  else if (isFree && v.validityDays !== null) f.validityDays = 'The Free plan never expires.';
-  if (!Array.isArray(v.features) || v.features.some((x) => !keys.includes(x)) || new Set(v.features).size !== v.features.length) f.features = 'Features must be a list of known feature keys, each once.';
-  const L = v.limits;
-  if (!L || typeof L !== 'object' || Array.isArray(L)) f.limits = 'Limits must be an object.';
-  else {
-    const extra = Object.keys(L).filter((k) => !['lessons', 'dailyTests', 'historyDays'].includes(k));
-    const okN = (x, max) => x === null || (Number.isInteger(x) && x >= 0 && x <= max);
-    if (extra.length) f.limits = `Unknown limit: ${extra[0]}.`;
-    else if (!['all', 'first5'].includes(L.lessons)) f.limits = 'limits.lessons must be "all" or "first5".';
-    else if (!okN(L.dailyTests, 10000)) f.limits = 'limits.dailyTests must be a whole number or null (unlimited).';
-    else if (!okN(L.historyDays, 3650) || L.historyDays === 0) f.limits = 'limits.historyDays must be 1–3650 or null (all history).';
-  }
-  if (typeof v.highlight !== 'boolean') f.highlight = 'highlight must be true or false.';
-  if (typeof v.active !== 'boolean') f.active = 'active must be true or false.';
-  else if (isFree && !v.active) f.active = 'The Free plan cannot be switched off.';
-  if (!Number.isInteger(v.displayOrder) || v.displayOrder < 0 || v.displayOrder > 1000) f.displayOrder = 'displayOrder must be a whole number from 0 to 1000.';
-  if (Object.keys(f).length) throw fieldError(f);
-  const now = nowIso();
-  const limits = { lessons: L.lessons, dailyTests: L.dailyTests ?? null, historyDays: L.historyDays ?? null };
-  await DB.prepare(`UPDATE packages SET name = ?2, description = ?3, price_paise = ?4, validity_days = ?5, features = ?6, limits = ?7, highlight = ?8, active = ?9,
-                    display_order = ?10, updated_at = ?11 WHERE id = ?1`)
-    .bind(p.id, v.name.trim(), v.description.trim(), v.pricePaise, v.validityDays, JSON.stringify(v.features), JSON.stringify(limits), v.highlight ? 1 : 0, v.active ? 1 : 0, v.displayOrder, now).run();
-  const changed = Object.keys(cur).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(k === 'limits' ? limits : k === 'name' || k === 'description' ? v[k].trim() : v[k]));
-  await audit(env, { actorId: actor.id, action: 'package.update', target: `package:${p.id}`, detail: { changed, from: Object.fromEntries(changed.map((k) => [k, cur[k]])) }, ip: clientIp(request) });
+  // the rules are shared with the admin console: src/package-rules.js
+  const cur = packageFields(p);
+  const { v, fields, changed } = checkPackage(p.id, cur, body, await featureKeys(env));
+  if (Object.keys(fields).length) throw fieldError(fields);
+  const taken = await highlightTakenFrom(env, p.id, v);
+  await DB.batch(saveStatements(env, p.id, v, { now: nowIso() }));
+  await audit(env, { actorId: actor.id, action: 'package.update', target: `package:${p.id}`,
+    detail: { changed, from: Object.fromEntries(changed.map((k) => [k, cur[k]])), ...(taken.length ? { highlightTakenFrom: taken } : {}) }, ip: clientIp(request) });
   const row = await DB.prepare('SELECT * FROM packages WHERE id = ?1').bind(p.id).first();
   const labels = Object.fromEntries((await DB.prepare('SELECT key, label FROM package_features').all()).results.map((r) => [r.key, r.label]));
   return json({ package: { ...packageView(row, labels), active: !!row.active, displayOrder: row.display_order, updatedAt: row.updated_at }, changed });

@@ -390,3 +390,140 @@ test('before migration 0006: what a customer may use is worked out as before', a
   assert.deepEqual(e.overrides, { lessons: { allow: [], deny: [] }, games: { allow: [], deny: [] } });
   assert.equal(lessonAllowed(e, 'l25'), true); assert.equal(lessonAllowed(e, 'l12'), false);
 });
+
+/* ================= packages (§10) ================= */
+const pkgBody = (over = {}) => ({ id: 'pro-yearly', name: 'Pro yearly', description: 'A year of Pro.', pricePaise: 149900, validityDays: 365,
+  features: ['lessons.all', 'arcade.all', 'tests.basic'], limits: { lessons: 'all', dailyTests: null, historyDays: null }, displayOrder: 6, ...over });
+
+test('packages: the list with customers and 30-day sales; money only with revenue.view', async () => {
+  assert.equal((await K.client()('GET', '/api/console/packages')).status, 401);
+  const buyer = await K.customer({ name: 'Package Buyer', email: 'pkg-buyer@example.com' });
+  await K.order(buyer, 'premium', { amountPaise: 39900 });
+  await K.order(buyer, 'premium', { amountPaise: 39900, createdAt: inDays(-40) });            // older than 30 days
+  const asAdmin = (await admin('GET', '/api/console/packages')).body;
+  assert.deepEqual(asAdmin.items.map((p) => p.id), ['free', 'starter', 'pro', 'premium', 'lifetime']);
+  assert.equal(asAdmin.features.length, 13);
+  const premium = asAdmin.items.find((p) => p.id === 'premium');
+  assert.deepEqual(premium.sales30, { orders: 1, grossPaise: 39900 });
+  assert.equal(premium.featureLabels.length, premium.features.length);
+  const free = asAdmin.items.find((p) => p.id === 'free');
+  assert.equal(free.sales30, null);
+  const users = (await K.one('SELECT COUNT(*) AS n FROM users')).n;
+  const paying = (await K.one("SELECT COUNT(DISTINCT user_id) AS n FROM user_subscriptions WHERE status = 'active' AND (expires_at IS NULL OR expires_at > ?1)", new Date().toISOString())).n;
+  assert.equal(free.customers, users - paying, 'everyone without a paid plan is on Free');
+  const asSupport = (await support('GET', '/api/console/packages')).body;
+  assert.deepEqual(asSupport.items.find((p) => p.id === 'premium').sales30, { orders: 1, grossPaise: null }, 'Support sees counts, not money');
+  const one = await support('GET', '/api/console/packages/premium');
+  assert.equal(one.status, 200); assert.equal(one.body.history, null, 'no audit.view');
+  assert.equal((await admin('GET', '/api/console/packages/premium')).body.history.length, 0);
+  assert.equal((await admin('GET', '/api/console/packages/nope')).status, 404);
+});
+
+test('packages: creating one; everything is checked, and it starts off sale', async () => {
+  const create = (c, over) => c('POST', '/api/console/packages', pkgBody(over));
+  assert.equal((await create(support)).status, 403);
+  const field = async (over, name) => { const r = await create(admin, over); assert.equal(r.status, 400, r.text); assert.ok(r.body.error.fields[name], `${name}: ${r.text}`); };
+  for (const id of ['Pro', '1pro', 'new', 'free', 'p', 'pro', 'a'.repeat(32), 'pro yearly']) await field({ id }, 'id');
+  await field({ name: ' ' }, 'name');
+  await field({ pricePaise: 50 }, 'pricePaise');
+  await field({ pricePaise: 199.5 }, 'pricePaise');
+  await field({ validityDays: 0 }, 'validityDays');
+  await field({ features: ['lessons.all', 'flying'] }, 'features');
+  await field({ features: ['lessons.all', 'lessons.all'] }, 'features');
+  await field({ limits: { lessons: 'some' } }, 'limits');
+  await field({ displayOrder: -1 }, 'displayOrder');
+
+  const r = await create(admin);
+  assert.equal(r.status, 201, r.text);
+  const p = r.body.package;
+  assert.deepEqual([p.id, p.name, p.pricePaise, p.validityDays, p.active, p.highlight, p.customers], ['pro-yearly', 'Pro yearly', 149900, 365, false, false, 0]);
+  assert.ok(!(await K.client()('GET', '/api/packages')).body.packages.some((x) => x.id === 'pro-yearly'), 'off sale: not on the plans page');
+  const log = (await K.audits('package.create')).find((a) => a.target === 'package:pro-yearly');
+  assert.equal(log.actor_id, admin.who.id); assert.equal(JSON.parse(log.detail).to.pricePaise, 149900);
+  assert.equal((await create(admin)).body.error.fields.id, 'A package with this ID already exists.');
+});
+
+test('packages: changing one; a big price change needs confirming; one recommended; Free keeps its rules', async () => {
+  const put = (c, id, body) => c('PUT', `/api/console/packages/${id}`, body);
+  assert.equal((await put(support, 'pro-yearly', { name: 'X' })).status, 403);
+  let r = await put(admin, 'pro-yearly', { name: 'Pro yearly' });
+  assert.deepEqual([r.status, r.body.changed], [200, []], 'nothing changed');
+
+  // more than half: confirm first
+  r = await put(admin, 'pro-yearly', { pricePaise: 49900 });
+  assert.equal(r.status, 409); assert.equal(r.body.error.code, 'confirm_price');
+  assert.equal((await K.one("SELECT price_paise FROM packages WHERE id = 'pro-yearly'")).price_paise, 149900, 'nothing saved yet');
+  r = await put(admin, 'pro-yearly', { pricePaise: 49900, confirmPriceChange: true });
+  assert.deepEqual([r.status, r.body.changed, r.body.package.pricePaise], [200, ['pricePaise'], 49900]);
+  r = await put(admin, 'pro-yearly', { pricePaise: 59900 });
+  assert.equal(r.status, 200, 'a smaller change needs no confirming');
+
+  // putting it on sale as the recommended plan takes the highlight off Pro
+  assert.equal((await K.one("SELECT highlight FROM packages WHERE id = 'pro'")).highlight, 1);
+  r = await put(owner, 'pro-yearly', { active: true, highlight: true });
+  assert.deepEqual(r.body.changed.sort(), ['active', 'highlight']);
+  assert.deepEqual((await K.many('SELECT id FROM packages WHERE highlight = 1')).map((x) => x.id), ['pro-yearly']);
+  const onSale = (await K.client()('GET', '/api/packages')).body.packages;
+  assert.ok(onSale.find((x) => x.id === 'pro-yearly').highlight);
+  const log = (await K.audits('package.update')).filter((a) => a.target === 'package:pro-yearly').map((a) => JSON.parse(a.detail));
+  assert.deepEqual(log[0], { changed: ['pricePaise'], pricePaise: { from: 149900, to: 49900 } });
+
+  // Free: always ₹0, no end date, on
+  for (const [body, name] of [[{ pricePaise: 100 }, 'pricePaise'], [{ validityDays: 30 }, 'validityDays'], [{ active: false }, 'active']]) {
+    r = await put(admin, 'free', body);
+    assert.equal(r.status, 400); assert.ok(r.body.error.fields[name], name);
+  }
+  // what Free includes applies to every free customer at once; a bought plan keeps what it was sold with
+  const freeCust = await K.customer({ name: 'Free Customer', email: 'free-cust@example.com' });
+  const proCust = await K.customer({ name: 'Pro Customer', email: 'pro-cust@example.com' });
+  await K.subscription(proCust, 'pro', { days: 30, source: 'purchase' });
+  assert.ok(!(await ent(freeCust)).features.includes('history.full'));
+  const freeNow = (await admin('GET', '/api/console/packages/free')).body.package;
+  r = await put(admin, 'free', { features: [...freeNow.features, 'history.full'] });
+  assert.equal(r.status, 200);
+  assert.ok((await ent(freeCust)).features.includes('history.full'), 'Free changed for free customers at once');
+  const proNow = (await admin('GET', '/api/console/packages/pro')).body.package;
+  r = await put(admin, 'pro', { features: proNow.features.filter((f) => f !== 'practice.custom') });
+  assert.equal(r.status, 200);
+  assert.ok((await ent(proCust)).features.includes('practice.custom'), 'a customer who bought Pro keeps what it gave them');
+  await put(admin, 'free', { features: freeNow.features });
+  await put(admin, 'pro', { features: proNow.features, highlight: true });
+  assert.deepEqual((await K.many('SELECT id FROM packages WHERE highlight = 1')).map((x) => x.id), ['pro']);
+  assert.equal((await admin('GET', '/api/console/packages/pro-yearly')).body.history.length, 4, 'created and changed three times');
+  const last = (await K.audits('package.update')).filter((a) => a.target === 'package:pro').pop();
+  assert.deepEqual(JSON.parse(last.detail).highlightTakenFrom, ['pro-yearly'], 'taking the highlight off another package is recorded');
+});
+
+test('packages: the current admin uses the same rules', async () => {
+  const learner = await K.account({ role: 'admin', name: 'Old Admin', email: 'old-admin@example.com' });
+  // the current admin works with the normal sign-in (the learner session of an Admin)
+  let r = await learner.learner('PUT', '/api/admin/packages/free', { pricePaise: 100 });
+  assert.equal(r.status, 400); assert.ok(r.body.error.fields.pricePaise);
+  r = await learner.learner('PUT', '/api/admin/packages/starter', { highlight: true });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual((await K.many('SELECT id FROM packages WHERE highlight = 1')).map((x) => x.id), ['starter'], 'one recommended there too');
+  await learner.learner('PUT', '/api/admin/packages/pro', { highlight: true });
+});
+
+test('packages pages: frames by permission; Support may look, not change', async () => {
+  const list = await support('GET', '/console/packages');
+  assert.equal(list.status, 200);
+  assertNoInlineCode(list.text);
+  assert.match(list.text, /<a class="nav-item is-current" href="\/console\/packages" aria-current="page">/);
+  assert.ok(!list.text.includes('href="/console/packages/new"'), 'no New package for Support');
+  assert.ok((await admin('GET', '/console/packages')).text.includes('href="/console/packages/new"'));
+  assert.equal((await support('GET', '/console/packages/new')).status, 403);
+  const fresh = await admin('GET', '/console/packages/new');
+  assert.equal(fresh.status, 200); assertNoInlineCode(fresh.text);
+  assert.ok(fresh.text.includes('id="f-id"') && fresh.text.includes('Create package'));
+  const boot = JSON.parse(fresh.text.match(/<script type="application\/json" id="console-boot">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(boot.page.params, {}, '/packages/new is the new-package page, not a package called new');
+  const one = await support('GET', '/console/packages/pro');
+  assert.equal(one.status, 200);
+  assert.ok(one.text.includes('data-readonly') && !one.text.includes('id="pkgSave"') && !one.text.includes('id="f-id"'));
+  assert.ok((await admin('GET', '/console/packages/pro')).text.includes('id="pkgSave"'));
+  for (const f of ['packages.js', 'package.js']) {
+    const r = await K.client()('GET', `/site/console/${f}`);
+    assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
+  }
+});
