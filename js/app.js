@@ -2110,6 +2110,9 @@ window.addEventListener('beforeunload', saveKeyStats);
    Free: the first five lessons in course order, the placement test, the
    problem-keys drill and the Daily Challenge. Anything else shows a lock and
    opens the upgrade sheet (plans and prices come from GET /api/packages).
+   Staff can also open or close one lesson or game for one learner
+   (entitlements.overrides): closed wins over the plan, and a closed one says
+   so without talking about plans.
    The server enforces the same rules (events, content packs); this keeps the
    screen honest. Also here: practice packs and custom practice, which run in
    the lesson engine as a one-step special lesson saved with lessonId 'custom'.
@@ -2136,13 +2139,27 @@ const Plan = {
   /* ---- what is allowed ---- */
   enforced(){ return !!Account.user; },     // a copy with no server (guest mode) has nothing to sell
   has(feature){ return !this.enforced() || (this.ent.features || []).includes(feature); },
+  /** 'allow', 'deny' or null: what staff decided about this lesson ('lessons') or game ('games') for this learner. */
+  override(kind, id){
+    const o = this.enforced() && this.ent.overrides && this.ent.overrides[kind];
+    if(!o) return null;
+    if(Array.isArray(o.deny) && o.deny.includes(id)) return 'deny';
+    if(Array.isArray(o.allow) && o.allow.includes(id)) return 'allow';
+    return null;
+  },
+  closed(kind, id){ return this.override(kind, id) === 'deny'; },
   lessonAllowed(id){
     if(!this.enforced() || ALWAYS_FREE.has(id)) return true;
     if(id === 'custom') return this.has('practice.custom');
     if(String(id).startsWith('pack:')) return this.has('exercises.premium');
+    const o = this.override('lessons', id); if(o) return o === 'allow';
     return this.has('lessons.all') || (this.ent.limits && this.ent.limits.lessons === 'all') || FREE_LESSONS.has(id);
   },
-  gameAllowed(id){ return id === 'daily' || this.has('arcade.all'); },
+  gameAllowed(id){
+    if(id === 'daily') return true;
+    const o = this.override('games', id); if(o) return o === 'allow';
+    return this.has('arcade.all');
+  },
   isPaid(){ return this.enforced() && this.ent.plan && this.ent.plan !== 'free'; },
   /** The cheapest active package that grants the feature: its name for the lock badge. */
   unlockName(feature){
@@ -2162,6 +2179,11 @@ const Plan = {
     this.loadPackages();
   },
   valid(e){ return !!e && typeof e === 'object' && Array.isArray(e.features); },
+  cleanOverrides(o){
+    const list = (x) => Array.isArray(x) ? x.filter(v => typeof v === 'string').slice(0, 200) : [];
+    const part = (x) => ({ allow:list(x && x.allow), deny:list(x && x.deny) });
+    return { lessons:part(o && o.lessons), games:part(o && o.games) };
+  },
   load(){
     if(this.loading) return this.loading;
     this.loading = (async () => {
@@ -2170,7 +2192,8 @@ const Plan = {
       if(res.status === 401) return;
       const e = res.ok ? (this.valid(res.entitlements) ? res.entitlements : res) : null;
       if(this.valid(e)){
-        this.ent = { plan:e.plan || 'free', planName:e.planName || 'Free', expiresAt:e.expiresAt || null, features:e.features.slice(), limits:Object.assign({}, e.limits || {}) };
+        this.ent = { plan:e.plan || 'free', planName:e.planName || 'Free', expiresAt:e.expiresAt || null, features:e.features.slice(), limits:Object.assign({}, e.limits || {}),
+          overrides:this.cleanOverrides(e.overrides) };
         try{ localStorage.setItem(PLAN_CACHE_KEY, JSON.stringify({ userId:this.userId, ent:this.ent })); }catch(err){}
       } else if(!res.network) this.ent = FREE_PLAN;   // no entitlements yet (404) or an error: Free. Offline: the last known plan.
       this.loaded = true; this.loadedAt = Date.now();
@@ -2211,6 +2234,7 @@ const Plan = {
   /* ---- the upgrade sheet ---- */
   sheet(o){
     o = o || {};
+    if(o.closed) return this.closedSheet(o);
     const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
     if(!el.classList.contains('hidden') && this.sheetFeature === o.feature && !o.force) return;
     this.sheetFeature = o.feature;
@@ -2235,6 +2259,19 @@ const Plan = {
     if(!this.packages && !this.packagesLoading) this.loadPackages();
     if(this.packagesLoading) this.packagesLoading.then(() => { if(!el.classList.contains('hidden') && this.sheetFeature === o.feature) this.sheet(Object.assign({}, o, { force:true })); });
   },
+  /** A lesson or game staff closed for this learner: says so, with no plans to buy. */
+  closedSheet(o){
+    const el = document.getElementById('upgradeSheet'), body = document.getElementById('upgradeBody');
+    this.sheetFeature = 'closed';
+    if(el.classList.contains('hidden')) this.lastFocus = document.activeElement;
+    body.innerHTML = `<button type="button" class="plan-x" data-plan-close aria-label="Close">&times;</button>
+      <h2 id="upgradeTitle">${esc(o.title || 'This is closed')}</h2>
+      <p class="lede">This is closed on your account. If you think that is a mistake, write to us and we will look into it.</p>
+      <div class="results-actions plan-sheet-actions"><a class="btn secondary" href="/contact">Contact us</a><button type="button" class="btn primary" data-plan-close>OK</button></div>`;
+    el.classList.remove('hidden');
+    document.documentElement.classList.add('plan-sheet-open');
+    const ok = body.querySelector('.btn.primary'); if(ok) ok.focus();
+  },
   closeSheet(){
     const el = document.getElementById('upgradeSheet');
     if(el.classList.contains('hidden')) return;
@@ -2253,6 +2290,10 @@ const Plan = {
     if(id === 'custom') return this.blocked('practice.custom', retry, 'Custom practice', `Custom practice is included with ${this.unlockName('practice.custom')} and above.`);
     if(String(id).startsWith('pack:')) return this.blocked('exercises.premium', retry, 'Practice packs', `Practice packs are included with ${this.unlockName('exercises.premium')} and above.`);
     const l = TC_COURSE.byId(id);
+    if(this.closed('lessons', id)){
+      if(this.loading && retry) return this.loading.then(() => retry());
+      return this.sheet({ closed:true, title: l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is closed' });
+    }
     const name = this.unlockName('lessons.all');
     this.blocked('lessons.all', retry, l ? `Lesson ${lessonNumber(l)}: ${l.title}` : 'This lesson is locked',
       `Free includes the first ${FREE_LESSONS.size} lessons, the placement test, the problem-keys drill and the Daily Challenge. ${name} and above unlock all ${lessons.length} lessons.`);
@@ -2260,8 +2301,10 @@ const Plan = {
   decorateCard(card, id){
     if(this.lessonAllowed(id)) return;
     card.classList.add('is-locked');
-    card.insertAdjacentHTML('beforeend', this.tag('lessons.all'));
-    const t = card.querySelector('.ltitle'); card.setAttribute('aria-label', `${t ? t.textContent : 'Lesson'}. Locked: needs ${this.unlockName('lessons.all')}.`);
+    const closed = this.closed('lessons', id);
+    card.insertAdjacentHTML('beforeend', closed ? `<span class="plan-tag">${LOCK_SVG}Closed</span>` : this.tag('lessons.all'));
+    const t = card.querySelector('.ltitle');
+    card.setAttribute('aria-label', `${t ? t.textContent : 'Lesson'}. ${closed ? 'Closed on your account.' : `Locked: needs ${this.unlockName('lessons.all')}.`}`);
   },
   decorateMap(el){
     el.querySelectorAll('.route-node').forEach(b => {
@@ -2275,6 +2318,10 @@ const Plan = {
   /* ---- arcade ---- */
   lockedGame(id, retry){
     const g = TC_GAMES.get(id);
+    if(this.closed('games', id)){
+      if(this.loading && retry) return this.loading.then(() => retry());
+      return this.sheet({ closed:true, title: g ? `${g.title} is closed` : 'This game is closed' });
+    }
     this.blocked('arcade.all', retry, g ? `${g.title} is locked` : 'This game is locked',
       `Free includes the Daily Challenge. ${this.unlockName('arcade.all')} and above unlock all eight arcade games.`);
   },
@@ -2282,8 +2329,9 @@ const Plan = {
     document.querySelectorAll('#arcadeCards [data-game]').forEach(c => {
       if(this.gameAllowed(c.dataset.game)) return;
       c.classList.add('is-locked');
-      const top = c.querySelector('.tcg-card-top') || c; top.insertAdjacentHTML('beforeend', this.tag('arcade.all'));
-      c.setAttribute('aria-label', (c.getAttribute('aria-label') || '') + ' Locked: needs ' + this.unlockName('arcade.all') + '.');
+      const closed = this.closed('games', c.dataset.game);
+      const top = c.querySelector('.tcg-card-top') || c; top.insertAdjacentHTML('beforeend', closed ? `<span class="plan-tag">${LOCK_SVG}Closed</span>` : this.tag('arcade.all'));
+      c.setAttribute('aria-label', (c.getAttribute('aria-label') || '') + (closed ? ' Closed on your account.' : ' Locked: needs ' + this.unlockName('arcade.all') + '.'));
     });
   },
 
@@ -2316,7 +2364,8 @@ const Plan = {
   renderHome(){
     const next = nextLessonInfo(), btn = document.getElementById('continueBtn');
     if(next && btn && !this.lessonAllowed(next.lesson.id) && !btn.dataset.locked){
-      btn.dataset.locked = '1'; btn.innerHTML = `${LOCK_SVG}Unlock lesson ${lessonNumber(next.lesson)}`;
+      btn.dataset.locked = '1';
+      btn.innerHTML = this.closed('lessons', next.lesson.id) ? `${LOCK_SVG}Lesson ${lessonNumber(next.lesson)} is closed` : `${LOCK_SVG}Unlock lesson ${lessonNumber(next.lesson)}`;
     }
     this.renderPacks(); this.renderCustom();
   },

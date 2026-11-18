@@ -16,7 +16,7 @@ nothing is applied to the live database, without the owner's yes.
 | 2 | Payments | built |
 | 3 | Refunds | built |
 | 4 | Subscriptions | built |
-| 5 | Learning access | not started |
+| 5 | Learning access | built |
 | 6 | Packages | not started |
 | 7 | Dashboard | not started |
 | 8 | Search box | not started |
@@ -89,8 +89,9 @@ and the two counts in `tests/console.test.mjs` are updated in the same commit.
 
 **Tests**: one file per group of modules, each with its own port: `console-core` (customers,
 8794), `console-payments` (payments and refunds, 8795, with the fake Razorpay in
-`tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning access, packages, 8796),
-`console-overview` (dashboard and search, 8798). `tests/console-kit.mjs` holds what they
+`tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning access, packages, 8793),
+`console-overview` (dashboard and search, 8799). Ports in use elsewhere: 8790 to 8792 and
+8796 to 8798. `tests/console-kit.mjs` holds what they
 share. Every step: who is refused, who is allowed, what is audited, what a wrong input
 answers. All test files and `node tests/check-lessons.mjs` pass before each commit.
 
@@ -211,25 +212,30 @@ plan refunds nothing; the dialog says where refunds are sent. Dates stay in the 
 say so. `subscriptions.manage` is now labelled "Grant, extend and end plans". Extending every
 plan is allowed once a minute and audited as `subscription.extend_all` with the count.
 
-## 9. Step 5: Learning access
+## 9. Step 5: Learning access (built)
 
-Page: `/console/access`; the same actions on the customer page.
+Page: `/console/access` (End on each row); on a customer's page, a Learning access section
+with "Open or close" and End. Shared dialogs: `site/console/access-actions.js` (`AC.access`).
 
 | Method and path | Permission | What |
 | --- | --- | --- |
-| `GET /api/console/access` | `access.view` (new) | `state` (`active`, `ended`), `q`, `page` |
-| `POST /api/console/customers/:id/access` | `access.manage` (new) | `{ kind: lesson or game, target, effect: allow or deny, days or null, reason }` |
-| `POST /api/console/access/:id/end` | `access.manage` | End an exception |
+| `GET /api/console/access` | `access.view` (new, on for Admin and Support) | `state` (`active`, `ended`), `kind`, `effect`, `q`, `page` |
+| `POST /api/console/customers/:id/access` | `access.manage` (new, on for Admin) | `{ kind: lesson or game, target, effect: allow or deny, days or null, reason }` |
+| `POST /api/console/access/:id/end` | `access.manage` | `{ reason? }` |
 
 - Targets: the 78 lesson ids in `shared/course-meta.js`, and the eight games in
-  `shared/rewards-rules.js` (`daily` stays open for everyone). At most 50 active per customer.
+  `shared/rewards-rules.js` (`daily` stays open for everyone; the placement test and the
+  review drill are never targets). At most 50 in force per customer. A new exception for the
+  same lesson or game replaces the one in force (ended, and recorded).
 - **Customer-facing change, the only one in Phase 2.** `entitlementsFor()` in
   `src/entitlements.js` adds `overrides: { lessons: { allow, deny }, games: { allow, deny } }`
   from a separate query that tolerates a missing table. `lessonAllowed()` and `gameAllowed()`
   check deny, then allow, then the plan; `placement`, `review` and `daily` are never locked.
-  The same three lines go into `Plan.lessonAllowed` and `Plan.gameAllowed` in `js/app.js`,
-  with a lock message for a denied lesson that does not talk about plans. Bump `VERSION` in
-  `sw.js`. Add cases to `tests/app-plan.test.mjs`.
+  A refused event says `closed` (not `plan_required`) when staff closed it, so the app does
+  not offer a plan; the older lesson-complete route answers 403 `closed`. In `js/app.js`,
+  `Plan.lessonAllowed` and `Plan.gameAllowed` follow the same rule; a closed lesson or game
+  shows "Closed" and a sheet that says it is closed on the account, with Contact us and no
+  plans. `sw.js` VERSION is `typecraft-next-5`. Cases in `tests/app-plan.test.mjs`.
 
 ## 10. Step 6: Packages
 

@@ -34,6 +34,8 @@ export const PERMISSIONS = [
   P('subscriptions.view', 'core', 'Subscriptions', 'See plans', "Every customer's plans: which, until when, and how they got them.", 1, 1),
   P('subscriptions.manage', 'core', 'Subscriptions', 'Grant, extend and end plans', 'Give a customer a plan, add days to one, or end one early. Ending a plan does not refund it.', 1, 0),
   P('subscriptions.bulk', 'core', 'Subscriptions', 'Extend every plan at once', 'Add days to every active plan, for example after an outage. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('access.view', 'core', 'Learning access', 'See lesson and game exceptions', 'Lessons and arcade games opened or closed for one customer, whatever their plan says.', 1, 1),
+  P('access.manage', 'core', 'Learning access', 'Open or close a lesson or game for a customer', 'Open a lesson or game their plan does not include, or close one it does.', 1, 0),
   P('packages.view', 'core', 'Packages', 'See packages and prices', 'The plans on sale and what each includes.', 1, 1),
   P('packages.manage', 'core', 'Packages', 'Change packages and prices', 'Edit price, validity, features and which plans are on sale.', 1, 0),
   P('payments.view', 'core', 'Payments', 'See payments', 'Orders, payment status and Razorpay references.', 1, 1),

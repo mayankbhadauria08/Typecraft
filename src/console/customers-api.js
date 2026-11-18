@@ -19,6 +19,7 @@ import { entitlementsFor } from '../entitlements.js';
 import { audit } from '../billing.js';
 import { requireAdmin, endAdminSessionsFor } from './session.js';
 import { subView } from './subscriptions-api.js';
+import { ACCESS_SELECT, accessView, TARGETS } from './learning-access-api.js';
 import { permissionsFor } from './permissions.js';
 import { ROLE_LABELS } from './config.js';
 import { PAGE_SIZE, EXPORT_MAX, DAY_MS, Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, istDayStart, istStamp, reasonOf, csvResponse } from './lib.js';
@@ -171,6 +172,11 @@ export async function getCustomer(request, env, ctx, params) {
                                  FROM orders o JOIN packages p ON p.id = o.package_id LEFT JOIN invoices i ON i.order_id = o.id
                                 WHERE o.user_id = ?1 ORDER BY o.created_at DESC LIMIT 10`).bind(u.id);
   }
+  if (has('access.view')) {
+    // the exceptions in force first, then the latest that ended
+    stmts.access = DB.prepare(`${ACCESS_SELECT} WHERE a.user_id = ?1
+      ORDER BY (a.ended_at IS NULL AND (a.expires_at IS NULL OR a.expires_at > ?2)) DESC, a.created_at DESC LIMIT 60`).bind(u.id, now);
+  }
   if (has('subscriptions.manage')) {
     stmts.packages = DB.prepare("SELECT id, name, validity_days, active FROM packages WHERE id <> 'free' ORDER BY display_order, name");
   }
@@ -202,6 +208,8 @@ export async function getCustomer(request, env, ctx, params) {
     plan: { id: ent.plan, name: ent.planName, expiresAt: ent.expiresAt },
     subscriptions: R.subs.map((s) => subView(s, now)),
     packages: R.packages ? R.packages.map((p) => ({ id: p.id, name: p.name, validityDays: p.validity_days, onSale: !!p.active })) : null,
+    access: R.access ? R.access.map((a) => accessView(a, now)) : null,
+    accessTargets: has('access.manage') ? TARGETS : null,
     orders: R.orders ? R.orders.map((o) => ({ id: o.id, packageName: o.package_name, amountPaise: o.amount_paise, currency: o.currency, status: o.status,
       createdAt: o.created_at, paidAt: o.paid_at, invoiceNumber: o.invoice_number })) : null,
     progress: {
@@ -219,7 +227,7 @@ export async function getCustomer(request, env, ctx, params) {
     emails: R.emails ? R.emails.map((e) => ({ template: e.template, subject: e.subject, status: e.status, createdAt: e.created_at })) : null,
     activity: R.activity ? R.activity.map((a) => ({ action: a.action, reason: reasonIn(a.detail), actor: a.actor || 'System', createdAt: a.created_at })) : null,
     can: { manage: has('customers.manage') && !manageBlock(who, u), manageBlock: has('customers.manage') ? manageBlock(who, u) : null, notes: has('customers.notes'),
-      plans: has('subscriptions.manage') },
+      plans: has('subscriptions.manage'), access: has('access.manage') },
   });
 }
 

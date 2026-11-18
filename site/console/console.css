@@ -489,6 +489,7 @@ th.col-role, td.col-role { width: 116px; padding-left: 8px; padding-right: 8px; 
 :where(.console) :where(th, td).col-act { width: 1%; white-space: nowrap; text-align: right; }
 .row-actions { display: flex; justify-content: flex-end; gap: 14px; }
 .btn-link-danger { color: var(--bad); }
+.list tr.is-past > td { color: var(--ink-3); }
 .measure { max-width: 44ch; }   /* long text in a table cell: keeps the column from taking the room of the others */
 .devices > li { display: grid; gap: 1px; }
 

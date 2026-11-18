@@ -6,7 +6,7 @@
    POST   /api/console/customers/:id/sign-out
    POST   /api/console/customers/:id/notes    { body } → { notes }
    DELETE /api/console/notes/:id              → { notes }
-   Giving, extending and ending plans: AC.plans (plan-actions.js). */
+   Giving, extending and ending plans: AC.plans (plan-actions.js). Learning access: AC.access (access-actions.js). */
 (function () {
   'use strict';
   var AC = window.AC, el = AC.el, doc = document;
@@ -184,6 +184,34 @@
       extra.length ? el('p', { class: 'quiet', text: extra.join(' ') }) : null
     ]);
   }
+  /* learning access: lessons and games opened or closed for this customer */
+  function learning(d) {
+    if (!d.access) return;
+    var who = d.customer.fullName || d.customer.email;
+    var inForce = d.access.filter(function (a) { return a.state === 'active'; }), past = d.access.length - inForce.length;
+    var rows = inForce.map(function (a) {
+      return el('tr', null, [
+        el('td', null, [el('span', { class: 'cell-main', text: a.targetName }), el('div', { class: 'cell-sub', text: a.reason })]),
+        el('td', { class: 'col-fit' }, AC.status('access', a.effect)),
+        el('td', { class: 'nowrap', text: AC.access.until(a) }),
+        d.can.access ? el('td', { class: 'col-act' }, el('button', { type: 'button', class: 'btn-link', text: 'End', 'aria-label': 'End the exception for ' + a.targetName,
+          on: { click: function () { AC.access.end(a, who).then(reloadAfter); } } })) : null
+      ]);
+    });
+    var heads = [['Lesson or game'], ['Effect', 'col-fit'], ['Until']];
+    if (d.can.access) heads.push(['', 'col-act']);
+    fill('accessBody', [
+      rows.length ? table(heads, rows) : quiet('Everything follows the plan.'),
+      past ? el('p', { class: 'hint' }, [past + (past === 1 ? ' earlier exception has ended. ' : ' earlier exceptions have ended. '),
+        AC.can('access.view') ? el('a', { href: AC.base + '/access?q=' + encodeURIComponent(d.customer.email), text: 'See them' }) : null]) : null
+    ]);
+    var head = byId('accessTitle').parentNode, old = head.querySelector('.block-actions');
+    if (old) old.remove();
+    if (d.can.access && d.accessTargets) {
+      head.appendChild(el('div', { class: 'block-actions' }, el('button', { type: 'button', class: 'btn btn-quiet btn-sm', text: 'Open or close',
+        on: { click: function () { AC.access.add(d.customer, d.accessTargets).then(reloadAfter); } } })));
+    }
+  }
   function notes(list) {
     fill('notesBody', list.length ? el('ul', { class: 'notes' }, list.map(function (n) {
       return el('li', { class: 'note' }, [
@@ -276,7 +304,7 @@
       current = d;
       byId('custMissing').hidden = true;
       var page = byId('custPage'); page.hidden = false; page.removeAttribute('aria-busy');
-      head(d); plan(d); orders(d); progress(d); notes(d.notes); emails(d); activity(d); account(d); devices(d);
+      head(d); plan(d); orders(d); progress(d); learning(d); notes(d.notes); emails(d); activity(d); account(d); devices(d);
       if (noteForm) noteForm.hidden = !d.can.notes;
     }, function (err) {
       if (err.status === 404) missing('Customer not found', 'There is no account with this ID. It may have been deleted.', false);

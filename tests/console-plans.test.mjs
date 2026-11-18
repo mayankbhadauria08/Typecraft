@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { makeEnv, startServer } from './server.mjs';
 import { kit, OWNER, pw, assertNoInlineCode } from './console-kit.mjs';
+import { entitlementsFor, lessonAllowed, gameAllowed } from '../src/entitlements.js';
+import { D1Shim } from './d1-shim.mjs';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DAY = 86400000;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -13,7 +18,7 @@ const inDays = (n) => new Date(Date.now() + n * DAY).toISOString();
 let S, K, owner, admin, support, P = {}, U = {};
 before(async () => {
   const env = makeEnv({ OWNER_EMAILS: OWNER, SITE_URL: 'https://typecraft.test' });
-  S = { env, srv: await startServer(env, 8796) };
+  S = { env, srv: await startServer(env, 8793) };
   S.base = `http://localhost:${S.srv.port}`;
   K = kit(S, { ipPrefix: '10.62.0.' });
   owner = await K.consoleLogin(await K.owner());
@@ -249,4 +254,139 @@ test('subscriptions page: the frame by permission', async () => {
     const r = await K.client()('GET', `/site/console/${f}`);
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
   }
+});
+
+/* ================= learning access (§9) ================= */
+
+const addAccess = (c, id, body) => c('POST', `/api/console/customers/${id}/access`, body);
+const why = { reason: 'Asked for the numbers lessons for a job test' };
+const ent = (id) => entitlementsFor(S.env, id);
+
+test('learning access: who may add one, and what is checked', async () => {
+  const cust = await K.customer({ name: 'Access Customer', email: 'access@example.com' });
+  assert.equal((await addAccess(support, cust, { kind: 'lesson', target: 'l12', effect: 'allow', ...why })).status, 403, 'Support may look, not change');
+  const field = async (body, name) => {
+    const r = await addAccess(admin, cust, { kind: 'lesson', target: 'l12', effect: 'allow', ...why, ...body });
+    assert.equal(r.status, 400, r.text); assert.ok(r.body.error.fields[name], `${name}: ${r.text}`);
+  };
+  for (const kind of [undefined, 'pack', 'LESSON']) await field({ kind }, 'kind');
+  for (const target of ['placement', 'review', 'custom', 'l999', 'storm', '', undefined]) await field({ target }, 'target');
+  for (const target of ['daily', 'pacman', 'l12']) await field({ kind: 'game', target }, 'target');
+  for (const effect of [undefined, 'open', 'ALLOW']) await field({ effect }, 'effect');
+  for (const days of [0, 366, 1.5, '7']) await field({ days }, 'days');
+  await field({ reason: 'x' }, 'reason');
+  assert.equal((await addAccess(admin, '00000000-0000-0000-0000-000000000000', { kind: 'lesson', target: 'l12', effect: 'allow', ...why })).status, 404);
+  assert.equal((await K.one('SELECT COUNT(*) AS n FROM access_overrides WHERE user_id = ?1', cust)).n, 0);
+});
+
+test('learning access: opening and closing change what the customer may use at once; a new one replaces the old', async () => {
+  const cust = await K.customer({ name: 'Open Customer', email: 'open@example.com' });
+  assert.equal(lessonAllowed(await ent(cust), 'l12'), false, 'Free: not lesson 12');
+  let r = await addAccess(admin, cust, { kind: 'lesson', target: 'l12', effect: 'allow', ...why });
+  assert.equal(r.status, 201, r.text);
+  assert.deepEqual([r.body.access.targetName, r.body.access.effect, r.body.access.state, r.body.access.expiresAt, r.body.access.createdBy, r.body.replaced],
+    ['Lesson 29: Number Row: 1–5', 'allow', 'active', null, 'Kavita Ops', 0]);
+  let e = await ent(cust);
+  assert.deepEqual(e.overrides.lessons, { allow: ['l12'], deny: [] });
+  assert.equal(lessonAllowed(e, 'l12'), true); assert.equal(lessonAllowed(e, 'l13'), false, 'only that one lesson');
+
+  // closing it replaces the opening
+  r = await addAccess(admin, cust, { kind: 'lesson', target: 'l12', effect: 'deny', days: 10, reason: 'Opened by mistake' });
+  assert.equal(r.status, 201); assert.equal(r.body.replaced, 1);
+  assert.equal(Date.parse(r.body.access.expiresAt) - Date.parse(r.body.access.createdAt), 10 * DAY);
+  e = await ent(cust);
+  assert.deepEqual(e.overrides.lessons, { allow: [], deny: ['l12'] });
+  const old = await K.one("SELECT ended_at, ended_by FROM access_overrides WHERE user_id = ?1 AND effect = 'allow'", cust);
+  assert.ok(old.ended_at); assert.equal(old.ended_by, admin.who.id);
+
+  // closing a game the plan includes
+  await K.subscription(cust, 'starter', { days: 30 });
+  assert.equal(gameAllowed(await ent(cust), 'storm'), true);
+  r = await addAccess(owner, cust, { kind: 'game', target: 'storm', effect: 'deny', reason: 'Asked to hide the games for a child' });
+  assert.equal(r.body.access.targetName, 'Word Storm');
+  e = await ent(cust);
+  assert.equal(gameAllowed(e, 'storm'), false); assert.equal(gameAllowed(e, 'beat'), true); assert.equal(gameAllowed(e, 'daily'), true);
+  assert.equal(lessonAllowed(e, 'l12'), false, 'closed wins over a plan that includes it');
+  assert.equal(lessonAllowed(e, 'placement'), true);
+
+  // when its days run out, the plan decides again
+  await K.run("UPDATE access_overrides SET expires_at = ?2 WHERE user_id = ?1 AND target = 'l12' AND ended_at IS NULL", cust, inDays(-1));
+  assert.equal(lessonAllowed(await ent(cust), 'l12'), true, 'Starter includes every lesson again');
+
+  const log = (await K.audits('access.add')).filter((a) => a.target === `user:${cust}`).map((a) => JSON.parse(a.detail));
+  assert.equal(log.length, 3);
+  assert.deepEqual(Object.keys(log[1]).sort(), ['accessId', 'days', 'effect', 'item', 'kind', 'reason', 'replaced']);
+  assert.deepEqual([log[1].item, log[1].effect, log[1].days, log[1].replaced.length], ['l12', 'deny', 10, 1]);
+});
+
+test('learning access: ending one, the list, and at most 50 in force', async () => {
+  const cust = await K.customer({ name: 'Many Exceptions', email: 'many@example.com' });
+  const made = (await addAccess(admin, cust, { kind: 'game', target: 'tug', effect: 'allow', ...why })).body.access;
+  const end = (c, id, body = {}) => c('POST', `/api/console/access/${id}/end`, body);
+  assert.equal((await end(support, made.id)).status, 403);
+  let r = await end(admin, made.id, { reason: 'Customer bought Starter' });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual([r.body.access.state, r.body.access.endedBy], ['ended', 'Kavita Ops']);
+  assert.equal(gameAllowed(await ent(cust), 'tug'), false);
+  assert.equal((await end(admin, made.id)).body.error.code, 'not_active');
+  assert.equal((await end(admin, 'nope-nope')).status, 404);
+  assert.deepEqual(JSON.parse((await K.audits('access.end')).find((a) => a.target === `user:${cust}`).detail),
+    { accessId: made.id, kind: 'game', item: 'tug', effect: 'allow', reason: 'Customer bought Starter' });
+
+  // the list
+  const list = async (query) => (await support('GET', '/api/console/access?' + query)).body;
+  let d = await list('q=many@example.com');
+  assert.deepEqual(d.items.map((a) => [a.target, a.state]), [['tug', 'ended']]);
+  assert.deepEqual(d.items[0].customer, { id: cust, fullName: 'Many Exceptions', email: 'many@example.com' });
+  assert.equal((await list('q=many@example.com&state=active')).total, 0);
+  assert.equal((await list('q=many@example.com&state=ended')).total, 1);
+  assert.equal((await list('kind=game&effect=deny')).items.every((a) => a.kind === 'game' && a.effect === 'deny'), true);
+  await K.setPermission('support', 'access.view', false);
+  try { assert.equal((await support('GET', '/api/console/access')).status, 403); } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'access.view'"); }
+
+  // 50 in force at most; replacing one of them is still fine
+  const lessons = globalThis.TC_META.ORDER.slice(0, 50);
+  for (const id of lessons) {
+    await K.run(`INSERT INTO access_overrides (id, user_id, kind, target, effect, reason, created_by, created_at) VALUES (?1, ?2, 'lesson', ?3, 'allow', 'bulk', ?4, ?5)`,
+      randomUUID(), cust, id, admin.who.id, inDays(0));
+  }
+  r = await addAccess(admin, cust, { kind: 'lesson', target: 'l78', effect: 'allow', ...why });
+  assert.equal(r.status, 400); assert.equal(r.body.error.code, 'too_many');
+  r = await addAccess(admin, cust, { kind: 'lesson', target: lessons[0], effect: 'deny', ...why });
+  assert.equal(r.status, 201); assert.equal(r.body.replaced, 1);
+});
+
+test('learning access on the customer page; the list page frame', async () => {
+  const cust = await K.customer({ name: 'Page Customer', email: 'page-access@example.com' });
+  await addAccess(admin, cust, { kind: 'lesson', target: 'l70', effect: 'allow', ...why });
+  const d = (await admin('GET', `/api/console/customers/${cust}`)).body;
+  assert.equal(d.can.access, true);
+  assert.deepEqual(d.access.map((a) => [a.target, a.state]), [['l70', 'active']]);
+  assert.equal(d.accessTargets.lesson.length, 78); assert.equal(d.accessTargets.game.length, 8);
+  assert.deepEqual(d.accessTargets.game.map((g) => g.id), ['storm', 'beat', 'tug', 'ghost', 'pop', 'tower', 'safe', 'boss']);
+  assert.equal(d.accessTargets.lesson[0].name, 'Lesson 1: Meet the keyboard');
+  const s = (await support('GET', `/api/console/customers/${cust}`)).body;
+  assert.equal(s.can.access, false); assert.equal(s.accessTargets, null); assert.equal(s.access.length, 1);
+  const frame = await admin('GET', `/console/customers/${cust}`);
+  assert.ok(frame.text.includes('id="accessBody"') && frame.text.includes('/site/console/access-actions.js?v='));
+
+  const page = await support('GET', '/console/access');
+  assert.equal(page.status, 200);
+  assertNoInlineCode(page.text);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/access" aria-current="page">/);
+  for (const name of ['q', 'state', 'kind', 'effect']) assert.ok(page.text.includes(`name="${name}"`), name);
+  for (const f of ['access-actions.js', 'access.js']) {
+    const r = await K.client()('GET', `/site/console/${f}`);
+    assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
+  }
+});
+
+test('before migration 0006: what a customer may use is worked out as before', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const DB = new D1Shim();
+  for (const f of ['0001_accounts.sql', '0002_next.sql', '0003_saas.sql', '0004_billing_archive.sql', '0005_admin_console.sql']) DB.db.exec(readFileSync(path.join(root, 'migrations', f), 'utf8'));
+  const e = await entitlementsFor({ DB }, 'someone');
+  assert.equal(e.plan, 'free');
+  assert.deepEqual(e.overrides, { lessons: { allow: [], deny: [] }, games: { allow: [], deny: [] } });
+  assert.equal(lessonAllowed(e, 'l25'), true); assert.equal(lessonAllowed(e, 'l12'), false);
 });

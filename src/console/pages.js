@@ -176,6 +176,7 @@ ${has('customers.notes') ? `<form class="note-form" id="noteForm" novalidate>
 </form>` : ''}
 <div id="notesBody">${lines(2)}</div>
 </section>
+${has('access.view') ? section('access', 'Learning access', lines(2), '<span class="panel-meta">Lessons and games opened or closed for this customer</span>') : ''}
 ${has('emails.view') ? section('emails', 'Emails sent', lines(3)) : ''}
 ${has('audit.view') ? section('activity', 'Admin activity', lines(3), '<span class="panel-meta">Changes staff made to this account</span>') : ''}
 </div>
@@ -192,7 +193,7 @@ export const PAGES = [
   { key: 'customers', path: '/customers', title: 'Customers', crumbs: ['Core operations', 'Customers'],
     permission: 'customers.view', body: customersBody, scripts: ['customers.js'] },
   { key: 'customers', match: /^\/customers\/([\w-]{1,64})$/, names: ['id'], title: 'Customer', crumbs: ['Core operations', ['Customers', '/customers'], 'Customer'],
-    permission: 'customers.view', body: customerBody, scripts: ['plan-actions.js', 'customer.js'] },
+    permission: 'customers.view', body: customerBody, scripts: ['plan-actions.js', 'access-actions.js', 'customer.js'] },
   ...CORE_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },

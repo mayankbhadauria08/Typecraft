@@ -69,6 +69,22 @@ function subscriptionsBody(me) {
   });
 }
 
+/* ---------- Learning access ---------- */
+function accessBody() {
+  return listFrame({
+    title: 'Learning access',
+    sub: 'Lessons and arcade games opened or closed for one customer, whatever their plan says. To add one, open the customer.',
+    label: 'Find exceptions',
+    search: { label: 'Search exceptions', placeholder: 'Email or name' },
+    filters: [
+      select('state', 'State', [['', 'In force and ended'], ['active', 'In force'], ['ended', 'Ended']]),
+      select('kind', 'What', [['', 'Lessons and games'], ['lesson', 'Lessons'], ['game', 'Arcade games']]),
+      select('effect', 'Effect', [['', 'Opened and closed'], ['allow', 'Opened'], ['deny', 'Closed']]),
+    ].join('\n'),
+    heads: [['Customer'], ['Lesson or game'], ['Effect', 'col-fit'], ['Until', 'col-wide'], ['Reason', 'col-wide'], ['Added by', 'col-wide'], ['', 'col-act']],
+  });
+}
+
 export const CORE_PAGES = [
   { key: 'payments', path: '/payments', title: 'Payments', crumbs: ['Core operations', 'Payments'],
     permission: 'payments.view', body: paymentsBody, scripts: ['payments.js'] },
@@ -78,4 +94,6 @@ export const CORE_PAGES = [
     permission: 'refunds.view', body: refundsBody, scripts: ['refunds.js'] },
   { key: 'subscriptions', path: '/subscriptions', title: 'Subscriptions', crumbs: ['Core operations', 'Subscriptions'],
     permission: 'subscriptions.view', body: subscriptionsBody, scripts: ['plan-actions.js', 'subscriptions.js'] },
+  { key: 'access', path: '/access', title: 'Learning access', crumbs: ['Core operations', 'Learning access'],
+    permission: 'access.view', body: accessBody, scripts: ['access-actions.js', 'access.js'] },
 ];

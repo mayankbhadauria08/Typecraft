@@ -204,7 +204,7 @@ test('customer profile: plan, payments, progress, devices; each section only wit
   assert.deepEqual(d.emails, [{ template: 'payment_receipt', subject: 'Your TypeCraft receipt', status: 'sent', createdAt: now }]);
   assert.deepEqual(d.activity, [{ action: 'subscription.grant', reason: 'Goodwill after an outage', actor: 'Mayank Owner', createdAt: now }]);
   assert.deepEqual(d.sessions, { active: 0, lastSeenAt: null });
-  assert.deepEqual(d.can, { manage: true, manageBlock: null, notes: true, plans: true });
+  assert.deepEqual(d.can, { manage: true, manageBlock: null, notes: true, plans: true, access: true });
   assert.ok(!/do-not-show|not-a-real-hash|10\.0\.0\.1/.test(r.text), 'no email contents, password data or staff addresses');
 
   // Amit: the plan past its end date is shown as ended
@@ -216,7 +216,7 @@ test('customer profile: plan, payments, progress, devices; each section only wit
   // Support sees payments and emails, not the staff activity; and nothing of payments once that is switched off
   const s = (await support('GET', `/api/console/customers/${P.riya}`)).body;
   assert.equal(s.orders.length, 1); assert.equal(s.emails.length, 1); assert.equal(s.activity, null);
-  assert.deepEqual(s.can, { manage: false, manageBlock: null, notes: true, plans: false });
+  assert.deepEqual(s.can, { manage: false, manageBlock: null, notes: true, plans: false, access: false });
   await K.setPermission('support', 'payments.view', false);
   try { assert.equal((await support('GET', `/api/console/customers/${P.riya}`)).body.orders, null); }
   finally { await K.run("DELETE FROM role_permissions WHERE permission = 'payments.view'"); }
@@ -232,7 +232,8 @@ test('customer profile: plan, payments, progress, devices; each section only wit
 });
 
 test('who may change which account: not yourself, never a Super Admin, staff only by a Super Admin', async () => {
-  const can = async (c, id) => { const x = (await c('GET', `/api/console/customers/${id}`)).body.can; delete x.plans; return x; };
+  // only the account rules here; plans and learning access have their own tests
+  const can = async (c, id) => { const x = (await c('GET', `/api/console/customers/${id}`)).body.can; delete x.plans; delete x.access; return x; };
   assert.deepEqual(await can(admin, P.riya), { manage: true, manageBlock: null, notes: true });
   assert.deepEqual(await can(admin, support.who.id), { manage: false, manageBlock: 'Only a Super Admin can change another staff account.', notes: true });
   assert.deepEqual(await can(owner, support.who.id), { manage: true, manageBlock: null, notes: true });

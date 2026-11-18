@@ -68,6 +68,7 @@
       refunded: ['Refunded', ''], partially_refunded: ['Partly refunded', ''] },
     refund: { pending: ['On its way', 'warn'], processed: ['Sent', 'ok'], failed: ['Failed', 'bad'] },
     plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended early', 'bad'] },
+    access: { allow: ['Opened', 'ok'], deny: ['Closed', 'bad'] },
     email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] }
   };
   /** A badge for a state: AC.status('order', 'paid'). */
@@ -201,7 +202,7 @@
    * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
    * opts: { title, text, submitLabel, danger, submit(values) → Promise,
    *         fields: [{ name, label, type: 'text' | 'textarea' | 'number' | 'select' | 'radio', value, required,
-   *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint }] }] }
+   *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint } | { group, options }] }] }
    */
   function formDialog(opts) {
     return openDialog(function (close) {
@@ -222,7 +223,10 @@
           return row;
         }
         if (f.type === 'textarea') control = el('textarea', { id: id, rows: f.rows || 3, maxlength: f.maxlength, placeholder: f.placeholder });
-        else if (f.type === 'select') control = el('select', { id: id }, f.options.map(function (o) { return el('option', { value: o.value, text: o.label }); }));
+        else if (f.type === 'select') control = el('select', { id: id }, (f.options || []).map(function (o) {
+          if (o.group) return el('optgroup', { label: o.group }, o.options.map(function (x) { return el('option', { value: x.value, text: x.label }); }));
+          return el('option', { value: o.value, text: o.label });
+        }));
         else control = el('input', { id: id, type: f.type === 'number' ? 'number' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
           inputmode: f.inputmode || (f.type === 'number' ? 'numeric' : null), autocomplete: 'off' });
         if (f.value !== undefined && f.value !== null) control.value = String(f.value);
