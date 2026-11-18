@@ -16,7 +16,7 @@ the live database, without the owner's yes.
 | 2 | Courses: publish, history, go back to a version | built |
 | 3 | Exercises: practice packs | built |
 | 4 | Student progress | built |
-| 5 | Learning analytics | not started |
+| 5 | Learning analytics | built |
 | 6 | Full check, docs, pull request | not started |
 | — | Unlock conditions | built (PR #20, `docs/UNLOCK-RULES.md`) |
 
@@ -93,6 +93,12 @@ version never stacks on an older one). Used by the app, the console pages and th
   a key counts as weak once it has been typed 20 times. Names come from the published course.
 - **Step 5.** Learning analytics (`analytics.view`): active learners, practice time, how far
   learners get per level, hardest lessons, placement results, weak keys across learners.
+  Read only, no new table, staff left out. Practice (learners, time, time per learner, lessons
+  finished for the first time) covers 7, 30 or 90 India days, each against the period before.
+  The rest is counted since the start, because the tables keep each learner's best, not a history:
+  per level started / finished / working on it now; hardest lessons = tried by 5 learners or more
+  and someone stuck on them, most stuck first; placement by level; best speed in bands; keys typed
+  200 times or more by everyone together, most missed first.
 - **Step 6.** Full check and pull request.
 
 ## 5. Going live

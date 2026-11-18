@@ -167,11 +167,40 @@ function progressOneBody(me) {
   });
 }
 
+const tiles = (id, n) => `<div class="tiles" id="${id}">${Array.from({ length: n }, () => '<div class="tile" aria-hidden="true"><span class="skeleton"></span><span class="skeleton skeleton-wide"></span></div>').join('')}</div>`;
+const block = (id, title, inner, meta = '') => `<section class="block" aria-labelledby="${id}Title"><div class="block-head"><h2 id="${id}Title">${esc(title)}</h2>${meta}</div><div id="${id}Body">${inner}</div></section>`;
+function analyticsBody() {
+  return `<div class="page-head">
+<h1>Learning analytics</h1>
+<p class="page-sub">How learners as a whole are getting on. Practice is counted over the period you pick, in India days; how far learners get, the hardest lessons, placement, speed and weak keys are counted since the start. Staff accounts are left out.</p>
+</div>
+<div class="dash-bar">
+<div class="seg" role="group" aria-label="Period" id="rangePick">
+<button type="button" data-range="7d" aria-pressed="false">Last 7 days</button><button type="button" data-range="30d" aria-pressed="true">Last 30 days</button><button type="button" data-range="90d" aria-pressed="false">Last 90 days</button>
+</div>
+<button type="button" class="btn btn-quiet btn-sm" id="refreshBtn">${icon('refresh')}<span>Refresh</span></button>
+<span class="list-meta" id="dashUpdated" aria-live="polite"></span>
+</div>
+<div id="dash" aria-busy="true">
+<section class="block" aria-labelledby="practiceTitle"><div class="block-head"><h2 id="practiceTitle">Practice</h2></div>${tiles('practiceTiles', 4)}</section>
+${block('active', 'Learners who practised each day', `<div class="chart" id="activeChart">${lines(3)}</div>`)}
+${block('levels', 'How far learners get', lines(5), '<span class="panel-meta" id="levelsMeta"></span>')}
+${block('hardest', 'Hardest lessons', lines(5), '<span class="panel-meta" id="hardestMeta"></span>')}
+<div class="dash-cols dash-cols-even">
+${block('speed', 'Best speed', lines(4), '<span class="panel-meta">Learners, by their fastest lesson</span>')}
+${block('placement', 'Placement test', lines(4), '<span class="panel-meta" id="placementMeta"></span>')}
+</div>
+${block('keys', 'Weakest keys across learners', lines(4), '<span class="panel-meta" id="keysMeta"></span>')}
+</div>`;
+}
+
 export const LEARNING_PAGES = [
   { key: 'progress', path: '/progress', title: 'Student progress', crumbs: ['Learning operations', 'Student progress'],
     permission: 'progress.view', body: progressBody, scripts: ['progress.js'] },
   { key: 'progress', match: /^\/progress\/([\w-]{1,64})$/, names: ['id'], title: 'Learner progress', crumbs: ['Learning operations', ['Student progress', '/progress'], 'Learner'],
     permission: 'progress.view', body: progressOneBody, scripts: ['charts.js', 'progress-one.js'] },
+  { key: 'analytics', path: '/learning-analytics', title: 'Learning analytics', crumbs: ['Learning operations', 'Learning analytics'],
+    permission: 'analytics.view', body: analyticsBody, scripts: ['charts.js', 'analytics.js'] },
   { key: 'courses', path: '/course', title: 'Courses', crumbs: ['Learning operations', 'Courses'],
     permission: 'course.view', body: courseBody, scripts: ['course-kit.js', 'course-home.js'] },
   { key: 'lessons', path: '/course/lessons', title: 'Lessons', crumbs: ['Learning operations', 'Lessons'],
