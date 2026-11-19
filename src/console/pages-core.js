@@ -75,15 +75,16 @@ function subscriptionsBody(me) {
 function accessBody() {
   return listFrame({
     title: 'Learning access',
-    sub: 'Lessons and arcade games opened or closed for one customer, whatever their plan says. To add one, open the customer.',
-    label: 'Find exceptions',
-    search: { label: 'Search exceptions', placeholder: 'Email or name' },
+    sub: 'Lessons and arcade games opened or closed for one customer, whatever their plan says. To give someone an exception, search for them here and open them.',
+    label: 'Find exceptions or a customer',
+    search: { label: 'Search by customer email or name', placeholder: 'Customer email or name' },
     filters: [
       select('state', 'State', [['', 'In force and ended'], ['active', 'In force'], ['ended', 'Ended']]),
       select('kind', 'What', [['', 'Lessons and games'], ['lesson', 'Lessons'], ['game', 'Arcade games']]),
       select('effect', 'Effect', [['', 'Opened and closed'], ['allow', 'Opened'], ['deny', 'Closed']]),
     ].join('\n'),
     heads: [['Customer'], ['Lesson or game'], ['Effect', 'col-fit'], ['Until', 'col-wide'], ['Reason', 'col-wide'], ['Added by', 'col-wide'], ['', 'col-act']],
+    note: '<div id="customerMatches" aria-live="polite"></div>',
   });
 }
 

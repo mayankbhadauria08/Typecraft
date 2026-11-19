@@ -838,3 +838,11 @@ progress.meter::-moz-progress-bar { background: var(--accent); border-radius: 99
 .cap-warn .cap-fill { background: var(--bad); }
 .cap-w0 { width: 1%; } .cap-w1 { width: 10%; } .cap-w2 { width: 20%; } .cap-w3 { width: 30%; } .cap-w4 { width: 40%; } .cap-w5 { width: 50%; }
 .cap-w6 { width: 60%; } .cap-w7 { width: 70%; } .cap-w8 { width: 80%; } .cap-w9 { width: 90%; } .cap-w10 { width: 100%; }
+
+/* ---------- Learning access: customers matching a search (problem log #7) ---------- */
+.match-box { margin: -4px 0 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.match-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.match-list { list-style: none; margin: 0; padding: 0; }
+.match-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.match-row:first-child { border-top: 0; }
+@media (max-width: 640px) { .match-row { grid-template-columns: minmax(0, 1fr) auto; } .match-row > .muted { grid-column: 1 / -1; order: 3; } }

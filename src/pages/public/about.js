@@ -3,6 +3,7 @@ import { icon } from '../../layout.js';
 export const meta = {
   path: '/about',
   title: 'About TypeCraft',
+  fullTitle: 'About TypeCraft', // not "About TypeCraft · TypeCraft" (problem log #8)
   description: 'Why TypeCraft exists, how the course is built, and the principles behind it: teach the movement first, measure honestly, no ads.',
 };
 
@@ -28,7 +29,7 @@ export default `
     <div class="stack">
       <div class="card"><span class="card-icon">${icon('target')}</span><h3>Teach, then measure</h3><p>Speed comes from accurate, relaxed movement. Lessons put accuracy first; speed targets come later in each level.</p></div>
       <div class="card"><span class="card-icon">${icon('shield')}</span><h3>Honest numbers</h3><p>Your speed, accuracy and history come from your own keystrokes. We don't publish testimonials or invented success rates.</p></div>
-      <div class="card"><span class="card-icon">${icon('sparkle')}</span><h3>No ads, no tracking scripts</h3><p>The site carries no advertising and no third-party trackers. Plans are one-time payments that never renew on their own.</p></div>
+      <div class="card"><span class="card-icon">${icon('sparkle')}</span><h3>No ads, no ad trackers</h3><p>The site carries no advertising and no advertising trackers. Visits are counted by Cloudflare Web Analytics, which sets no cookies (see the <a href="/privacy">privacy policy</a>). Plans are one-time payments that never renew on their own.</p></div>
     </div>
   </div>
 </section>

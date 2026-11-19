@@ -2552,13 +2552,13 @@ const Plan = {
           : (open.error ? `<p class="plan-note">${esc(open.error)} <button type="button" class="link-btn" data-pack="${esc(open.id)}">Try again</button></p>` : '<p class="plan-note">Loading the exercises…</p>')) + '</div>';
       return;
     }
-    el.innerHTML = head + (locked ? `<p class="plan-note">Numbers and data entry, code, business writing and exam passages: ${this.packs.reduce((s, p) => s + p.exerciseCount, 0)} exercises written for TypeCraft. Included with ${esc(this.unlockName('exercises.premium'))} and above.</p>` : '') +
+    el.innerHTML = head + (locked ? `<p class="plan-note">Numbers and data entry, code, business writing and long 300-word passages: ${this.packs.reduce((s, p) => s + p.exerciseCount, 0)} exercises written for TypeCraft. Included with ${esc(this.unlockName('exercises.premium'))} and above.</p>` : '') +
       `<div class="pack-grid">${this.packs.map(p => `<button type="button" class="pack-card${locked ? ' is-locked' : ''}" data-pack="${esc(p.id)}" aria-label="${esc(p.title)}: ${p.exerciseCount} exercises${locked ? '. Locked' : ''}">
         <b>${esc(p.title)}</b><span>${esc(p.description)}</span><small>${p.exerciseCount} exercises${locked ? ' · ' + LOCK_SVG + 'locked' : ''}</small></button>`).join('')}</div>`;
   },
   async choosePack(id){
     if(!this.has('exercises.premium')) return this.blocked('exercises.premium', () => this.choosePack(id), 'Practice packs',
-      `Practise with invoices, phone numbers, code, business letters and exam passages. Included with ${this.unlockName('exercises.premium')} and above.`);
+      `Practise with invoices, phone numbers, code, business letters and long 300-word passages. Included with ${this.unlockName('exercises.premium')} and above.`);
     this.openPack = id; const meta = this.packs.find(p => p.id === id); if(meta) delete meta.error;
     this.renderPacks();
     if(this.packTexts[id]) return;

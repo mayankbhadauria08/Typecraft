@@ -1,12 +1,13 @@
 import { sellerBlock } from './legal-common.js';
 
-// its own date: exam practice and certificate checks were added on this day (docs/EXAM-MODES.md)
+// its own date: exam practice and certificate checks were added on this day (docs/EXAM-MODES.md); the same day,
+// Cloudflare Web Analytics and Resend were named (problem log #9)
 const UPDATED = '19 November 2026';
 
 export const meta = {
   path: '/privacy',
   title: 'Privacy policy',
-  description: 'What TypeCraft collects, why, who processes it (Cloudflare, Razorpay, our email provider), how long it is kept, and your rights under Indian law.',
+  description: 'What TypeCraft collects, why, who processes it (Cloudflare, Razorpay, Resend for email), how long it is kept, and your rights under Indian law.',
   changefreq: 'yearly',
   priority: '0.3',
 };
@@ -14,7 +15,7 @@ export const meta = {
 export default `
 <div class="container">
   <header class="page-head"><span class="eyebrow">Legal</span><h1>Privacy policy</h1>
-    <p class="lede">We collect what's needed to teach you, keep your account safe and take payments. We don't sell data, show ads or use third-party trackers.</p>
+    <p class="lede">We collect what's needed to teach you, keep your account safe and take payments. We don't sell data, show ads or use advertising trackers. To count visits we use Cloudflare Web Analytics, which sets no cookies.</p>
     <p class="updated mono muted">Last updated: ${UPDATED}</p></header>
   <div class="prose" style="padding-bottom:40px">
     <h2>1. What we collect</h2>
@@ -27,6 +28,7 @@ export default `
       <li><b>Payments</b>: the plan, amount, status, dates and the payment reference from Razorpay. Card numbers, UPI PINs and bank logins go directly to Razorpay and never reach us.</li>
       <li><b>Messages</b>: what you send through the contact form or by email, and a record of the emails we send you (type, time, delivery status).</li>
       <li><b>Security data</b>: your IP address and browser type, used to limit repeated sign-in attempts and to tell you about sign-ins from a new device.</li>
+      <li><b>Visit counts</b>: on the public website, Cloudflare Web Analytics records each page view: the page, the site that sent you, your browser and device type, your country and how fast the page loaded. It is used only to count visits and find slow pages, not to build a profile of you.</li>
     </ul>
     <h2>2. Why we use it</h2>
     <ul>
@@ -41,14 +43,14 @@ export default `
     <h2>3. Who processes it for us</h2>
     <p>We use a small number of service providers, only for the purposes above:</p>
     <ul>
-      <li><b>Cloudflare</b> hosts the website and its database.</li>
+      <li><b>Cloudflare</b> hosts the website and its database, and counts visits with Cloudflare Web Analytics. Cloudflare says Web Analytics uses no cookies or local storage and doesn't fingerprint visitors.</li>
       <li><b>Razorpay</b> processes payments under its own privacy policy and Indian payment regulations.</li>
-      <li><b>Our email provider</b> (Resend) delivers account and receipt emails.</li>
+      <li><b>Resend</b>, our email provider, delivers account emails, receipts and replies from us.</li>
       <li><b>Google Fonts</b> serves the typefaces this site uses, so your browser contacts Google's servers to fetch them.</li>
     </ul>
     <p>Some of these providers may process data outside India. We don't share your data with anyone else unless the law requires it.</p>
     <h2>4. Cookies and local storage</h2>
-    <p>We use one essential cookie to keep you signed in. Your browser also keeps your settings (theme, sound) and, for offline use, a copy of unsent progress in local storage. There are no advertising or analytics cookies.</p>
+    <p>We use one essential cookie to keep you signed in. Your browser also keeps your settings (theme, sound) and, for offline use, a copy of unsent progress in local storage. There are no advertising or analytics cookies: the visit counter uses none.</p>
     <h2>5. How long we keep it</h2>
     <p>Account and learning data are kept until you delete your account. Payment records and invoices are kept for as long as Indian tax and accounting law requires, even after an account is deleted. Security logs are kept for a short period and then removed.</p>
     <h2>6. Your rights</h2>

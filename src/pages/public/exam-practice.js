@@ -9,9 +9,10 @@ const X = globalThis.TC_EXAMS;
 export const meta = {
   needsKeyboard: true,   // phones see a note offering to send the link to a computer
   path: '/exam-practice',
-  title: 'Typing exam practice: SSC typing test, SSC data entry (DEST) and CPCT',
+  // Google shows about 60 characters of a title and 155 of a description (problem log #8)
+  title: 'Free SSC, DEST and CPCT typing test practice',
   ogTitle: 'Typing exam practice · TypeCraft',
-  description: 'Free practice tests in the style of the SSC typing test (35 wpm in 10 minutes), the SSC data entry test (8,000 key depressions an hour) and the CPCT English typing test, marked with full and half mistakes.',
+  description: 'Free practice for the SSC typing test (35 wpm in 10 minutes), SSC data entry (DEST) and CPCT, marked with full and half mistakes.',
   changefreq: 'monthly',
 };
 
@@ -50,7 +51,7 @@ export default `
 
   <section class="ex-test" id="exTest" hidden aria-labelledby="exTestName">
     <div class="ex-bar">
-      <div class="ex-bar-name"><h2 id="exTestName"></h2><p class="muted" id="exTestRules"></p></div>
+      <div class="ex-bar-name"><h2 id="exTestName">Typing test</h2><p class="muted" id="exTestRules"></p></div>
       <div class="ex-bar-live" aria-live="off">
         <div class="ex-clock"><span class="stat-label">Time left</span><span class="mono" id="exClock"></span></div>
         <div class="ex-clock" id="exWordsWrap"><span class="stat-label">Words left</span><span class="mono" id="exWords"></span></div>

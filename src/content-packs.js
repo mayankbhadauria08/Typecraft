@@ -172,8 +172,9 @@ const business = {
 
 const exam = {
   id: 'exam',
-  title: 'Exam passages',
-  description: 'Paragraphs of about 300 words on general topics, in the style of SSC and clerk typing tests.',
+  // not "Exam passages": that sounded like the free Exam practice tests (problem log #10)
+  title: 'Long passages',
+  description: 'Paragraphs of about 300 words on everyday topics, like the passages in SSC and clerk typing tests. Practise at your own pace; for a timed, marked test, use Exam practice.',
   exercises: [
     { id: 'trees', title: 'Trees in our towns', text:
       'Trees are among the oldest friends of human beings, yet in our growing towns they are often the first to be removed. When a road is widened or a new building comes up, the old neem or banyan that gave shade for decades is cut down in a single afternoon. We rarely stop to count what is lost. A large tree cools the air around it, holds the soil together during heavy rain and gives shelter to birds, squirrels and countless insects. It also gives people a place to rest, to meet and to talk. In many villages the most important decisions were once taken under a big tree in the centre of the settlement. Studies in several cities have shown that streets lined with trees can be a few degrees cooler in summer than streets without them. This matters more every year as summers become hotter. Trees also absorb dust and some of the harmful gases released by vehicles, so they help the people who live near busy roads. Planting a sapling is easy, but caring for it is not. Many saplings planted with great ceremony on special days dry up within a few weeks because nobody waters them. A better plan is for each family, school or office to adopt a few trees and look after them for at least three years, until they can survive on their own. Local bodies can help by choosing native species that suit the soil and climate, and by protecting young trees with simple guards. When development is planned with care, old trees can often be saved by changing the line of a road or the shape of a building. A town that values its trees is a town that values the health and comfort of its people.' },

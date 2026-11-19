@@ -1,7 +1,8 @@
 // Learning access (docs/ADMIN-PHASE-2.md §9): one lesson or arcade game opened or closed for one
 // customer, whatever their plan says. Console-only endpoints.
 //
-//   GET  /api/console/access                   access.view    list: q, state (active, ended), kind, effect, page
+//   GET  /api/console/access                   access.view    list: q, state (active, ended), kind, effect, page; with q, also
+//                                                             the customers whose name or email matches (to add an exception)
 //   POST /api/console/customers/:id/access     access.manage  { kind: 'lesson' | 'game', target, effect: 'allow' | 'deny', days | null, reason }
 //   POST /api/console/access/:id/end           access.manage  { reason? }
 //
@@ -71,7 +72,19 @@ export async function getAccess(request, env) {
     DB.prepare(`SELECT COUNT(*) AS n FROM access_overrides a JOIN users u ON u.id = a.user_id ${countWhere}`).bind(...count.args),
   ]);
   const items = rows.results.map((a) => ({ ...accessView(a, now), customer: { id: a.user_id, fullName: a.full_name, email: a.email } }));
-  return json(paged(items, page, total.results[0].n));
+  // a search is often for a customer, to give them an exception: list the people it matches too (problem log #7)
+  const term = (q.get('q') || '').trim().slice(0, 80);
+  let customers = null;
+  if (term.length >= 2) {
+    const t = like(term.toLowerCase());
+    customers = (await DB.prepare(`SELECT u.id, u.full_name, u.email,
+                                          (SELECT COUNT(*) FROM access_overrides a WHERE a.user_id = u.id AND a.ended_at IS NULL
+                                              AND (a.expires_at IS NULL OR a.expires_at > ?2)) AS in_force
+                                     FROM users u WHERE lower(u.email) LIKE ?1 ESCAPE '\\' OR lower(u.full_name) LIKE ?1 ESCAPE '\\'
+                                    ORDER BY CASE WHEN lower(u.email) = ?3 THEN 0 ELSE 1 END, u.email LIMIT 6`)
+      .bind(t, now, term.toLowerCase()).all()).results.map((u) => ({ id: u.id, fullName: u.full_name, email: u.email, inForce: u.in_force }));
+  }
+  return json({ ...paged(items, page, total.results[0].n), customers });
 }
 
 /* ---------- adding and ending ---------- */
