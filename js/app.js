@@ -2716,4 +2716,13 @@ document.addEventListener('visibilitychange', () => {
   Plan.loadRules();   // the last known rules at once, the current ones when the server answers
   renderHome();
   initAccount(); // async: signs you back in and loads your account's progress, if there is a server
+  openArcadeFromHash();
 })();
+/* /arcade on the site lands here as /app#arcade: open the arcade at once. The #arcade leaves the
+   address bar so a reload shows the trainer's home as usual. */
+function openArcadeFromHash(){
+  if(location.hash !== '#arcade') return;
+  history.replaceState(null, '', location.pathname + location.search);
+  openFunMode();
+}
+window.addEventListener('hashchange', openArcadeFromHash);

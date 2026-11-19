@@ -21,7 +21,7 @@ export default `
         <div class="field"><label for="cEmail">Email</label><input id="cEmail" name="email" type="email" autocomplete="email" maxlength="254" required><div class="err"></div></div>
       </div>
       <div class="field"><label for="cTopic">Topic</label>
-        <select id="cTopic" name="topic"><option value="general">General question</option><option value="billing">Payment, invoice or refund</option><option value="technical">Something isn't working</option><option value="feedback">Feedback or an idea</option></select>
+        <select id="cTopic" name="topic"><option value="general">General question</option><option value="institutes">For institutes: labs, batches and certificates</option><option value="billing">Payment, invoice or refund</option><option value="technical">Something isn't working</option><option value="feedback">Feedback or an idea</option></select>
         <div class="err"></div></div>
       <div class="field"><label for="cMsg">Message</label><textarea id="cMsg" name="message" maxlength="5000" required></textarea>
         <div class="hint">For payments, please include your order or invoice number.</div><div class="err"></div></div>

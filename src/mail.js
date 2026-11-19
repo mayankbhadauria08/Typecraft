@@ -366,7 +366,7 @@ export async function unsubscribe(request, env) {
 }
 
 /* ---------- contact form ---------- */
-const TOPICS = ['general', 'billing', 'technical', 'account', 'feedback', 'other'];
+const TOPICS = ['general', 'institutes', 'billing', 'technical', 'account', 'feedback', 'other'];
 
 export async function contact(request, env, ctx) {
   const body = await readJson(request, 32 * 1024);

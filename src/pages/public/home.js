@@ -40,12 +40,12 @@ export default `
 <section class="hero">
   <div class="container hero-grid">
     <div class="hero-copy">
-      <span class="eyebrow">Touch typing course · made in India</span>
+      <span class="eyebrow">Touch typing + exam practice · made in India</span>
       <h1>Type without looking. <em>Calmly</em> first, then fast.</h1>
-      <p class="lede">TypeCraft teaches touch typing one key at a time: <b>78 short lessons</b> from the home row to full speed, a coach that notices which keys you miss, and an arcade for when you've earned a break.</p>
+      <p class="lede">TypeCraft teaches touch typing one key at a time: <b>78 short lessons</b> from the home row to full speed, a coach that notices which keys you miss, and practice tests marked the way government typing exams mark them.</p>
       <div class="actions">
         <a class="btn btn-primary btn-lg" href="/signup" data-auth-swap>Start free ${icon('arrowRight')}</a>
-        <a class="btn btn-ghost btn-lg" href="/typing-test">Take a typing test</a>
+        <a class="btn btn-ghost btn-lg" href="/typing-test">Take a 1-minute test</a>
       </div>
       <div class="hero-facts"><span>${icon('check')}{{free.badge}}</span><span>${icon('check')}No card needed</span><span>${icon('check')}Progress saved to your account</span></div>
     </div>
@@ -62,6 +62,17 @@ export default `
       </div>
       <div class="demo-keys" aria-hidden="true"><i data-k="a">A</i><i data-k="s">S</i><i data-k="d">D</i><i data-k="f">F</i><i data-k=" ">␣</i><i data-k="j">J</i><i data-k="k">K</i><i data-k="l">L</i><i data-k=";">;</i></div>
       <div class="demo-foot"><span id="demoStatus">Typing by itself…</span><button type="button" id="demoTry">Try it yourself</button></div>
+    </div>
+  </div>
+</section>
+
+<section class="paths-band" aria-labelledby="paths-h">
+  <div class="container">
+    <h2 id="paths-h" class="paths-h">Where are you starting?</h2>
+    <div class="paths">
+      <a class="path" href="/signup"><span class="card-icon">${icon('keyboard')}</span><span class="path-text"><b>I look at the keys</b><small>Start the course on the home row. {{free.badge}}.</small></span>${icon('arrowRight')}</a>
+      <a class="path" href="/typing-test"><span class="card-icon">${icon('bolt')}</span><span class="path-text"><b>I want to type faster</b><small>Take a 1-minute test, then drill the keys that slow you.</small></span>${icon('arrowRight')}</a>
+      <a class="path" href="/exam-practice"><span class="card-icon brass">${icon('certificate')}</span><span class="path-text"><b>I have a typing exam</b><small>SSC, DEST and CPCT-style tests, marked like the real ones.</small></span>${icon('arrowRight')}</a>
     </div>
   </div>
 </section>
@@ -108,6 +119,7 @@ export default `
     <div class="games">
       ${GAMES.map(([t, d, trains, ic]) => `<div class="game"><span class="gi">${icon(ic)}</span><h3>${t}</h3><p>${d}</p><div class="trains">trains: ${trains}</div></div>`).join('')}
     </div>
+    <div class="actions" style="margin-top:24px"><a class="btn btn-brass" href="/arcade">${icon('gamepad')}Play the arcade</a></div>
   </div>
 </section>
 
