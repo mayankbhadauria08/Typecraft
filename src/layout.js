@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '4';
+export const ASSET_VERSION = '5';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -18,7 +18,6 @@ export function scriptJson(data) {
 
 const BRAND_MARK = '<svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><rect class="bm-base" x="3" y="7" width="34" height="30" rx="8"/><rect class="bm-top" x="3" y="3" width="34" height="29" rx="8"/><path class="bm-glyph" d="M12.5 11.5h15v4.2h-5.3V25h-4.4v-9.3h-5.3z"/></svg>';
 const brand = (href = '/') => `<a class="brand" href="${href}" aria-label="TypeCraft home">${BRAND_MARK}<span>type<em>craft</em></span></a>`;
-const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='3' y='7' width='34' height='30' rx='8' fill='%23177a6c'/%3E%3Crect x='3' y='3' width='34' height='29' rx='8' fill='%2345cdb6'/%3E%3Cpath d='M12.5 11.5h15v4.2h-5.3V25h-4.4v-9.3h-5.3z' fill='%230c1615'/%3E%3C/svg%3E";
 const FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap';
 // same theme as the app: typingMasterSettings.bg 'paper' (or the old 'light' theme) = light, before anything is drawn
 const THEME_SCRIPT = "try{var s=JSON.parse(localStorage.getItem('typingMasterSettings')||'{}');if(s.bg==='paper'||(!s.bg&&localStorage.getItem('typingMasterTheme')==='light'))document.documentElement.setAttribute('data-theme','light')}catch(e){}";
@@ -102,12 +101,20 @@ function userMenu(ctx, withTheme) {
     <a role="menuitem" href="/account/settings">${icon('settings')}<span>Account settings</span></a>
     ${admin}
     ${withTheme ? '<button type="button" role="menuitem" data-theme-toggle="menu" aria-pressed="false"><span>Switch theme</span></button>' : ''}
+    <button type="button" role="menuitem" data-install hidden>${icon('download')}<span>Install the app</span></button>
     <hr>
     <button type="button" role="menuitem" data-signout>${icon('logout')}<span>Sign out</span></button>
   </div>
 </details>`;
 }
 const themeButton = '<button type="button" class="icon-btn" data-theme-toggle aria-pressed="false"><span class="sr-only">Switch theme</span></button>';
+/* Pages you type on (meta.needsKeyboard): on a phone or tablet with no keyboard, a note offers to send the link to
+   your computer (CSS shows it only on touch-only screens; site.js wires the buttons). */
+const KEYBOARD_NOTE = `<div class="container"><div class="kb-note" data-kb-note role="note">
+  <span class="card-icon brass" aria-hidden="true">${icon('keyboard')}</span>
+  <div class="kb-text"><strong>Typing practice needs a keyboard.</strong><span>TypeCraft is made for a computer. Send this link to yourself and open it there.</span></div>
+  <div class="kb-actions"><button type="button" class="btn btn-primary btn-sm" data-share-link>${icon('send')}Send link</button><button type="button" class="btn btn-ghost btn-sm" data-kb-dismiss>I have a keyboard</button></div>
+</div></div>`;
 
 function navGroup(ctx, label, items) {
   const here = items.some(([href]) => current(ctx.path, href));
@@ -156,7 +163,7 @@ function siteFooter(ctx) {
   return `<footer class="site-foot"><div class="container">
   <div class="foot-grid">
     <div class="foot-brand">${brand('/')}<p class="muted">A calm, thorough typing course: 78 lessons, a coach that finds your weak keys, and an arcade to practise in. Made in India.</p></div>
-    <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a></nav>
+    <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/get-the-app">Get the app</a></nav>
     <nav aria-label="Company"><h2 class="foot-h">Company</h2><a href="/about">About</a><a href="/contact">Contact</a><a href="/faq">FAQ</a></nav>
     <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a></nav>
   </div>
@@ -191,7 +198,7 @@ function layoutBody(layout, ctx, body) {
     case 'admin':
       return shellLayout(ctx, body, ADMIN_NAV, 'Admin');
     default:
-      return `${siteHeader(ctx)}<main id="main" class="site-main" tabindex="-1">${body}</main>${siteFooter(ctx)}`;
+      return `${siteHeader(ctx)}<main id="main" class="site-main" tabindex="-1">${ctx.needsKeyboard ? KEYBOARD_NOTE : ''}${body}</main>${siteFooter(ctx)}`;
   }
 }
 
@@ -202,6 +209,7 @@ function layoutBody(layout, ctx, body) {
 export function renderPage(page, ctx, body) {
   const meta = page.meta || {};
   const layout = meta.layout || 'site';
+  ctx.needsKeyboard = !!meta.needsKeyboard;
   const title = meta.fullTitle || `${meta.title} · TypeCraft`;
   const description = meta.description || 'Learn to touch type with TypeCraft: 78 lessons, a coach that finds your weak keys and an arcade.';
   const canonical = ctx.siteUrl + (ctx.canonicalPath || ctx.path);
@@ -227,13 +235,18 @@ ${robots}<link rel="canonical" href="${esc(canonical)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(canonical)}">
 <meta property="og:image" content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TypeCraft: type without looking. Calmly first, then fast.">
 <meta property="og:locale" content="en_IN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(meta.ogTitle || title)}">
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image" content="${esc(image)}">
 <meta name="theme-color" content="#070b0a">
-<link rel="icon" type="image/svg+xml" href="${FAVICON}">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONTS}">
