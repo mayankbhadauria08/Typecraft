@@ -48,12 +48,12 @@ export const LAYERS = [
   {
     key: 'infra', label: 'Infrastructure', hint: 'Maintain and protect',
     modules: [
-      { key: 'administrators', label: 'Administrators', icon: 'user', phase: 5 },
+      { key: 'administrators', label: 'Administrators', icon: 'user', path: '/administrators', permission: 'roles.view' },
       { key: 'roles', label: 'Roles and permissions', icon: 'shield', path: '/roles', permission: 'roles.view' },
-      { key: 'activity-logs', label: 'Activity logs', icon: 'history', phase: 5 },
+      { key: 'activity-logs', label: 'Activity logs', icon: 'history', path: '/activity-logs', permission: 'audit.view' },
       { key: 'system-health', label: 'System health', icon: 'bolt', path: '/system-health', permission: 'health.view' },
       { key: 'integrations', label: 'Integrations', icon: 'globe', path: '/integrations', permission: 'integrations.view' },
-      { key: 'security', label: 'Security', icon: 'lock', phase: 5 },
+      { key: 'security', label: 'Security', icon: 'lock', path: '/security', permission: 'security.view' },
       { key: 'settings', label: 'Settings', icon: 'settings', path: '/settings', permission: 'settings.view' },
     ],
   },

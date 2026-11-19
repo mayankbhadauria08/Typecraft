@@ -168,7 +168,7 @@ test('every cron run is recorded part by part; nightly adds the learner totals a
   const ten = JSON.parse(runs[0].parts), night = JSON.parse(runs[1].parts);
   assert.deepEqual(Object.keys(ten), ['clean-up', 'payments', 'email', 'institute reminders', 'institute payments', 'institute Monday email', 'console (campaigns, old sign-ins)']);
   assert.ok(Object.values(ten).every((v) => v === 'ok'), JSON.stringify(ten));
-  assert.deepEqual(Object.keys(night).slice(-2), ['learner totals', 'job record']);
+  assert.deepEqual(Object.keys(night).slice(-3), ['learner totals', 'privacy clean-up', 'job record']);
   assert.ok(runs.every((r) => r.ok === 1 && r.failed === 0 && r.finished_at && r.ms >= 0));
   assert.ok(!Object.keys(ten).some((k) => /^part \d+$/.test(k)), 'every part has a name');
 

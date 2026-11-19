@@ -1,7 +1,8 @@
 import { sellerBlock } from './legal-common.js';
 
 // its own date: exam practice and certificate checks were added on this day (docs/EXAM-MODES.md); the same day,
-// Cloudflare Web Analytics and Resend were named (problem log #9)
+// Cloudflare Web Analytics and Resend were named (problem log #9), and §5 got the exact keeping periods that the
+// nightly privacy clean-up applies (src/retention.js, docs/ADMIN-PHASE-5.md §12)
 const UPDATED = '19 November 2026';
 
 export const meta = {
@@ -27,7 +28,7 @@ export default `
       <li><b>Institutes</b>: if you join an institute's batch with its code, which institute and batch, when you joined and left, and that you confirmed you are 18 or older. If you help run an institute, your role there and the invitations you sent or received.</li>
       <li><b>Payments</b>: the plan, amount, status, dates and the payment reference from Razorpay. Card numbers, UPI PINs and bank logins go directly to Razorpay and never reach us.</li>
       <li><b>Messages</b>: what you send through the contact form or by email, and a record of the emails we send you (type, time, delivery status).</li>
-      <li><b>Security data</b>: your IP address and browser type, used to limit repeated sign-in attempts and to tell you about sign-ins from a new device.</li>
+      <li><b>Security data</b>: your IP address and browser type, used to limit repeated sign-in attempts, to tell you about sign-ins from a new device, and in our record of changes made by our staff.</li>
       <li><b>Visit counts</b>: on the public website, Cloudflare Web Analytics records each page view: the page, the site that sent you, your browser and device type, your country and how fast the page loaded. It is used only to count visits and find slow pages, not to build a profile of you.</li>
     </ul>
     <h2>2. Why we use it</h2>
@@ -52,7 +53,14 @@ export default `
     <h2>4. Cookies and local storage</h2>
     <p>We use one essential cookie to keep you signed in. Your browser also keeps your settings (theme, sound) and, for offline use, a copy of unsent progress in local storage. There are no advertising or analytics cookies: the visit counter uses none.</p>
     <h2>5. How long we keep it</h2>
-    <p>Account and learning data are kept until you delete your account. Payment records and invoices are kept for as long as Indian tax and accounting law requires, even after an account is deleted. Security logs are kept for a short period and then removed.</p>
+    <p>Account and learning data are kept until you delete your account. Payment records and invoices are kept for as long as Indian tax and accounting law requires, even after an account is deleted.</p>
+    <ul>
+      <li><b>IP addresses</b> in our records (sign-in limits, staff activity, contact messages) are removed after 90 days. Counters that limit repeated sign-in attempts are deleted after a day.</li>
+      <li><b>The browsers you sign in from</b> are remembered for one year after you last use them, so we can tell you about a sign-in from a new device.</li>
+      <li><b>Records of the emails we send you</b> (type, time, delivery status) are kept for one year.</li>
+      <li><b>Sign-in and confirmation codes</b> are deleted a day after they are sent; links in password-reset and confirmation emails stop working after a short time and are deleted a week later.</li>
+      <li><b>Messages you send us</b> are kept so we can help you if you write again. Write to us and we will delete them.</li>
+    </ul>
     <h2>6. Your rights</h2>
     <p>Under the Digital Personal Data Protection Act, 2023 you can ask to see, correct or erase your personal data, and you can withdraw consent. You can export your learning data and delete your account yourself from Account settings, or write to us. If you are under 18, please use TypeCraft with the consent of a parent or guardian.</p>
     <h2>7. Security</h2>

@@ -122,7 +122,7 @@ function rolesBody() {
 <tbody id="staffBody">${skeletonRows(2, 4)}</tbody>
 </table>
 </div>
-<p class="hint" id="staffHint">Super Admins are the emails in the OWNER_EMAILS setting in Cloudflare. To give someone the Admin or Support role today, open their profile under <a href="/admin/users" target="_blank" rel="noopener">Users in the current admin</a>. Managing administrators moves into this console in Phase 5.</p>
+<p class="hint" id="staffHint">Super Admins are the emails in the OWNER_EMAILS setting in Cloudflare. To give someone the Admin or Support role, or take it away, use <a href="${CONSOLE_BASE}/administrators">Administrators</a>.</p>
 </section>`;
 }
 

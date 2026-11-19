@@ -4,8 +4,8 @@ The new admin dashboard, built in six phases beside the current `/admin` pages. 
 map for whoever works on it next: what exists, how sign-in and permissions work, how to add a
 module, and what has to happen before it replaces the current admin.
 
-Status: **Phases 1 to 4 of 6 are built, and Phase 5 is in progress** (foundation; core operations;
-learning operations; business growth; infrastructure). It lives at `/console`. The current `/admin`
+Status: **Phases 1 to 5 of 6 are built** (foundation; core operations; learning operations; business
+growth; infrastructure). It lives at `/console`. The current `/admin`
 keeps working unchanged until the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
 `docs/ADMIN-PHASE-3.md`, `docs/ADMIN-PHASE-4.md`, `docs/ADMIN-PHASE-5.md`.
 
@@ -15,7 +15,7 @@ keeps working unchanged until the cutover in §9. Work orders, endpoints and rul
 | 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access, the search box | built |
 | 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | built (docs/ADMIN-PHASE-3.md, docs/UNLOCK-RULES.md) |
 | 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | built in three parts: 4a Support and Business reports, 4b Email campaigns and Notifications, 4c Coupons and Promotions (docs/ADMIN-PHASE-4.md) |
-| 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | in two parts: 5a Settings, Integrations, System health (built), 5b Administrators, Activity logs, Security (docs/ADMIN-PHASE-5.md) |
+| 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | built in two parts: 5a Settings, Integrations, System health; 5b Administrators, Activity logs, Security (docs/ADMIN-PHASE-5.md) |
 | 6 | Optimisation, full test pass, cutover, delivery report | not started |
 
 ## 1. What the audit found (Phase 1)
@@ -51,7 +51,7 @@ a link.
 1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access, Institutes (docs/INSTITUTES.md §7)
 2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth** (docs/ADMIN-PHASE-4.md): Coupons, Promotions, Email campaigns, Support, Notifications, Business reports (all built)
-4. **Infrastructure** (docs/ADMIN-PHASE-5.md): Administrators, Roles and permissions (built), Activity logs, System health (built), Integrations (built), Security, Settings (built)
+4. **Infrastructure** (docs/ADMIN-PHASE-5.md): Administrators, Roles and permissions, Activity logs, System health, Integrations, Security, Settings (all built)
 
 ## 3. Sign-in and sessions
 
@@ -231,7 +231,7 @@ nothing else depends on it.
 
 ## 9. Cutover (when the console replaces `/admin`)
 
-Not before Phases 2–5 cover everything the current admin does.
+Phases 2–5 now cover everything the current admin does (since Phase 5b); the cutover is Phase 6.
 
 1. `CONSOLE_BASE` in `src/console/config.js` becomes `/admin`; remove the admin pages from
    `src/pages/admin/`, `site/js/admin-*.js` and the registry in `src/site.js`.
@@ -268,4 +268,5 @@ The other test files still pass unchanged apart from two expectations that follo
 defaults (an Admin cannot change settings or refund until allowed).
 Phase 4: `console-support`, `console-campaigns`, `console-coupons`, `console-institutes`.
 Phase 5a: `tests/console-system.test.mjs` (settings, integrations, system health, the job record and
-its alerts, email previews; docs/ADMIN-PHASE-5.md §8).
+its alerts, email previews; docs/ADMIN-PHASE-5.md §8). Phase 5b: `tests/console-security.test.mjs`
+(administrators, activity logs, security, the privacy clean-up; §14).

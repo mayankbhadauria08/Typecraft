@@ -1,13 +1,67 @@
-// The console's Infrastructure pages from Phase 5a: Settings, Integrations, System health, and the email
-// templates (listed under Email campaigns). Frames only; each page's script in site/console/ fills them.
-// docs/ADMIN-PHASE-5.md.
+// The console's Infrastructure pages (Phase 5): Administrators, Activity logs, Security, Settings, Integrations,
+// System health, and the email templates (listed under Email campaigns). Frames only; each page's script in
+// site/console/ fills them. docs/ADMIN-PHASE-5.md.
 import { esc } from '../layout.js';
 import { icon } from './icons.js';
 import { CONSOLE_BASE } from './config.js';
-import { lines, section } from './page-kit.js';
+import { lines, section, listFrame, select, dayField, downloadButton, skeletonRows } from './page-kit.js';
 
 const tools = (id) => `<div class="block-actions" id="${id}Tools"></div>`;
 const tiles = (id, n) => `<div class="tiles" id="${id}">${Array.from({ length: n }, () => '<div class="tile"><span class="skeleton"></span><span class="skeleton skeleton-wide"></span></div>').join('')}</div>`;
+
+/* ---------- Administrators ---------- */
+function administratorsBody(me) {
+  const manage = me.permissions.includes('admins.manage');
+  return `<div class="page-head page-head-row">
+<div><h1>Administrators</h1>
+<p class="page-sub">Everyone who can use this admin console, and their role. What each role can do is set under <a href="${esc(CONSOLE_BASE)}/roles">Roles and permissions</a>.</p></div>
+${manage ? `<button type="button" class="btn btn-primary" id="addAdmin" disabled>${icon('plus')}<span>Add an administrator</span></button>` : ''}
+</div>
+<div id="adminNote"></div>
+<div class="table-panel">
+<table class="list fold" id="adminList" aria-busy="true">
+<thead><tr><th scope="col">Person</th><th scope="col" class="col-fit">Role</th><th scope="col" class="col-wide">Added</th><th scope="col" class="col-wide">Last admin sign-in</th><th scope="col" class="col-fit"><span class="vh">Actions</span></th></tr></thead>
+<tbody id="adminBody">${skeletonRows(3, 5)}</tbody>
+</table>
+</div>
+<p class="hint">Administrators are TypeCraft accounts: the person signs up on the site first, then a Super Admin adds them here. Super Admins are the emails in the OWNER_EMAILS setting in Cloudflare and are changed there. Each person gets an email when their role changes.</p>`;
+}
+
+/* ---------- Activity logs ---------- */
+function activityBody(me) {
+  return listFrame({
+    title: 'Activity logs',
+    sub: 'Who changed what, and when: every change made in the admin, sign-ins to it, and payments confirmed by Razorpay. Newest first. IP addresses are kept for 90 days.',
+    action: downloadButton(),
+    label: 'Find activity',
+    search: { label: 'Search the activity log', placeholder: "A customer's email, or an action" },
+    filters: [
+      select('kind', 'Kind', [['', 'Everything']]),
+      select('actor', 'Who', [['', 'Anyone']]),
+      dayField('from', 'From'),
+      dayField('to', 'To'),
+    ].join('\n'),
+    heads: [['When', 'col-wide'], ['What'], ['Who', 'col-wide'], ['', 'col-fit']],
+  });
+}
+
+/* ---------- Security ---------- */
+function securityBody() {
+  return `<div class="page-head page-head-row">
+<div><h1>Security</h1>
+<p class="page-sub">Who is signed in to the admin console, failed admin sign-ins, accounts locked after wrong passwords, and a few checks.</p></div>
+</div>
+<div id="securityNote"></div>
+<div id="dash" aria-busy="true">
+${section('checks', 'Checks', lines(4))}
+${section('sessions', 'Signed in to the admin console now', lines(3), '<div class="block-actions" id="sessionsTools"></div>')}
+<div class="dash-cols dash-cols-even">
+${section('locks', 'Sign-in locks', lines(2))}
+${section('failed', 'Failed admin sign-ins (7 days)', lines(2))}
+</div>
+${section('rules', 'How sign-in is protected', lines(4))}
+</div>`;
+}
 
 /* ---------- Settings ---------- */
 function settingsBody() {
@@ -90,6 +144,12 @@ function templatesBody() {
 }
 
 export const INFRA_PAGES = [
+  { key: 'administrators', path: '/administrators', title: 'Administrators', crumbs: ['Infrastructure', 'Administrators'],
+    permission: 'roles.view', body: administratorsBody, scripts: ['administrators.js'] },
+  { key: 'activity-logs', path: '/activity-logs', title: 'Activity logs', crumbs: ['Infrastructure', 'Activity logs'],
+    permission: 'audit.view', body: activityBody, scripts: ['activity.js'] },
+  { key: 'security', path: '/security', title: 'Security', crumbs: ['Infrastructure', 'Security'],
+    permission: 'security.view', body: securityBody, scripts: ['security.js'] },
   { key: 'settings', path: '/settings', title: 'Settings', crumbs: ['Infrastructure', 'Settings'],
     permission: 'settings.view', body: settingsBody, scripts: ['settings.js'] },
   { key: 'integrations', path: '/integrations', title: 'Integrations', crumbs: ['Infrastructure', 'Integrations'],

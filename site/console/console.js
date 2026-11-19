@@ -154,7 +154,7 @@
       var value = false;
       var dialog = el('dialog', { class: 'dialog', 'aria-label': label });
       function close(v) { value = v; dialog.close(); }
-      append(dialog, build(close));
+      append(dialog, build(close, dialog));
       dialog.addEventListener('click', function (e) { if (e.target === dialog) close(false); });
       dialog.addEventListener('close', function () { dialog.remove(); resolve(value); });
       doc.body.appendChild(dialog);
@@ -172,6 +172,16 @@
         ])
       ];
     }, opts.title);
+  }
+  /** A dialog that only shows something, with a Close button: AC.show(title, nodes, { wide }). */
+  function showDialog(title, kids, opts) {
+    return openDialog(function (close, dialog) {
+      if (opts && opts.wide) dialog.classList.add('dialog-wide');
+      return [
+        el('div', { class: 'dialog-body' }, [el('h2', { text: title })].concat(kids || [])),
+        el('div', { class: 'dialog-actions' }, el('button', { type: 'button', class: 'btn btn-quiet', text: 'Close', autofocus: true, on: { click: function () { close(true); } } }))
+      ];
+    }, title);
   }
   /** Asks for the password again (sensitive actions). → true once the server has accepted it. */
   function confirmPassword() {
@@ -768,7 +778,7 @@
     can: function (permission) { return !!(me && me.permissions.indexOf(permission) !== -1); },
     el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, localInput: localInput, fromLocalInput: fromLocalInput, badge: badge, toast: toast, busy: busy,
     status: status, method: method, source: source,
-    confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, listPage: listPage, options: options,
+    confirm: confirmDialog, formDialog: formDialog, show: showDialog, api: api, download: download, list: list, listPage: listPage, options: options,
     record: record, head: head, notice: notice, fill: fill, quiet: quiet, table: table, fact: fact, facts: facts, idFact: idFact, copyButton: copyButton, timeline: timeline,
     ApiError: ApiError
   };
