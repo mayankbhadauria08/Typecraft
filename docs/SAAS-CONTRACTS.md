@@ -263,6 +263,10 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - Teaching (`src/institute-teaching.js`, docs/INSTITUTES.md §12), staff of the batch: `GET /api/institutes/:id/batches/:bid/teaching`,
   `PUT …/target` `{ wpm, accuracy, dueDay?, note? }` or `{ clear: true }`, `POST …/assignments` `{ kind, ref, dueDay, note? }`,
   `POST …/assignments/:aid/remove`, `PUT …/leaderboard` `{ on }`; signed in: `GET /api/me/batches`.
+- Students by email (`src/institute-mail.js`, docs/INSTITUTES.md §13), admins: `POST /api/institutes/:id/batches/:bid/invites`
+  `{ students: [{ name, email }] }` (≤ 25) → `{ sent, skipped: [{ email, why }] }`; `GET …/invites`. Nightly reminders.
+- Email templates `student_invite` `{ name, instituteName*, batchName*, batchCode*, joinPath* }`, `institute_reminder`
+  `{ name, instituteName*, kind*, seats, seatsUsed, lastDay, days, link }`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

@@ -230,6 +230,68 @@
     load();
   }
 
+  /* Invite students by email (admins): a spreadsheet (CSV) or a pasted list of names and emails.
+     POST …/invites { students: [{ name, email }] } in parts of 25 → { sent, skipped: [{ email, why }] }; GET …/invites. */
+  const EMAIL = /[^\s@,;"<>]+@[^\s@,;"<>]+\.[^\s@,;"<>]+/;
+  /** Names and emails from CSV or pasted text: an email anywhere on a line, the other words are the name. */
+  function parseList(text) {
+    const out = [];
+    for (const line of String(text || '').split(/\r?\n/)) {
+      const m = line.match(EMAIL);
+      if (!m) continue;
+      const name = line.replace(m[0], ' ').replace(/["']/g, ' ').split(/[,;\t]/).map((x) => x.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+      if (/^e-?mail$/i.test(m[0])) continue;
+      out.push({ email: m[0].toLowerCase(), name: /^(name|email|e-mail|student)$/i.test(name) ? '' : name.slice(0, 80) });
+    }
+    return out;
+  }
+  async function invitations(d) {
+    const sec = $('#ib-inv-sec');
+    if (d.batch.archived) { sec.hidden = true; return; }
+    const list = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/invites`);
+    if (!list.ok) { sec.hidden = true; return; } // before database update 0010
+    sec.hidden = false;
+    const file = h('input', { type: 'file', id: 'ibInvFile', accept: '.csv,text/csv,text/plain' });
+    const text = h('textarea', { id: 'ibInvText', rows: 5, placeholder: 'Asha Verma, asha@example.com\nRavi Kumar, ravi@example.com' });
+    const status = h('p', { class: 'muted', 'aria-live': 'polite' });
+    const btn = h('button', { type: 'submit', class: 'btn btn-primary btn-sm', text: 'Send invitations' });
+    file.addEventListener('change', () => { const f = file.files && file.files[0]; if (!f) return; f.text().then((t) => { text.value = t; status.textContent = `${parseList(t).length} email addresses found.`; }); });
+    const form = h('form', { class: 'ins-form', novalidate: true },
+      h('p', { class: 'muted', text: d.batch.joinCode ? 'Each student gets an email with this batch’s code and link. Choose a spreadsheet saved as CSV, or paste names and emails, one student a line.'
+        : 'Switch joining on first: the email carries the batch code.' }),
+      h('div', { class: 'field' }, h('label', { for: 'ibInvFile', text: 'Spreadsheet (CSV)' }), file),
+      h('div', { class: 'field' }, h('label', { for: 'ibInvText', text: 'Or paste' }), text),
+      h('div', { class: 'actions' }, btn), status);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const people = parseList(text.value);
+      if (!people.length) { status.textContent = 'No email addresses found.'; return; }
+      const ok = await K.confirm({ title: `Email ${people.length} student${people.length === 1 ? '' : 's'}?`, text: 'Each gets this batch’s code and link. People already in your institute, or already invited to this batch, are skipped.', confirmLabel: 'Send' });
+      if (!ok) return;
+      K.busy(btn, true);
+      let sent = 0; const skipped = [];
+      for (let i = 0; i < people.length; i += 25) {
+        status.textContent = `Sending ${Math.min(i + 25, people.length)} of ${people.length}…`;
+        const res = await K.api('POST', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/invites`, { students: people.slice(i, i + 25) });
+        if (!res.ok) { K.busy(btn, false); status.textContent = K.errMsg(res); return; }
+        sent += res.data.sent.length; skipped.push(...res.data.skipped);
+      }
+      K.busy(btn, false);
+      text.value = ''; file.value = '';
+      await invitations(data);
+      // the section is drawn again: say what happened where it stays
+      K.mount($('#ib-inv'), K.alert(skipped.length ? 'info' : 'ok', `Invited ${sent}.` + (skipped.length ? ` Skipped ${skipped.length}: ${skipped.slice(0, 5).map((x) => `${x.email} (${x.why})`).join('; ')}${skipped.length > 5 ? '…' : ''}` : '')),
+        ...Array.from($('#ib-inv').childNodes));
+    });
+    const rows = list.data.invites;
+    K.mount($('#ib-inv'), h('div', { class: 'ins-settings' }, form,
+      rows.length ? K.table([
+        { label: 'Invited', value: (r) => [h('strong', { text: r.name || r.email }), r.name ? h('div', { class: 'muted', text: r.email }) : null] },
+        { label: 'On', value: (r) => K.date(r.invitedAt) },
+        { label: '', value: (r) => (r.joined ? K.badge('active', 'Joined') : r.emailStatus === 'sent' ? K.badge('created', 'Email sent') : K.badge('pending', 'Email not sent')) },
+      ], rows, { caption: 'Students invited by email' }) : null));
+  }
+
   async function settings(d) {
     const b = d.batch;
     $('#ib-admin-sec').hidden = false;
@@ -291,7 +353,7 @@
     students();
     teaching();
     certificates();
-    if (data.role === 'admin') settings(data); else $('#ib-admin-sec').hidden = true;
+    if (data.role === 'admin') { settings(data); invitations(data); } else { $('#ib-admin-sec').hidden = true; $('#ib-inv-sec').hidden = true; }
   }
   load();
 })();
