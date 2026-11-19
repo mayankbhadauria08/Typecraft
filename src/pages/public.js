@@ -1,6 +1,7 @@
 // Public pages registry (owner: the site part; docs/SAAS-CONTRACTS.md §8).
 // Each entry: { meta, body, scripts, load?(env, ctx) → { data?, … }, jsonld?(ctx, loaded) }.
 import { loadPackages } from '../site-data.js';
+import { remember, PUBLIC_DATA_TTL } from '../memo.js';
 import { ALL_FAQ, FAQ, faqJsonLd } from './public/faq-data.js';
 import home, { meta as homeMeta } from './public/home.js';
 import about, { meta as aboutMeta } from './public/about.js';
@@ -49,7 +50,7 @@ function productLd(ctx, loaded) {
     ...(offers.length ? { offers } : {}),
   };
 }
-const packagesData = async (env) => { const d = await loadPackages(env); return d ? { data: d } : {}; };
+const packagesData = async (env) => { const d = await remember(env, 'packages', PUBLIC_DATA_TTL, () => loadPackages(env)); return d ? { data: d } : {}; };
 
 export const PAGES = [
   { meta: homeMeta, body: home, scripts: ['/site/js/home.js'], load: packagesData, jsonld: (ctx) => [organization(ctx), website(ctx)] },

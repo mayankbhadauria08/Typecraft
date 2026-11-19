@@ -115,11 +115,13 @@ test('the header: Learn and Resources groups, an Arcade button, Exam practice an
   assert.match(faq.text, /<a href="\/faq" aria-current="page">/);
 });
 
-test('signed in: Open trainer is back, with the streak and XP chip and Upgrade on the Free plan', async () => {
+test('signed in: the streak and XP chip and Upgrade on the Free plan; the trainer is in Learn and the account menu', async () => {
   const cookie = await signup('header@example.com', '203.0.113.88');
   const page = await get('/pricing', { cookie });
   const head = page.text.slice(page.text.indexOf('<header class="site-head'), page.text.indexOf('</header>'));
-  assert.match(head, /<a class="btn btn-primary btn-sm hide-xs" href="\/app">.*Open trainer<\/a>/);
+  assert.doesNotMatch(head, /class="btn btn-primary btn-sm[^"]*" href="\/app"/, 'no Open trainer button in the top bar');
+  assert.match(head, /<a href="\/app"><span class="ng-ic"/, 'Learn → Course and trainer');
+  assert.match(head, /<a role="menuitem" href="\/app">.*<span>Open the trainer<\/span><\/a>/, 'account menu');
   assert.match(head, /class="streak-chip"[^>]*aria-label="0 days streak, 0 XP"/);
   assert.match(head, /href="\/account\/plans">Upgrade<\/a>/);
   assert.match(head, /<a href="\/arcade" class="nav-arcade">/);
@@ -155,4 +157,39 @@ test('the streak chip counts a streak only while it is current (India time)', as
 test('the contact form takes an institutes topic', async () => {
   const page = await get('/contact');
   assert.match(page.text, /<option value="institutes">/);
+});
+
+test('slow-changing public data is remembered for a minute and forgotten after an admin change', async () => {
+  const { remember, forgetAll } = await import('../src/memo.js');
+  const env = { DB: {} };
+  let reads = 0;
+  const load = async () => { reads += 1; return { n: reads }; };
+  assert.deepEqual(await remember(env, 'k', 60000, load), { n: 1 });
+  assert.deepEqual(await remember(env, 'k', 60000, load), { n: 1 }, 'second read comes from memory');
+  forgetAll(env);
+  assert.deepEqual(await remember(env, 'k', 60000, load), { n: 2 }, 'read again after forgetAll');
+  await remember(env, 'e', 0, load);
+  assert.deepEqual(await remember(env, 'e', 0, load), { n: 4 }, 'expired at once: read again');
+  let nulls = 0;
+  await remember(env, 'n', 60000, async () => { nulls += 1; return null; });
+  await remember(env, 'n', 60000, async () => { nulls += 1; return null; });
+  assert.equal(nulls, 2, 'a null read is not kept');
+  assert.deepEqual(await remember({ DB: {} }, 'k', 60000, load), { n: 5 }, 'kept per database');
+});
+
+test('a seller change in admin shows on the legal pages straight away', async () => {
+  assert.doesNotMatch((await get('/privacy')).text, /Asha Verma/);   // read once: now remembered
+  const res = await worker.fetch(new Request(BASE + '/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: BASE, 'CF-Connecting-IP': '10.9.0.3' },
+    body: JSON.stringify({ email: 'owner@example.com', password: pw }),
+  }), env, ctx);
+  assert.equal(res.status, 200);
+  const owner = res.headers.get('set-cookie').split(';')[0];
+  const call = (method, body) => worker.fetch(new Request(BASE + '/api/admin/settings', {
+    method, headers: { 'Content-Type': 'application/json', Origin: BASE, Cookie: owner }, body: body && JSON.stringify(body),
+  }), env, ctx);
+  const { settings } = await (await call('GET')).json();
+  const put = await call('PUT', { ...settings, seller: { ...settings.seller, legalName: 'Asha Verma (sole proprietor)' } });
+  assert.equal(put.status, 200, await put.clone().text());
+  assert.match((await get('/privacy')).text, /Asha Verma \(sole proprietor\)/);
 });
