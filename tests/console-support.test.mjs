@@ -227,18 +227,18 @@ test('reports download as CSV, with totals only; Support cannot see them by defa
 });
 
 test('the pages: frames with no inline code; a role without the permission gets the 403 page', async () => {
-  for (const p of ['/console/support', `/console/support/${m1}`, '/console/reports']) {
+  for (const p of ['/admin/support', `/admin/support/${m1}`, '/admin/reports']) {
     const r = await owner('GET', p);
     assert.equal(r.status, 200, p);
     assertNoInlineCode(r.text);
   }
-  assert.match((await owner('GET', '/console/reports')).text, /id="netChart"/);
-  assert.match((await owner('GET', `/console/support/${m1}`)).text, /id="replyForm"/);
-  assert.equal((await support('GET', '/console/reports')).status, 403);
+  assert.match((await owner('GET', '/admin/reports')).text, /id="netChart"/);
+  assert.match((await owner('GET', `/admin/support/${m1}`)).text, /id="replyForm"/);
+  assert.equal((await support('GET', '/admin/reports')).status, 403);
   // the sidebar links both modules for those who may open them
-  const home = await owner('GET', '/console');
-  assert.match(home.text, /href="\/console\/support"/);
-  assert.match(home.text, /href="\/console\/reports"/);
+  const home = await owner('GET', '/admin');
+  assert.match(home.text, /href="\/admin\/support"/);
+  assert.match(home.text, /href="\/admin\/reports"/);
 });
 
 test('before database update 0014 the support pages say so plainly', async () => {

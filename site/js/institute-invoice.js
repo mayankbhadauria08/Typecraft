@@ -16,7 +16,7 @@
     let res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/invoices/${encodeURIComponent(number)}`);
     if (!res.ok && (res.status === 401 || res.status === 404 || res.status === 403)) {
       const staff = await K.api('GET', `/api/console/institutes/${encodeURIComponent(id)}/invoices/${encodeURIComponent(number)}`);
-      if (staff.ok) { res = staff; $('#inv-back').href = `/console/institutes/${encodeURIComponent(id)}`; $('#inv-back').textContent = '← Console'; }
+      if (staff.ok) { res = staff; $('#inv-back').href = `/admin/institutes/${encodeURIComponent(id)}`; $('#inv-back').textContent = '← Console'; }
     } else if (res.ok) $('#inv-back').href = `/institute/${encodeURIComponent(id)}`;
     if (!res.ok) {
       K.mount($('#inv-seller'));

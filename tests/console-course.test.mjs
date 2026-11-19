@@ -156,20 +156,20 @@ test('a stored version that no longer checks loses only the broken parts', async
 });
 
 test('course pages: frames by permission, the course loaded on the lesson page, no inline code', async () => {
-  for (const [path, needs] of [['/console/course', 'id="draftsBody"'], ['/console/course/lessons', 'id="listBody"'], ['/console/course/lessons/l7', 'id="lessonForm"'],
-    ['/console/course/levels', 'Speed targets decide crowns'], ['/console/course/modules', 'id="listBody"']]) {
-    const r = await support(path === '/console/course/lessons/l7' ? 'GET' : 'GET', path);
+  for (const [path, needs] of [['/admin/course', 'id="draftsBody"'], ['/admin/course/lessons', 'id="listBody"'], ['/admin/course/lessons/l7', 'id="lessonForm"'],
+    ['/admin/course/levels', 'Speed targets decide crowns'], ['/admin/course/modules', 'id="listBody"']]) {
+    const r = await support(path === '/admin/course/lessons/l7' ? 'GET' : 'GET', path);
     assert.equal(r.status, 200, path); assertNoInlineCode(r.text); assert.ok(r.text.includes(needs), path);
   }
-  const lesson = (await support('GET', '/console/course/lessons/l7')).text;
+  const lesson = (await support('GET', '/admin/course/lessons/l7')).text;
   assert.ok(lesson.includes('src="/js/course.js?v=') && lesson.includes('src="/shared/course-edits.js?v='));
   assert.ok(lesson.includes('data-readonly') && !lesson.includes('id="saveDraft"'), 'Support reads, does not edit');
-  assert.ok((await admin('GET', '/console/course/lessons/l7')).text.includes('id="saveDraft"'));
-  assert.ok(!(await admin('GET', '/console/course')).text.includes('id="publishForm"'), 'Admin does not publish by default');
-  assert.ok((await owner('GET', '/console/course')).text.includes('id="publishForm"'));
-  assert.ok((await support('GET', '/console/course/lessons/l999')).text.includes('id="recMissing"'), 'an unknown lesson: the page says so once its data does not come');
-  const menu = (await support('GET', '/console')).text;
-  for (const p of ['/console/course"', '/console/course/lessons"', '/console/course/levels"', '/console/course/modules"']) assert.ok(menu.includes(`href="${p}`), p);
+  assert.ok((await admin('GET', '/admin/course/lessons/l7')).text.includes('id="saveDraft"'));
+  assert.ok(!(await admin('GET', '/admin/course')).text.includes('id="publishForm"'), 'Admin does not publish by default');
+  assert.ok((await owner('GET', '/admin/course')).text.includes('id="publishForm"'));
+  assert.ok((await support('GET', '/admin/course/lessons/l999')).text.includes('id="recMissing"'), 'an unknown lesson: the page says so once its data does not come');
+  const menu = (await support('GET', '/admin')).text;
+  for (const p of ['/admin/course"', '/admin/course/lessons"', '/admin/course/levels"', '/admin/course/modules"']) assert.ok(menu.includes(`href="${p}`), p);
 });
 
 /* ---------------- step 3: practice packs ---------------- */
@@ -228,11 +228,11 @@ test('practice packs: edit, hide, add and reorder through drafts; learners get t
 });
 
 test('exercise pages: frames by permission, no inline code', async () => {
-  const list = await support('GET', '/console/course/exercises');
+  const list = await support('GET', '/admin/course/exercises');
   assert.equal(list.status, 200); assertNoInlineCode(list.text);
   assert.ok(!list.text.includes('id="newPack"'));
-  assert.ok((await admin('GET', '/console/course/exercises')).text.includes('id="newPack"'));
-  const one = await support('GET', '/console/course/exercises/numbers');
+  assert.ok((await admin('GET', '/admin/course/exercises')).text.includes('id="newPack"'));
+  const one = await support('GET', '/admin/course/exercises/numbers');
   assert.equal(one.status, 200); assertNoInlineCode(one.text); assert.ok(one.text.includes('data-readonly'));
-  assert.ok((await admin('GET', '/console/course/exercises/numbers')).text.includes('id="saveDraft"'));
+  assert.ok((await admin('GET', '/admin/course/exercises/numbers')).text.includes('id="saveDraft"'));
 });

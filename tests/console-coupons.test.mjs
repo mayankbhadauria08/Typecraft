@@ -235,16 +235,16 @@ test('a sale: lower prices everywhere, the better of sale and coupon applies, ne
 
 /* ---------------- pages ---------------- */
 test('pages: frames without inline code; Support sees coupons and sales but not the buttons to make them', async () => {
-  for (const p of ['/console/coupons', `/console/coupons/${DIWALI}`, '/console/promotions']) {
+  for (const p of ['/admin/coupons', `/admin/coupons/${DIWALI}`, '/admin/promotions']) {
     const r = await owner('GET', p);
     assert.equal(r.status, 200, p);
     assertNoInlineCode(r.text);
   }
-  assert.ok((await owner('GET', '/console/coupons')).text.includes('id="newCoupon"'));
-  assert.ok(!(await support('GET', '/console/coupons')).text.includes('id="newCoupon"'));
-  assert.ok((await owner('GET', '/console/promotions')).text.includes('id="newPromotion"'));
-  assert.ok(!(await support('GET', '/console/promotions')).text.includes('id="newPromotion"'));
-  assert.match((await owner('GET', '/console/promotions')).text, /<a class="nav-item is-current" href="\/console\/promotions" aria-current="page">/);
+  assert.ok((await owner('GET', '/admin/coupons')).text.includes('id="newCoupon"'));
+  assert.ok(!(await support('GET', '/admin/coupons')).text.includes('id="newCoupon"'));
+  assert.ok((await owner('GET', '/admin/promotions')).text.includes('id="newPromotion"'));
+  assert.ok(!(await support('GET', '/admin/promotions')).text.includes('id="newPromotion"'));
+  assert.match((await owner('GET', '/admin/promotions')).text, /<a class="nav-item is-current" href="\/admin\/promotions" aria-current="page">/);
   const checkout = await buyerA('GET', '/checkout?plan=pro');
   assert.equal(checkout.status, 200);
 });

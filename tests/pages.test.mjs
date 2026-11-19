@@ -1,4 +1,5 @@
-// Pages part: registries for the account, payment and admin pages (docs/SAAS-CONTRACTS.md §8, §11).
+// Pages part: registries for the account and payment pages (docs/SAAS-CONTRACTS.md §8, §11). The admin is the
+// console (src/console/, tests/console*.test.mjs) since Phase 6.
 // node --test tests/pages.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,12 +11,11 @@ import { makeEnv } from './server.mjs';
 import worker from '../src/index.js';
 import * as account from '../src/pages/account.js';
 import * as payment from '../src/pages/payment.js';
-import * as admin from '../src/pages/admin.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const REGISTRIES = { account: account.PAGES, payment: payment.PAGES, admin: admin.PAGES };
+const REGISTRIES = { account: account.PAGES, payment: payment.PAGES };
 const ALL = Object.values(REGISTRIES).flat();
-const LAYOUTS = new Set(['site', 'auth', 'account', 'admin', 'bare']);
+const LAYOUTS = new Set(['site', 'auth', 'account', 'bare']);
 
 // [path, access, layout] — the contract table rows owned by this part
 const EXPECTED = [
@@ -42,13 +42,6 @@ const EXPECTED = [
   ['/payment/success', 'user', 'account'],
   ['/payment/failure', 'user', 'account'],
   ['/payment/pending', 'user', 'account'],
-  ['/admin', 'admin', 'admin'],
-  ['/admin/users', 'admin', 'admin'],
-  ['/admin/packages', 'admin', 'admin'],
-  ['/admin/payments', 'admin', 'admin'],
-  ['/admin/revenue', 'admin', 'admin'],
-  ['/admin/emails', 'admin', 'admin'],
-  ['/admin/settings', 'admin', 'admin'],
 ];
 
 const scriptsOf = (p) => p.scripts.map((s) => ({ url: s, file: join(ROOT, s.replace(/^\//, '')) }));
@@ -64,7 +57,6 @@ test('every contract path exists exactly once with the right access, layout and 
     assert.equal(m.noindex, true, `${path} noindex`);
   }
   assert.equal(ALL.length, EXPECTED.length, 'no pages beyond the contract table');
-  for (const p of REGISTRIES.admin) assert.equal(p.meta.access, 'admin');
 });
 
 test('page entries have the module shape the site part expects', () => {
@@ -79,7 +71,7 @@ test('page entries have the module shape the site part expects', () => {
 });
 
 test('page modules export meta, body and a default body', async () => {
-  for (const dir of ['account', 'payment', 'admin']) {
+  for (const dir of ['account', 'payment']) {
     for (const p of REGISTRIES[dir]) {
       assert.ok(p.meta && p.meta.path.startsWith('/'), p.meta.path);
     }
@@ -157,11 +149,10 @@ test('payments: success is only shown on server status "paid", Razorpay checkout
   assert.ok(!kitAndPages.includes('checkout.razorpay.com'), 'Razorpay is not loaded by any page body');
 });
 
-test('admin money inputs convert rupees to paise', () => {
-  const src = readFileSync(join(ROOT, 'site/js/admin-packages.js'), 'utf8');
-  assert.match(src, /Math\.round\(Number\(f\.elements\.price\.value \|\| 0\) \* 100\)/);
-  const pay = readFileSync(join(ROOT, 'site/js/admin-payments.js'), 'utf8');
-  assert.match(pay, /Math\.round\(Number\(vals\.amount\) \* 100\)/);
+test('admin money inputs convert rupees to paise (the console: plan price, refund amount)', () => {
+  for (const f of ['site/console/package.js', 'site/console/payment.js']) {
+    assert.match(readFileSync(join(ROOT, f), 'utf8'), /Math\.round\(parseFloat\(t\) \* 100\)/, f);
+  }
 });
 
 /** Loads site/js/pages-kit.js in a tiny fake browser and returns TCK. */
@@ -188,11 +179,6 @@ test('checkout order statuses route to the right page; success only for orders t
 const SAMPLE = [
   [/\/api\/checkout\/orders\/\$\{[^}]+\}/, '/api/checkout/orders/ord_000000000000000000000000'],
   [/\/api\/me\/invoices\/\$\{[^}]+\}/, '/api/me/invoices/TC-2026-999999'],
-  [/\/api\/admin\/users\/\$\{[^}]+\}/, '/api/admin/users/no-such-user'],
-  [/\/api\/admin\/payments\/\$\{[^}]+\}/, '/api/admin/payments/ord_000000000000000000000000'],
-  [/\/api\/admin\/packages\/\$\{[^}]+\}/, '/api/admin/packages/no-such-package'],
-  [/\/api\/admin\/emails\/\$\{[^}]+\}/, '/api/admin/emails/em_none'],
-  [/\/api\/admin\/contact\/\$\{[^}]+\}/, '/api/admin/contact/msg_none'],
   [/\/api\/me\/certificates\/\$\{[^}]+\}/, '/api/me/certificates/ABCD-EFGH-JKLM'],
   [/\/api\/me\/institutes\/\$\{[^}]+\}/, '/api/me/institutes/mem_00000000000000000000'],
   [/\/api\/me\/institute-invites\/\$\{[^}]+\}\/\$\{[^}]+\}/, '/api/me/institute-invites/stf_00000000000000000000/accept'],

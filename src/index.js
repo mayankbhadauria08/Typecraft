@@ -6,14 +6,12 @@ import * as auth from './auth.js';
 import * as account from './account.js';
 import * as progress from './progress.js';
 import * as api from './api.js';
-import * as admin from './admin.js';
 import { rebuildAll } from './pipeline.js';
 import { runJobs, pruneJobRuns } from './jobs.js';
 import { retention } from './retention.js'; // the nightly privacy clean-up (docs/ADMIN-PHASE-5.md §12)
 // SaaS modules: each exports ROUTES ({'METHOD /path': handler}), PATTERNS ([method, regex, names, handler])
 // and optionally cron(env, ctx, kind). See docs/SAAS-CONTRACTS.md.
 import * as billing from './billing.js';
-import * as adminApi from './admin-api.js';
 import * as mail from './mail.js';
 import * as content from './content.js';
 import * as site from './site.js';
@@ -34,7 +32,7 @@ import * as consoleApi from './console/index.js'; // admin console: sign-in, rol
 // names for System health's job record (a module with a cron and no name here shows as "part N")
 const CRON_NAMES = new Map([[billing, 'payments'], [mail, 'email'], [instituteCheckout, 'institute payments'], [instituteMail, 'institute reminders'],
   [instituteWeekly, 'institute Monday email'], [consoleApi, 'console (campaigns, old sign-ins)']]);
-const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, notices, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, instituteCheckout, instituteTests, instituteWeekly, consoleApi];
+const MODULES = [billing, mail, content, learningRules, courseStore, exams, notices, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, instituteCheckout, instituteTests, instituteWeekly, consoleApi];
 
 /** Expired sign-ins, reset and confirmation links, and old rate-limit windows. */
 async function cleanUp(env) {
@@ -84,7 +82,6 @@ const CORE_ROUTES = {
   'POST /api/user/import': api.postImport,
   'GET /api/user/export': api.getExport,
   'POST /api/user/reset': api.postReset,
-  'GET /api/admin/health': admin.getHealth,
 };
 const ROUTES = Object.assign({}, CORE_ROUTES, ...MODULES.map((m) => m.ROUTES || {}));
 // routes with a parameter in the path

@@ -12,8 +12,7 @@ import { HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail,
 import { perRun } from './limits.js';
 import { uuid } from './crypto.js';
 import { getSession, requireSession, hitLimit, tooMany, emailEnabled } from './session.js';
-import { requirePermission } from './console/session.js';
-import { renderTemplate, TEMPLATE_NAMES } from './mail-templates.js';
+import { renderTemplate } from './mail-templates.js';
 import * as auth from './auth.js';
 import * as entitlements from './entitlements.js';
 
@@ -28,7 +27,6 @@ const STALE_MS = 15 * MIN;                       // a 'queued' row this old was 
 // how many emails one run sends: src/limits.js (small on Workers Free, where a run may call Resend at most 50 times)
 const RETRY_BATCH = 50;                          // the most failed emails retried per cron run (Workers Paid)
 export const ANNOUNCE_BATCH = 100;               // the most announcement emails sent per run (Workers Paid)
-const ANNOUNCE_MAX_AUDIENCE = 20000;
 
 /** Templates whose content is a secret (code or link): no retry, nothing secret in the log. */
 export const SENSITIVE = new Set(['otp_login', 'admin_otp', 'password_reset', 'verify_email']);
@@ -292,19 +290,6 @@ function runLater(ctx, promise) {
   return null;
 }
 
-export async function audit(env, actorId, action, target, detail, request) {
-  try {
-    await env.DB.prepare('INSERT INTO audit_logs (id, actor_id, action, target, detail, ip, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
-      .bind(uuid(), actorId || null, action, target || null, detail ? JSON.stringify(detail) : null, request ? clientIp(request) : null, nowIso()).run();
-  } catch (err) { console.error('audit log failed:', err && err.message); }
-}
-
-const PAGE_SIZE = 50;
-function pageOf(url) {
-  const p = parseInt(url.searchParams.get('page') || '1', 10);
-  return Number.isFinite(p) && p > 0 ? Math.min(p, 10000) : 1;
-}
-
 /* ---------- email preferences ---------- */
 const PREF_DEFAULTS = { announcements: true, testResults: false, loginAlerts: true };
 
@@ -481,7 +466,7 @@ export async function resendWebhook(request, env) {
   return json({ received: true });
 }
 
-/* ---------- admin: emails ---------- */
+/* ---------- the console's email log (src/console/campaigns-api.js) ---------- */
 export function publicLog(r) {
   return {
     id: r.id, userId: r.user_id, to: r.to_email, template: r.template, category: r.category, subject: r.subject,
@@ -491,131 +476,8 @@ export function publicLog(r) {
   };
 }
 
-export async function adminEmails(request, env) {
-  await requirePermission(env, request, 'emails.view');
-  const url = new URL(request.url);
-  const status = url.searchParams.get('status') || '';
-  const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 100);
-  const page = pageOf(url);
-  const where = [], args = [];
-  if (status) {
-    if (!['queued', 'sent', 'failed', 'bounced', 'delivered', 'cancelled'].includes(status)) throw fieldError({ status: 'Unknown status.' });
-    args.push(status); where.push(`status = ?${args.length}`);
-  }
-  if (q) {
-    args.push(`%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    where.push(`(to_email LIKE ?${args.length} ESCAPE '\\' OR template LIKE ?${args.length} ESCAPE '\\' OR subject LIKE ?${args.length} ESCAPE '\\')`);
-  }
-  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const total = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM email_logs ${w}`).bind(...args).first()).n;
-  const rows = (await env.DB.prepare(`SELECT * FROM email_logs ${w} ORDER BY created_at DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`).bind(...args).all()).results;
-  const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const stats = (await env.DB.prepare('SELECT status, COUNT(*) AS n FROM email_logs WHERE created_at >= ?1 GROUP BY status').bind(dayAgo).all()).results;
-  return json({
-    emails: rows.map(publicLog), page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)), total,
-    last24h: Object.fromEntries(stats.map((s) => [s.status, s.n])), templates: TEMPLATE_NAMES, configured: emailEnabled(env),
-  });
-}
-
-export async function adminRetryEmail(request, env, ctx, params) {
-  const { user } = await requirePermission(env, request, 'emails.retry');
-  const row = await env.DB.prepare('SELECT * FROM email_logs WHERE id = ?1').bind(params.id).first();
-  if (!row) throw new HttpError(404, 'not_found', 'That email was not found.');
-  if (SENSITIVE.has(row.template)) throw new HttpError(400, 'not_retryable', "Codes and links can't be sent again. Ask the person to request a new one.");
-  if (!['failed', 'bounced', 'cancelled'].includes(row.status)) throw new HttpError(400, 'not_retryable', 'Only failed, bounced or cancelled emails can be retried.');
-  if (!emailEnabled(env)) throw new HttpError(503, 'email_not_configured', "Email sending isn't set up for this site yet.");
-  const result = await resendRow(env, row, { manual: true });
-  await audit(env, user.id, 'email.retry', `email:${row.id}`, { template: row.template, result }, request);
-  const after = await env.DB.prepare('SELECT * FROM email_logs WHERE id = ?1').bind(row.id).first();
-  return json({ email: publicLog(after), result });
-}
-
 /** Sends a logged email again from its stored payload (the console's email log). */
 export const sendAgain = (env, row, opts) => resendRow(env, row, opts);
-
-/* ---------- admin: announcements ---------- */
-function audienceSql(audience) {
-  const active = "(s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > ?1))";
-  const paid = `EXISTS (SELECT 1 FROM user_subscriptions s WHERE s.user_id = u.id AND ${active})`;
-  const filter = audience === 'paid' ? `AND ${paid}` : audience === 'free' ? `AND NOT ${paid}` : '';
-  return `SELECT u.id, u.full_name, u.email FROM users u LEFT JOIN email_preferences p ON p.user_id = u.id
-           WHERE u.account_status = 'active' AND u.email_verified = 1 AND COALESCE(p.announcements, 1) = 1 ${filter}
-           ORDER BY u.created_at LIMIT ${ANNOUNCE_MAX_AUDIENCE}`;
-}
-
-export async function adminAnnouncement(request, env, ctx) {
-  const { user } = await requirePermission(env, request, 'emails.announce');
-  const body = await readJson(request, 64 * 1024);
-  const fields = {};
-  const subject = typeof body.subject === 'string' ? body.subject.trim().replace(/\s+/g, ' ') : '';
-  const text = typeof body.body === 'string' ? body.body.replace(/\r\n/g, '\n').trim() : '';
-  const audience = body.audience || 'all';
-  if (!subject) fields.subject = 'Write a subject.'; else if (subject.length > 150) fields.subject = 'Keep the subject under 150 characters.';
-  if (!text) fields.body = 'Write the message.'; else if (text.length > 20000) fields.body = 'Keep the message under 20,000 characters.';
-  if (!['all', 'paid', 'free'].includes(audience)) fields.audience = 'Choose all, paid or free.';
-  if (Object.keys(fields).length) throw fieldError(fields);
-  if (!emailEnabled(env)) throw new HttpError(503, 'email_not_configured', "Email sending isn't set up for this site yet.");
-
-  if (body.test === true) {
-    const r = await sendTemplate(env, ctx, { to: user.email, userId: user.id, template: 'announcement', data: { name: user.fullName, subject, body: text } });
-    return json({ test: true, status: r.status, to: user.email });
-  }
-  if (!(await hitLimit(env, `announce:${user.id}`, 5, 3600))) throw tooMany(60);
-  // With email campaigns switched on (migration 0015) an announcement is a campaign that starts now, so it
-  // keeps to the daily limit (docs/ADMIN-PHASE-4.md §4). Before that, the old way below.
-  try {
-    const { campaignFromAnnouncement } = await import('./console/campaigns-api.js');
-    const c = await campaignFromAnnouncement(env, ctx, user, { subject, body: text, audience });
-    await audit(env, user.id, 'announcement.send', `audience:${audience}`, { subject, recipients: c.total, campaign: c.id }, request);
-    return json({ queued: c.total, audience, campaignId: c.id, dailyCap: c.dailyCap,
-      message: `Queued for ${c.total} people as a campaign. Up to ${c.dailyCap} campaign emails are sent a day; follow it in the admin console under Email campaigns.` }, 202);
-  } catch (err) {
-    if (!/no such table/i.test(String(err && err.message))) throw err;
-  }
-  const recipients = (await env.DB.prepare(audienceSql(audience)).bind(...(audience === 'all' ? [] : [nowIso()])).all()).results;
-  const now = nowIso();
-  const stmts = recipients.map((r) => env.DB.prepare(
-    `INSERT INTO email_logs (id, user_id, to_email, template, category, subject, payload, status, provider, attempts, created_at, updated_at)
-     VALUES (?1, ?2, ?3, 'announcement', 'platform', ?4, ?5, 'queued', 'resend', 0, ?6, ?6)`
-  ).bind(`em_${uuid()}`, r.id, r.email, subject, JSON.stringify({ data: { name: r.full_name, subject, body: text } }), now));
-  for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
-  await audit(env, user.id, 'announcement.send', `audience:${audience}`, { subject, recipients: recipients.length }, request);
-  // the first batch goes now (after the response); the 10-minute cron sends the rest
-  const batch = perRun(env).announcements;
-  const first = processQueue(env, { cap: batch, onlyAnnouncements: true }).catch(() => {});
-  await runLater(ctx, first);
-  return json({ queued: recipients.length, audience, batchSize: batch, message: `Queued for ${recipients.length} people. Up to ${batch} are sent every 10 minutes.` }, 202);
-}
-
-/* ---------- admin: contact messages ---------- */
-export async function adminContact(request, env) {
-  await requirePermission(env, request, 'support.view');
-  const url = new URL(request.url);
-  const status = url.searchParams.get('status') || '';
-  const page = pageOf(url);
-  if (status && !['new', 'answered', 'closed'].includes(status)) throw fieldError({ status: 'Unknown status.' });
-  const w = status ? 'WHERE status = ?1' : '';
-  const args = status ? [status] : [];
-  const total = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM contact_messages ${w}`).bind(...args).first()).n;
-  const rows = (await env.DB.prepare(
-    `SELECT id, user_id, name, email, topic, message, priority, status, created_at FROM contact_messages ${w}
-      ORDER BY priority DESC, created_at DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`
-  ).bind(...args).all()).results;
-  return json({
-    messages: rows.map((r) => ({ id: r.id, userId: r.user_id, name: r.name, email: r.email, topic: r.topic, message: r.message, priority: !!r.priority, status: r.status, createdAt: r.created_at })),
-    page, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)), total,
-  });
-}
-
-export async function adminContactUpdate(request, env, ctx, params) {
-  const { user } = await requirePermission(env, request, 'support.manage');
-  const body = await readJson(request, 1024);
-  if (!['new', 'answered', 'closed'].includes(body.status)) throw fieldError({ status: 'Choose new, answered or closed.' });
-  const r = await env.DB.prepare('UPDATE contact_messages SET status = ?2 WHERE id = ?1').bind(params.id, body.status).run();
-  if (!r.meta || r.meta.changes !== 1) throw new HttpError(404, 'not_found', 'That message was not found.');
-  await audit(env, user.id, 'contact.status', `contact:${params.id}`, { status: body.status }, request);
-  return json({ id: params.id, status: body.status });
-}
 
 /* ---------- routes ---------- */
 export const ROUTES = {
@@ -628,12 +490,6 @@ export const ROUTES = {
   'GET /api/email/unsubscribe': unsubscribePage,
   'POST /api/email/unsubscribe': unsubscribe,
   'POST /api/webhooks/resend': resendWebhook,
-  'GET /api/admin/emails': adminEmails,
-  'POST /api/admin/announcements': adminAnnouncement,
-  'GET /api/admin/contact': adminContact,
 };
 
-export const PATTERNS = [
-  ['POST', /^\/api\/admin\/emails\/(em_[\w-]{1,60})\/retry$/, ['id'], adminRetryEmail],
-  ['POST', /^\/api\/admin\/contact\/(msg_[\w-]{1,60})$/, ['id'], adminContactUpdate],
-];
+export const PATTERNS = [];

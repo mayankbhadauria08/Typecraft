@@ -103,11 +103,12 @@ test('dashboard: what needs attention, only what the role may open, each with wh
 
   const items = (await dash(admin)).attention;
   const find = (text) => items.find((a) => a.text.includes(text));
-  assert.deepEqual(find('still not confirmed'), { count: 1, text: 'payment started over 15 minutes ago and still not confirmed', href: '/console/payments?status=pending', external: false });
-  assert.equal(find('on its way').count, 1); assert.equal(find('on its way').href, '/console/refunds?status=pending');
+  assert.deepEqual(find('still not confirmed'), { count: 1, text: 'payment started over 15 minutes ago and still not confirmed', href: '/admin/payments?status=pending' });
+  assert.equal(find('on its way').count, 1); assert.equal(find('on its way').href, '/admin/refunds?status=pending');
   assert.equal(find('refund that failed').count, 1);
   assert.equal(find('email that failed').count, 1, 'an email that failed only because sending is off is counted under services, not here');
-  assert.deepEqual([find('new message').count, find('new message').external], [1, true]);
+  assert.deepEqual([find('new message').count, find('new message').href], [1, '/admin/support?status=new']);
+  assert.equal(find('email that failed').href, '/admin/email-log?status=failed');
   const services = find('services not set up');
   assert.ok(services && /sending email/.test(services.text), 'Admin has settings.view');
   assert.ok(!(await dash(support)).attention.some((a) => a.text.includes('services')), 'Support does not');
@@ -118,13 +119,13 @@ test('dashboard: what needs attention, only what the role may open, each with wh
 });
 
 test('dashboard page: the frame by permission', async () => {
-  const page = await support('GET', '/console/dashboard');
+  const page = await support('GET', '/admin/dashboard');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/dashboard" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/dashboard" aria-current="page">/);
   assert.ok(page.text.includes('/site/console/charts.js?v=') && page.text.includes('/site/console/dashboard.js?v='));
   assert.ok(page.text.includes('Payments per day') && !page.text.includes('Money in per day'), 'no money headings without revenue.view');
-  assert.ok((await admin('GET', '/console/dashboard')).text.includes('Money in per day, after refunds'));
+  assert.ok((await admin('GET', '/admin/dashboard')).text.includes('Money in per day, after refunds'));
   for (const f of ['charts.js', 'dashboard.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
@@ -181,7 +182,7 @@ test('search: each part only with its permission; 60 a minute; the text is never
 });
 
 test('the search box is on every console page, above Home', async () => {
-  for (const p of ['/console', '/console/customers', '/console/dashboard']) {
+  for (const p of ['/admin', '/admin/customers', '/admin/dashboard']) {
     const page = await support('GET', p);
     assert.equal(page.status, 200);
     assertNoInlineCode(page.text);

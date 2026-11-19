@@ -29,7 +29,7 @@ const parse = (text, def) => { try { const v = JSON.parse(text); return v == nul
 const money = (paise) => `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 const siteUrl = (env) => String(env.SITE_URL || 'https://typecrafttyping.in').replace(/\/+$/, '');
 
-/* ---------------- shared helpers (also used by src/admin-api.js) ---------------- */
+/* ---------------- shared helpers (also used by the admin console) ---------------- */
 export async function getSetting(env, key, def = {}) {
   const row = await env.DB.prepare('SELECT value FROM platform_settings WHERE key = ?1').bind(key).first();
   return row ? parse(row.value, def) : def;

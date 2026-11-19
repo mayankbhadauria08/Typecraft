@@ -3,7 +3,6 @@
 // servePage(): every HTML page (public, auth, account, payment, admin), /app, robots.txt and
 // sitemap.xml; a Response, or null to let the static files answer (css, js, icons…).
 import { getSession } from './session.js';
-import * as admin from './admin.js';
 import { roleOf } from './roles.js';
 import { entitlementsFor } from './entitlements.js';
 import { liveNotices, pickNotices, dismissedFrom, viewerOf } from './notices.js';
@@ -12,7 +11,6 @@ import { PAGES as PUBLIC_PAGES } from './pages/public.js';
 import { PAGES as AUTH_PAGES } from './pages/auth.js';
 import { PAGES as ACCOUNT_PAGES } from './pages/account.js';
 import { PAGES as PAYMENT_PAGES } from './pages/payment.js';
-import { PAGES as ADMIN_PAGES } from './pages/admin.js';
 import { loadSettings } from './site-data.js';
 import { freeLessons } from './package-view.js';
 import { remember, PUBLIC_DATA_TTL } from './memo.js';
@@ -20,9 +18,9 @@ import '../shared/course-meta.js';
 import '../shared/lesson-access.js';
 import notFoundBody, { meta as notFoundMeta } from './pages/public/not-found.js';
 import { serveConsole, isConsolePath } from './console/router.js'; // the new admin console (docs/ADMIN-CONSOLE.md)
+import { CONSOLE_BASE } from './console/config.js';
 
 const APEX = 'typecrafttyping.in';
-const ADMIN_ROLES = ['owner', 'admin', 'support'];
 
 /* ---------- registry ---------- */
 function compile(list, defaults) {
@@ -45,7 +43,6 @@ function registry() {
     ...compile(AUTH_PAGES, { access: 'guest', layout: 'auth' }),
     ...compile(ACCOUNT_PAGES, { access: 'user', layout: 'account' }),
     ...compile(PAYMENT_PAGES, { access: 'user', layout: 'site' }),
-    ...compile(ADMIN_PAGES, { access: 'admin', layout: 'admin' }),
   ];
   return REGISTRY;
 }
@@ -222,12 +219,9 @@ export async function servePage(request, env, ctx) {
   if (path === '/app') return readOnly ? serveApp(request, env, url) : new Response('Method not allowed', { status: 405 });
   if (path === '/arcade') return readOnly ? serveArcade(request, env, url) : new Response('Method not allowed', { status: 405 });
 
-  // the owner page from before the multi-page site, until the admin registry provides /admin
-  const hasAdminHome = !!findPage('/admin');
-  if (path === '/admin.html' || path === '/admin/' || (path === '/admin' && !hasAdminHome)) {
-    if (!hasAdminHome) return admin.serveAdminPage(request, env);
-    return notFound(request, env, url);
-  }
+  // the admin console moved from /console to /admin (docs/ADMIN-CONSOLE.md §9): old bookmarks and links still work
+  if (path === '/admin.html') return redirect(url, CONSOLE_BASE, 301);
+  if (path === '/console' || path.startsWith('/console/')) return redirect(url, CONSOLE_BASE + path.slice('/console'.length) + url.search, 301);
 
   if (path.length > 1 && path.endsWith('/') && !path.includes('.')) return redirect(url, path.replace(/\/+$/, '') + url.search, 301);
 
@@ -257,10 +251,6 @@ export async function servePage(request, env, ctx) {
   if (access === 'user' && !session) return redirect(url, '/login?next=' + encodeURIComponent(path + url.search));
   const who = await whoFor(env, session);
   who.notices = pickNotices(await noticesP, viewerOf(who.user, who.entitlements), 'site', dismissedFrom(request));
-  if (access === 'admin') {
-    const allowed = page.meta.roles || ADMIN_ROLES;
-    if (!who.role || !allowed.includes(who.role)) return notFound(request, env, url, session, who);
-  }
   const personal = access !== 'public' || !!session;
   const html = await render(env, url, page, params, who);
   const headers = pageHeaders(url, { nonce: html.nonce, cache: personal ? NO_STORE : PUBLIC_CACHE, extra: { 'Set-Cookie': renew } });
@@ -274,7 +264,7 @@ async function render(env, url, page, params, who, status) {
     env, url, params, siteUrl: base, path: url.pathname, nonce,
     canonicalPath: page.meta.canonical || (page.re ? url.pathname : page.meta.path),
     user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null, notices: who.notices || [], institute: !!who.institute,
-    noindex: !!page.meta.noindex || page.meta.access === 'user' || page.meta.access === 'admin' || isWorkersDev(url) || !!status,
+    noindex: !!page.meta.noindex || page.meta.access === 'user' || isWorkersDev(url) || !!status,
     jsonld: [],
   };
   let loaded = {};
@@ -325,7 +315,7 @@ async function serveArcade(request, env, url) {
 /* ---------- robots.txt and sitemap.xml ---------- */
 export function robotsTxt(env) {
   return ['User-agent: *', 'Allow: /',
-    'Disallow: /account', 'Disallow: /admin', 'Disallow: /checkout', 'Disallow: /payment', 'Disallow: /app', 'Disallow: /api',
+    'Disallow: /account', 'Disallow: /checkout', 'Disallow: /payment', 'Disallow: /app', 'Disallow: /api',
     'Disallow: /dashboard', 'Disallow: /reset-password', 'Disallow: /verify-email', 'Disallow: /verify-otp',
     '', `Sitemap: ${siteUrl(env)}/sitemap.xml`, ''].join('\n');
 }

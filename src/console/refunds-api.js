@@ -5,7 +5,7 @@
 //                                                            { paymentId, amountPaise | null, reasonCode, reasonText, planAction }
 //   POST /api/console/refunds/:id/recheck  payments.recheck  ask Razorpay about a refund that is still on its way
 //
-// Money moves only through refund() in src/billing.js, the path the current admin uses too.
+// Money moves only through refund() in src/billing.js.
 import { HttpError, json, readJson, fieldError, clientIp } from '../http.js';
 import { hitLimit, emailEnabled } from '../session.js';
 import * as rzp from '../razorpay.js';

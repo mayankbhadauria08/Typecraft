@@ -7,6 +7,7 @@
 import { nowIso } from './http.js';
 import { hitLimit, emailEnabled } from './session.js';
 import { sendTemplate } from './mail.js';
+import { CONSOLE_BASE } from './console/config.js';
 
 export const SCHEDULES = {
   '*/10 * * * *': { label: 'Every 10 minutes', everyMin: 10 },
@@ -60,7 +61,7 @@ export async function alertOwners(env, ctx, schedule, failures) {
     for (const email of to) {
       await sendTemplate(env, null, { to: email, template: 'system_alert', category: 'security',
         data: { title: `A background job failed: ${(SCHEDULES[schedule] || { label: schedule }).label.toLowerCase()}`,
-          failures, link: '/console/system-health' } });
+          failures, link: `${CONSOLE_BASE}/system-health` } });
     }
     return true;
   } catch (err) {

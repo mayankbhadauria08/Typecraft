@@ -66,7 +66,7 @@ Browsers only ever see the projection, without reasons or staff ids: `{ closed: 
 open: { levels, lessons }, progress, placement }`, from `GET /api/learning-rules` (public, cached
 60 seconds; the app without an account uses it) and as `rules` in `GET /api/me/entitlements`.
 
-## 4. The console: Unlock conditions (`/console/unlock`)
+## 4. The console: Unlock conditions (`/admin/unlock`)
 
 | Endpoint | Permission | Does |
 | --- | --- | --- |

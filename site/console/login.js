@@ -4,7 +4,7 @@
   'use strict';
   var doc = document;
   var byId = function (id) { return doc.getElementById(id); };
-  var base = doc.documentElement.getAttribute('data-console-base') || '/console';
+  var base = doc.documentElement.getAttribute('data-console-base') || '/admin';
   var next = byId('main').getAttribute('data-next') || base;
 
   var stepPassword = byId('stepPassword'), stepCode = byId('stepCode');

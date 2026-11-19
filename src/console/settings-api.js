@@ -5,7 +5,7 @@
 //   PUT /api/console/settings/:section   settings.manage  seller | support | payments | signups; the section's fields.
 //                                                         Asks for the password again (settings.manage is sensitive).
 //
-// Checking and saving live in src/settings.js, shared with the old /admin. A save clears the remembered seller
+// Checking and saving live in src/settings.js. A save clears the remembered seller
 // details on this Worker straight away (src/index.js forgets after every console change).
 import { HttpError, json, readJson, clientIp } from '../http.js';
 import { readSettings, checkSection, saveSettings, sellerIncomplete, paymentsMode, SECTIONS } from '../settings.js';

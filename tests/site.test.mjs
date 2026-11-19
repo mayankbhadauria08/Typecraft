@@ -46,7 +46,7 @@ test('the CSP lets Cloudflare Web Analytics load and report on site pages, not i
     assert.match(directive('script-src'), /https:\/\/static\.cloudflareinsights\.com/, `${path}: beacon script allowed`);
     assert.match(directive('connect-src'), /https:\/\/cloudflareinsights\.com/, `${path}: beacon report allowed`);
   }
-  const consoleCsp = (await get('/console/login')).headers.get('content-security-policy') || '';
+  const consoleCsp = (await get('/admin/login')).headers.get('content-security-policy') || '';
   assert.doesNotMatch(consoleCsp, /cloudflareinsights/, 'the admin console stays unmeasured');
 });
 
@@ -61,7 +61,7 @@ test('host rules: www goes to the apex; workers.dev pages are noindex', async ()
 
 test('robots.txt and sitemap.xml', async () => {
   const robots = await get('/robots.txt');
-  assert.match(robots.text, /Disallow: \/admin/);
+  assert.doesNotMatch(robots.text, /\/admin|\/console/, 'the admin is not advertised (its pages send noindex)');
   assert.match(robots.text, /Sitemap: https:\/\/typecrafttyping\.in\/sitemap\.xml/);
   const map = await get('/sitemap.xml');
   assert.match(map.text, /<loc>https:\/\/typecrafttyping\.in\/pricing<\/loc>/);
@@ -82,12 +82,19 @@ test('access: guest, user and admin pages', async () => {
   assert.equal(loginIn.status, 302);
   assert.equal(new URL(loginIn.headers.get('location')).pathname, '/dashboard');
   assert.match((await get('/dashboard', { cookie: learner })).headers.get('cache-control'), /no-store/);
-  assert.equal((await get('/admin', { cookie: learner })).status, 404);
-  assert.equal((await get('/admin/payments', { cookie: learner })).status, 404);
-
   const owner = await signup('owner@example.com', '10.9.0.2');
-  assert.equal((await get('/admin', { cookie: owner })).status, 200);
-  assert.equal((await get('/admin/payments', { cookie: owner })).status, 200);
+  // /admin is the admin console (src/console/): its own sign-in, whatever the site session
+  for (const cookie of [learner, owner, undefined]) {
+    for (const p of ['/admin', '/admin/payments']) {
+      const r = await get(p, { cookie });
+      assert.equal(r.status, 302, p); assert.equal(new URL(r.headers.get('location')).pathname, '/admin/login', p);
+    }
+  }
+  // the console's old address, and the page from before the multi-page site, lead there
+  const moved = await get('/console/payments?status=failed');
+  assert.equal(moved.status, 301); assert.equal(moved.headers.get('location'), BASE + '/admin/payments?status=failed');
+  assert.equal(new URL((await get('/console')).headers.get('location')).pathname, '/admin');
+  assert.equal(new URL((await get('/admin.html')).headers.get('location')).pathname, '/admin');
 });
 
 test('old addresses and unknown pages', async () => {
@@ -179,17 +186,19 @@ test('slow-changing public data is remembered for a minute and forgotten after a
 
 test('a seller change in admin shows on the legal pages straight away', async () => {
   assert.doesNotMatch((await get('/privacy')).text, /Asha Verma/);   // read once: now remembered
-  const res = await worker.fetch(new Request(BASE + '/api/auth/login', {
+  // signed in to the admin console (no emailed code: email is not set up here)
+  const res = await worker.fetch(new Request(BASE + '/api/admin/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: BASE, 'CF-Connecting-IP': '10.9.0.3' },
     body: JSON.stringify({ email: 'owner@example.com', password: pw }),
   }), env, ctx);
-  assert.equal(res.status, 200);
-  const owner = res.headers.get('set-cookie').split(';')[0];
-  const call = (method, body) => worker.fetch(new Request(BASE + '/api/admin/settings', {
+  assert.equal(res.status, 200, await res.clone().text());
+  const owner = res.headers.getSetCookie().map((c) => c.split(';')[0]).filter((c) => !/=$/.test(c)).join('; ');
+  const call = (method, path, body) => worker.fetch(new Request(BASE + path, {
     method, headers: { 'Content-Type': 'application/json', Origin: BASE, Cookie: owner }, body: body && JSON.stringify(body),
   }), env, ctx);
-  const { settings } = await (await call('GET')).json();
-  const put = await call('PUT', { ...settings, seller: { ...settings.seller, legalName: 'Asha Verma (sole proprietor)' } });
+  const data = await (await call('GET', '/api/console/settings')).json();
+  const seller = Object.fromEntries(Object.entries(data.settings.seller).filter(([k]) => k !== 'updatedAt'));
+  const put = await call('PUT', '/api/console/settings/seller', { ...seller, legalName: 'Asha Verma (sole proprietor)' });
   assert.equal(put.status, 200, await put.clone().text());
   assert.match((await get('/privacy')).text, /Asha Verma \(sole proprietor\)/);
 });

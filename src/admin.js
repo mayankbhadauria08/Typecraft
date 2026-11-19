@@ -1,20 +1,13 @@
-// Owner-only health numbers and the admin page. Owners are the emails listed in
-// the OWNER_EMAILS secret (comma-separated). Everyone else gets "not found".
-import { HttpError, json, nowIso } from './http.js';
-import { getSession, requireSession } from './session.js';
+// Who is a Super Admin (OWNER_EMAILS) and the saving-health numbers that System health shows
+// (src/console/system-api.js). The old owner page and its /api/admin/health went with the Phase 6 cutover.
+import { nowIso } from './http.js';
 
 export function isOwner(env, email) {
   const list = String(env.OWNER_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   return !!email && list.includes(String(email).toLowerCase());
 }
 
-export async function getHealth(request, env) {
-  const { user } = await requireSession(env, request);
-  if (!isOwner(env, user.email)) throw new HttpError(404, 'not_found', 'Not found.');
-  return json(await healthNumbers(env));
-}
-
-/** The saving-health numbers (also part of GET /api/admin/overview). */
+/** The saving-health numbers (System health in the console). */
 export async function healthNumbers(env) {
   const DB = env.DB;
   const now = nowIso();
@@ -49,20 +42,4 @@ export async function healthNumbers(env) {
     feedback7d: one(8).n,
     lastRebuild: last ? { at: last.started_at, finishedAt: last.finished_at, users: last.users, differences: last.differences, errors: last.errors, byTable: lastDiffs } : null,
   };
-}
-
-/** /admin and /admin.html: the page itself, only for owners. */
-export async function serveAdminPage(request, env) {
-  const notFound = () => new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
-  if (!env.DB) return notFound();
-  let s = null;
-  try { s = await getSession(env, request); } catch { s = null; }
-  if (!s || !isOwner(env, s.user.email)) return notFound();
-  const url = new URL(request.url);
-  let res = await env.ASSETS.fetch(new Request(new URL('/admin', url), { headers: request.headers }));
-  if (res.status >= 300 && res.status < 400) res = await env.ASSETS.fetch(new Request(new URL('/admin.html', url), { headers: request.headers }));
-  const headers = new Headers(res.headers);
-  headers.set('Cache-Control', 'no-store');
-  headers.set('X-Robots-Tag', 'noindex');
-  return new Response(res.body, { status: res.status, headers });
 }

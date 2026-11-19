@@ -19,7 +19,7 @@ Decisions behind it (November 2026):
 - Administrators are existing TypeCraft accounts only (5b).
 - IP addresses in the activity and security logs are kept 90 days; email records 1 year (5b).
 
-## 1. Settings (`/console/settings`)
+## 1. Settings (`/admin/settings`)
 
 Business details (printed on every new invoice and on the legal pages), the support contact (reply-to
 of every email, shown on the contact page), and two switches:
@@ -46,7 +46,7 @@ what. Saving the same values again changes nothing and logs nothing.
 Checking and saving are shared with the old `/admin/settings` page (`src/settings.js`), so both always
 agree. The campaign daily limit is shown here and changed under Email campaigns (Super Admin).
 
-## 2. Integrations (`/console/integrations`)
+## 2. Integrations (`/admin/integrations`)
 
 One card per outside service: Razorpay, Resend, the emailed codes (`SESSION_SECRET`), Cloudflare (plan
 and restore points), Cloudflare Web Analytics, Google Fonts and Google Search Console. Each says what
@@ -103,7 +103,7 @@ System health and Integrations show the Paid limits.
 
 Before migration 0017 the jobs run exactly as before, and nothing is recorded (tested).
 
-## 4. System health (`/console/system-health`)
+## 4. System health (`/admin/system-health`)
 
 Problems first, worst first, then:
 
@@ -129,13 +129,13 @@ Razorpay messages; the database 80% and 95% full; practice that couldn't be save
 
 Read-only. Each load is a few batched queries. Permission `health.view`: Super Admin and Admin.
 
-## 5. Email templates (`/console/email-templates`, under Email campaigns)
+## 5. Email templates (`/admin/email-templates`, under Email campaigns)
 
 Every email TypeCraft sends (27), grouped (sign-in and security, payments and plans, learning and news,
 support, institutes, for the team), each filled with sample data from `src/mail-samples.js`, with its
 subject, who gets it and when, and a plain-text view. Nothing is sent.
 
-The email is shown in a frame from `/console/email-preview/:name`, because an email needs inline styles
+The email is shown in a frame from `/admin/email-preview/:name`, because an email needs inline styles
 and the console allows none. That address has its own policy: no scripts at all, sandboxed, and only
 the console may frame it (`frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`). The console's own
 policy gains only `frame-src 'self'`. Permission `emails.view`.
@@ -170,7 +170,7 @@ email and payment warnings, the state before migration 0017, the migration list 
 and the email previews with their headers. `tests/email.test.mjs` checks every template has preview
 data and a description.
 
-## 9. Administrators (`/console/administrators`)
+## 9. Administrators (`/admin/administrators`)
 
 Everyone who can use the console: the Super Admins from `OWNER_EMAILS` (marked "From OWNER_EMAILS", changed
 only in Cloudflare) and everyone given Admin or Support here, with when and by whom, their last admin sign-in,
@@ -186,7 +186,7 @@ and whether they are signed in now.
 Viewing needs `roles.view` (Super Admin, Admin). Changing needs `admins.manage`: Super Admins only, and it
 asks for the password again. This replaces role changes in the old `/admin/users`.
 
-## 10. Activity logs (`/console/activity-logs`)
+## 10. Activity logs (`/admin/activity-logs`)
 
 Every entry in `audit_logs`: changes made in the admin (old and new), console sign-ins and failed sign-ins,
 payments confirmed by Razorpay, discounts used at checkout. Newest first, 25 a page, with plain-words labels
@@ -204,7 +204,7 @@ and the download itself is logged (`audit.export`), because it holds IP addresse
 
 Permission `audit.view`: Super Admin and Admin.
 
-## 11. Security (`/console/security`)
+## 11. Security (`/admin/security`)
 
 - **Checks**: emailed code at admin sign-in on; `SESSION_SECRET` installed; every `OWNER_EMAILS` address has
   an account (one that doesn't could be claimed by whoever signs up with it first); every administrator has

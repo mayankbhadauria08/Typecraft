@@ -312,13 +312,6 @@
   K.tests = (data) => ((data && data.tests) || []);
   /** Letter pair from the app's "a>b" key, with the space made visible. */
   K.pair = (p) => String(p).split('>').map((c) => (c === ' ' ? '␣' : c)).join('');
-  /** The signed-in staff role: TC.me().role, else GET /api/admin/me. */
-  K.role = async function () {
-    const me = await K.me();
-    if (me && me.role !== undefined) return me.role;
-    const r = await K.api('GET', '/api/admin/me');
-    return r.ok ? r.data.role : null;
-  };
   /** Where a checkout order's server status sends the learner. 'paid' and part-refunded orders were paid (success);
       a fully refunded order is shown in the payment history; failed/cancelled → failure; anything else is still pending. */
   K.orderPage = (status) => (status === 'paid' || status === 'partially_refunded' ? 'success'

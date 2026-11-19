@@ -90,10 +90,10 @@ test('a plan can include chosen levels and lessons; the lesson features follow; 
   assert.equal(starter.lessons.Text, 'Levels 1 and 2 and 1 more lesson (35 lessons)');
   assert.deepEqual(starter.features[0], { key: 'lessons', label: starter.lessons.Text });
   assert.ok(!pub.features.some((f) => f.key.startsWith('lessons.')));
-  // the current /admin sees the stored value, so its form can keep it
-  const old = (await owner.who.learner('GET', '/api/admin/packages')).body.packages.find((p) => p.id === 'starter');
-  assert.deepEqual(old.limits.lessons, { levels: [1, 2], lessons: ['l49'] });
-  r = await owner.who.learner('PUT', '/api/admin/packages/starter', { ...old, features: old.features.map((f) => f.key), limits: old.limits });
+  // the console reads back the stored choice, so its form can keep it when something else is changed
+  const stored = (await owner('GET', '/api/console/packages/starter')).body.package;
+  assert.deepEqual(stored.limits.lessons, { levels: [1, 2], lessons: ['l49'] });
+  r = await pkgPut(owner, 'starter', { description: 'Two levels and one lesson more' });
   assert.equal(r.status, 200, JSON.stringify(r.body)); assert.deepEqual(r.body.package.limits.lessons, { levels: [1, 2], lessons: ['l49'] });
 });
 
@@ -262,19 +262,19 @@ test('a broken stored value means no rules, never an error', async () => {
 
 /* ---------------- the console page ---------------- */
 test('the Unlock conditions page: in the menu by permission; Support may look, not change; no inline code', async () => {
-  const s = await support('GET', '/console/unlock');
+  const s = await support('GET', '/admin/unlock');
   assert.equal(s.status, 200); assertNoInlineCode(s.text);
-  assert.match(s.text, /<a class="nav-item is-current" href="\/console\/unlock" aria-current="page">/);
+  assert.match(s.text, /<a class="nav-item is-current" href="\/admin\/unlock" aria-current="page">/);
   assert.ok(s.text.includes('src="/shared/lesson-access.js?v='));
   assert.ok(s.text.includes('data-readonly') && !s.text.includes('id="progressSave"'));
-  const o = await owner('GET', '/console/unlock');
+  const o = await owner('GET', '/admin/unlock');
   assert.ok(o.text.includes('id="progressSave"'));
   await K.setPermission('support', 'unlock.view', false);
-  assert.equal((await support('GET', '/console/unlock')).status, 403);
-  assert.ok(!(await support('GET', '/console')).text.includes('href="/console/unlock"'), 'not in the menu without the permission');
+  assert.equal((await support('GET', '/admin/unlock')).status, 403);
+  assert.ok(!(await support('GET', '/admin')).text.includes('href="/admin/unlock"'), 'not in the menu without the permission');
   await K.setPermission('support', 'unlock.view', true);
   // the package page chooses lessons with the same shared rules
-  const pkg = await owner('GET', '/console/packages/starter');
+  const pkg = await owner('GET', '/admin/packages/starter');
   assertNoInlineCode(pkg.text);
   assert.ok(pkg.text.includes('name="lessonsMode"') && pkg.text.includes('src="/shared/course-meta.js?v='));
 });

@@ -6,7 +6,7 @@
 //   PUT  /api/console/packages/:id    packages.manage  update: the fields to change; { confirmPriceChange: true } when
 //                                                      the price moves by more than half
 //
-// The rules are src/package-rules.js, shared with the current admin. No delete: a package goes off
+// The rules are src/package-rules.js. No delete: a package goes off
 // sale instead, because orders and subscriptions point at it. Money totals need revenue.view.
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from '../http.js';
 import { audit } from '../billing.js';

@@ -121,10 +121,10 @@ test('activity logs: filters, Admin may read, Support may not, and the download 
   const disabled = all.body.items.find((x) => x.id === 'al_cust');
   assert.equal(disabled.label, 'Disabled an account');
   assert.equal(disabled.about, 'Asha Verma (asha@example.com)');
-  assert.equal(disabled.link, `/console/customers/${customer}`);
+  assert.equal(disabled.link, `/admin/customers/${customer}`);
   assert.equal(disabled.actor.roleLabel, 'Admin'); assert.equal(disabled.ip, '10.1.2.3');
   const sys = all.body.items.find((x) => x.id === 'al_sys');
-  assert.equal(sys.actor, null); assert.equal(sys.link, '/console/payments/ord_1');
+  assert.equal(sys.actor, null); assert.equal(sys.link, '/admin/payments/ord_1');
 
   const q = (s) => admin('GET', '/api/console/activity?' + s).then((r) => r.body.items.map((x) => x.id));
   assert.deepEqual(await q('actor=system'), ['al_sys']);
@@ -254,7 +254,7 @@ test('nightly privacy clean-up: IP addresses after 90 days, email records after 
 
 /* ---------------- pages ---------------- */
 test('the Administrators, Activity logs and Security pages: by permission, no inline code; every module is built', async () => {
-  for (const [path, script] of [['/console/administrators', 'administrators.js'], ['/console/activity-logs', 'activity.js'], ['/console/security', 'security.js']]) {
+  for (const [path, script] of [['/admin/administrators', 'administrators.js'], ['/admin/activity-logs', 'activity.js'], ['/admin/security', 'security.js']]) {
     const page = await admin('GET', path);
     assert.equal(page.status, 200, path);
     assertNoInlineCode(page.text);
@@ -262,15 +262,15 @@ test('the Administrators, Activity logs and Security pages: by permission, no in
     assert.match(page.text, new RegExp(`<a class="nav-item is-current" href="${path.replace(/\//g, '\\/')}"`));
     assert.equal((await support('GET', path)).status, 403, path);
   }
-  assert.ok(!(await admin('GET', '/console/administrators')).text.includes('id="addAdmin"'), 'no Add button without admins.manage');
-  assert.ok((await owner('GET', '/console/administrators')).text.includes('id="addAdmin"'));
-  const activity = (await admin('GET', '/console/activity-logs')).text;
+  assert.ok(!(await admin('GET', '/admin/administrators')).text.includes('id="addAdmin"'), 'no Add button without admins.manage');
+  assert.ok((await owner('GET', '/admin/administrators')).text.includes('id="addAdmin"'));
+  const activity = (await admin('GET', '/admin/activity-logs')).text;
   for (const name of ['q', 'kind', 'actor', 'from', 'to']) assert.ok(activity.includes(`name="${name}"`), name);
   assert.ok(activity.includes('id="exportBtn"'));
-  const roles = (await owner('GET', '/console/roles')).text;
-  assert.match(roles, /use <a href="\/console\/administrators">Administrators<\/a>/);
+  const roles = (await owner('GET', '/admin/roles')).text;
+  assert.match(roles, /use <a href="\/admin\/administrators">Administrators<\/a>/);
   assert.ok(!roles.includes('/admin/users'));
-  const home = (await owner('GET', '/console')).text;
+  const home = (await owner('GET', '/admin')).text;
   assert.ok(!/Phase \d/.test(home.replace(/<script[\s\S]*?<\/script>/g, '')), 'no module waits for a later phase');
   assert.ok(!/still managed in the current admin/.test(home));
 });

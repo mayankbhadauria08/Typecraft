@@ -1,7 +1,7 @@
 // Roles and permissions for the admin console (docs/ADMIN-CONSOLE.md §4).
 //
 // One list of permissions, checked on the server by every admin API through
-// requireAdmin() / requirePermission() in ./session.js. Each permission has a default
+// requireAdmin() in ./session.js. Each permission has a default
 // for the Admin and Support roles; a Super Admin can change those in the console
 // (stored in role_permissions, migration 0005). Super Admin always has every permission.
 //

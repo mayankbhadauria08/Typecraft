@@ -29,7 +29,7 @@ test('#7 Learning access: a search also finds customers, so you can give one an 
   assert.equal((await owner('GET', '/api/console/access?q=a')).body.customers, null, 'one letter is not a search for a customer');
   assert.equal((await owner('GET', '/api/console/access')).body.customers, null);
   assert.deepEqual((await owner('GET', '/api/console/access?q=nobody-like-this')).body.customers, []);
-  const page = await owner('GET', '/console/access');
+  const page = await owner('GET', '/admin/access');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
   assert.ok(page.text.includes('id="customerMatches"'));

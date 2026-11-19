@@ -117,5 +117,5 @@ test('an institute, from setting up to the end of a batch', async () => {
     assert.equal(page.status, 200, p);
   }
   assert.match((await K.client()('GET', '/privacy')).text, /terms for institutes/);
-  assert.match((await owner('GET', '/console/institutes')).text, /id="capBody"/);
+  assert.match((await owner('GET', '/admin/institutes')).text, /id="capBody"/);
 });
