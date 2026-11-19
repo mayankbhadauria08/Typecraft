@@ -241,10 +241,10 @@ test('the pages: frames with no inline code; a role without the permission gets 
   assert.match(home.text, /href="\/console\/reports"/);
 });
 
-test('before database update 0011 the support pages say so plainly', async () => {
+test('before database update 0014 the support pages say so plainly', async () => {
   await K.run('DROP TABLE support_assignments');
   const r = await owner('GET', '/api/console/support');
   assert.equal(r.status, 503);
   assert.equal(r.body.error.code, 'console_not_ready');
-  assert.match(r.body.error.message, /0011/);
+  assert.match(r.body.error.message, /0014/);
 });

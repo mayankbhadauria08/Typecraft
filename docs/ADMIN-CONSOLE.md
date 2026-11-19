@@ -48,7 +48,7 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 `src/console/modules.js`; a module without a `path` is shown as a label with its phase, never as
 a link.
 
-1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
+1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access, Institutes (docs/INSTITUTES.md §7)
 2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth** (docs/ADMIN-PHASE-4.md): Coupons, Promotions, Email campaigns, Support (built), Notifications, Business reports (built)
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
@@ -185,7 +185,7 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
-- `0011_support.sql` (Phase 4a; 0009 and 0010 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
+- `0014_support.sql` (Phase 4a; 0009 to 0013 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the Support pages answer "not switched on yet"
   (503); Business reports need no new table. Go-live steps: `docs/ADMIN-PHASE-4.md` §4 and
   `docs/LAUNCH.md` §1i.

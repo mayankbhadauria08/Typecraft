@@ -18,6 +18,7 @@ export const LAYERS = [
       { key: 'packages', label: 'Packages', icon: 'package', path: '/packages', permission: 'packages.view' },
       { key: 'subscriptions', label: 'Subscriptions', icon: 'calendar', path: '/subscriptions', permission: 'subscriptions.view' },
       { key: 'access', label: 'Learning access', icon: 'unlock', path: '/access', permission: 'access.view' },
+      { key: 'institutes', label: 'Institutes', icon: 'users', path: '/institutes', permission: 'institutes.view' },
     ],
   },
   {

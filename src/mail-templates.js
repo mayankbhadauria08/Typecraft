@@ -26,6 +26,12 @@
 //   test_completed                { name, wpm*, accuracy*, duration (s), errors, best (bool) }
 //   contact_received              { name, topic, message*, replyDays = 2 }
 //   contact_forward               { name*, email*, topic, message*, userId, priority (bool), plan, messageId }
+//   institute_invite              { name, instituteName*, role* ('admin' | 'teacher'), invitedBy, email*, link* }
+//   student_invite                { name, instituteName*, batchName*, batchCode*, joinPath* }  (not 'code'/'link': kept for retries)
+//   institute_reminder            { name, instituteName*, kind* ('seats' | 'ends'), seats, seatsUsed, lastDay, days, link, online (bool) }
+//   institute_payment             { name, instituteName*, kind ('new' | 'seats' | 'renew'), what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }
+//   institute_weekly              { name, from*, to*, institutes*: [{ name, link, batches: [{ name, students, practised, time, top: [text], quiet: [name],
+//                                   quietMore, link }] }], settingsUrl }
 // URLs given in data may be absolute https URLs or site paths ('/pricing'); anything else is dropped.
 
 const ACCENT = '#0b6e63';
@@ -150,6 +156,11 @@ const HEADS = {
   contact_received: ['Support', 'We got your message'],
   contact_forward: ['Support', 'New contact message'],
   support_reply: ['Support', 'A reply from TypeCraft'],
+  institute_invite: ['Institute', null],
+  student_invite: ['Institute', null],
+  institute_reminder: ['Institute', null],
+  institute_payment: ['Payment', 'Payment received'],
+  institute_weekly: ['Institute', 'Your batches last week'],
 };
 const DARK = '#0f1b19';
 
@@ -403,6 +414,77 @@ export const TEMPLATES = {
       Paragraphs(d.message),
       cta ? Button(d.ctaLabel || 'Open TypeCraft', cta) : Raw('', ''),
     ] });
+  },
+
+  institute_invite(d, site) {
+    const admin = d.role === 'admin';
+    const subject = `You're invited to ${String(d.instituteName || 'an institute').replace(/[\r\n]+/g, ' ')} on TypeCraft`;
+    return layout(site, { subject, preheader: admin ? 'Set up batches and see your students\u2019 progress.' : 'See the progress of the batches you teach.', blocks: [
+      P(hi(d)),
+      P(`${d.invitedBy || 'TypeCraft'} has invited you to ${d.instituteName} on TypeCraft as ${admin ? 'its admin' : 'a teacher'}.`),
+      P(admin ? 'As the admin you set up batches, invite teachers, add students and see everyone\u2019s progress.'
+        : 'As a teacher you see the progress of the batches you teach and print their certificates.'),
+      P(`Sign in, or create an account, with this email address${d.email ? ` (${d.email})` : ''}. Then accept the invitation.`),
+      Button('Open the invitation', url(site, d.link) || `${site.siteUrl}/institute`),
+      Small("If you weren't expecting this, you can ignore this email: nothing happens unless you accept."),
+    ] });
+  },
+
+  student_invite(d, site) {
+    const subject = `Join ${String(d.batchName || 'your batch').replace(/[\r\n]+/g, ' ')} at ${String(d.instituteName || 'your institute').replace(/[\r\n]+/g, ' ')} on TypeCraft`;
+    return layout(site, { subject, preheader: `Your batch code is ${d.batchCode}.`, blocks: [
+      P(hi(d)),
+      P(`${d.instituteName} uses TypeCraft for typing practice, and has added you to its batch ${d.batchName}. Joining gives you the institute's plan while you study there.`),
+      Code(d.batchCode, 'Batch code'),
+      Button('Join the batch', url(site, d.joinPath) || `${site.siteUrl}/join`),
+      P('Sign in, or create an account with any email address, then confirm that you are 18 or older. Your teachers will see your typing progress while you are in the batch.'),
+      Small("If you don't study at this institute, you can ignore this email."),
+    ] });
+  },
+
+  institute_reminder(d, site) {
+    const seats = d.kind === 'seats';
+    const subject = seats ? `${d.instituteName}: ${d.seatsUsed} of ${d.seats} TypeCraft seats are in use`
+      : `${d.instituteName}: your TypeCraft seats end on ${d.lastDay}`;
+    return layout(site, { subject: subject.replace(/[\r\n]+/g, ' '), preheader: seats ? 'Add seats before you run out.' : 'Renew to keep your students practising.', blocks: [
+      P(hi(d)),
+      P(seats ? `${d.seatsUsed} of your ${d.seats} seats are in use. When every seat is taken, new students can't join your batches. ${d.online ? 'You can add seats online from your institute page, or reply to this email.' : 'To add seats, reply to this email.'}`
+        : `Your institute's seats end on ${d.lastDay}${d.days != null ? `, in ${d.days} day${d.days === 1 ? '' : 's'}` : ''}. After that your students go back to the Free plan; their progress and your batches stay. ${d.online ? 'You can renew online from your institute page, or reply to this email.' : 'To renew, reply to this email.'}`),
+      Button('Open your institute', url(site, d.link) || `${site.siteUrl}/institute`),
+    ] });
+  },
+
+  institute_payment(d, site) {
+    const subject = `${String(d.instituteName || 'Your institute').replace(/[\r\n]+/g, ' ')}: payment received, invoice ${d.invoiceNumber || ''}`.trim();
+    const done = d.kind === 'new' ? 'Your institute is set up and its seats are on. Make a batch, then give your students its code.'
+      : d.kind === 'renew' ? 'Your institute is renewed.' : 'Your extra seats are on.';
+    return layout(site, { subject, preheader: `${money(d.amountPaise)} received. Thank you.`, blocks: [
+      P(hi(d)),
+      P(`Thank you: we received ${money(d.amountPaise)} for ${d.instituteName}. ${done}`),
+      Rows([['For', d.what], ['Seats', d.seats != null ? String(d.seats) : null], ['Last day', d.lastDay || null],
+        ['Invoice', d.invoiceNumber || null], ['Amount', money(d.amountPaise)]]),
+      Button('View and print invoice', url(site, d.invoiceUrl) || `${site.siteUrl}/institute`),
+      Small(`Open your institute any time at ${url(site, d.link) || `${site.siteUrl}/institute`}. Only its admins can open the invoice.`),
+    ] });
+  },
+
+  institute_weekly(d, site) {
+    const list = Array.isArray(d.institutes) ? d.institutes.slice(0, 10) : [];
+    const one = list.length === 1;
+    const subject = `${one ? `${String(list[0].name || '').replace(/[\r\n]+/g, ' ')}: ` : ''}your batches from ${d.from} to ${d.to}`;
+    const blocks = [P(hi(d)), P(`Here is how your students practised last week, ${d.from} to ${d.to}.`)];
+    for (const i of list) {
+      if (!one) blocks.push(P(`${i.name}`));
+      for (const b of (Array.isArray(i.batches) ? i.batches.slice(0, 20) : [])) {
+        blocks.push(P(`${b.name}: ${b.practised} of ${b.students} student${b.students === 1 ? '' : 's'} practised, ${b.time} in all.`));
+        const quiet = (b.quiet || []).join(', ') + (b.quietMore ? ` and ${b.quietMore} more` : '');
+        blocks.push(Rows([['Most practice', (b.top || []).join(', ') || 'Nobody practised'], ["Didn't practise", quiet || 'Everyone practised']]));
+      }
+    }
+    const first = list[0] ? url(site, list[0].link) : null;
+    blocks.push(Button(one ? 'Open your institute' : 'Open your institutes', first && one ? first : `${site.siteUrl}/institute`));
+    blocks.push(Small(`You get this every Monday because you teach or run batches on TypeCraft. To stop it, switch off "Your Monday email" on your institute's page: ${url(site, d.settingsUrl) || `${site.siteUrl}/institute`}`));
+    return layout(site, { subject, preheader: list.length ? `${list.reduce((n, i) => n + (i.batches || []).length, 0)} batches: who practised and who didn't.` : 'Your batches last week.', blocks });
   },
 
   test_completed(d, site) {

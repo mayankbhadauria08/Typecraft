@@ -16,6 +16,8 @@ import contact, { meta as contactMeta } from './public/contact.js';
 import privacy, { meta as privacyMeta } from './public/privacy.js';
 import terms, { meta as termsMeta } from './public/terms.js';
 import refund, { meta as refundMeta } from './public/refund-policy.js';
+import instituteTerms, { meta as instituteTermsMeta } from './public/institute-terms.js';
+import instituteGuide, { meta as instituteGuideMeta } from './public/institute-guide.js';
 import getTheApp, { meta as getTheAppMeta } from './public/get-the-app.js';
 
 const organization = (ctx) => ({
@@ -70,4 +72,6 @@ export const PAGES = [
   { meta: privacyMeta, body: privacy, scripts: [] },
   { meta: termsMeta, body: terms, scripts: [] },
   { meta: refundMeta, body: refund, scripts: [] },
+  { meta: instituteTermsMeta, body: instituteTerms, scripts: [] },
+  { meta: instituteGuideMeta, body: instituteGuide, scripts: [] },
 ];

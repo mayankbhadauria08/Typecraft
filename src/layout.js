@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '5';
+export const ASSET_VERSION = '10';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -47,6 +47,8 @@ export const SITE_NAV = [
   ['/contact?topic=institutes', 'For institutes', 'institutes'],
   ...NAV_RESOURCES.map(([h, l, , i]) => [h, l, i]),
 ];
+/** People who help run an institute (or are invited to) get its pages after Certificates (docs/INSTITUTES.md §8). */
+const withInstitute = (nav) => { const i = nav.findIndex(([h]) => h === '/account/certificates') + 1; return [...nav.slice(0, i), ['/institute', 'Institute', 'users'], ...nav.slice(i)]; };
 export const ACCOUNT_NAV = [
   ['/dashboard', 'Dashboard', 'grid'],
   ['/app', 'Practice', 'keyboard'],
@@ -96,6 +98,7 @@ function userMenu(ctx, withTheme) {
     <a role="menuitem" href="/app">${icon('keyboard')}<span>Open the trainer</span></a>
     <a role="menuitem" href="/arcade">${icon('gamepad')}<span>Arcade</span></a>
     <a role="menuitem" href="/account/certificates">${icon('certificate')}<span>My certificates</span></a>
+    ${ctx.institute ? `<a role="menuitem" href="/institute">${icon('users')}<span>Institute</span></a>` : ''}
     <a role="menuitem" href="/account/plans">${icon('package')}<span>Plans &amp; billing</span></a>
     <a role="menuitem" href="/account/profile">${icon('user')}<span>Profile</span></a>
     <a role="menuitem" href="/account/settings">${icon('settings')}<span>Account settings</span></a>
@@ -165,7 +168,7 @@ function siteFooter(ctx) {
     <div class="foot-brand">${brand('/')}<p class="muted">A calm, thorough typing course: 78 lessons, a coach that finds your weak keys, and an arcade to practise in. Made in India.</p></div>
     <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/get-the-app">Get the app</a></nav>
     <nav aria-label="Company"><h2 class="foot-h">Company</h2><a href="/about">About</a><a href="/contact">Contact</a><a href="/faq">FAQ</a></nav>
-    <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a></nav>
+    <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a><a href="/institute-terms">Terms for institutes</a></nav>
   </div>
   <div class="foot-base"><span>© ${year} TypeCraft</span><span>Payments are processed securely by Razorpay</span><a href="mailto:hello@typecrafttyping.com">hello@typecrafttyping.com</a></div>
 </div></footer>`;
@@ -194,7 +197,7 @@ function layoutBody(layout, ctx, body) {
 <main id="main" class="auth-main" tabindex="-1">${body}</main>
 <footer class="auth-foot"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Help</a></footer>`;
     case 'account':
-      return shellLayout(ctx, body, ACCOUNT_NAV, 'Account');
+      return shellLayout(ctx, body, ctx.institute ? withInstitute(ACCOUNT_NAV) : ACCOUNT_NAV, 'Account');
     case 'admin':
       return shellLayout(ctx, body, ADMIN_NAV, 'Admin');
     default:

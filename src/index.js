@@ -18,8 +18,17 @@ import * as site from './site.js';
 import * as learningRules from './learning-rules.js';
 import * as courseStore from './course-store.js';   // published course edits (docs/ADMIN-PHASE-3.md) // rules for everyone about lessons (docs/UNLOCK-RULES.md)
 import * as exams from './exams.js';          // exam practice and certificate codes (docs/EXAM-MODES.md)
+import * as institutes from './institutes.js'; // institute seats, join codes, staff views (docs/INSTITUTES.md)
+import * as institutePortal from './institute-portal.js'; // the institute's own pages: batches, teachers, students
+import * as instituteReports from './institute-reports.js'; // batch report, a student's page, certificates to print
+import * as instituteTeaching from './institute-teaching.js'; // targets, assignments, exam results by batch, leaderboard
+import * as instituteMail from './institute-mail.js'; // students invited by email, reminders to institutes
+import * as instituteInvoices from './institute-invoices.js'; // invoices for institute payments
+import * as instituteCheckout from './institute-checkout.js'; // seats bought online with Razorpay
+import * as instituteTests from './institute-tests.js'; // scheduled mock tests for a batch
+import * as instituteWeekly from './institute-weekly.js'; // the Monday email to teachers and admins
 import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
-const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, consoleApi];
+const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, instituteCheckout, instituteTests, instituteWeekly, consoleApi];
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,
