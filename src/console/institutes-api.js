@@ -252,6 +252,11 @@ function historyNote(action, d, money) {
   if ((action === 'institute.payment' || action === 'institute.payment_remove') && money && d.amountPaise) return `${rupees(d.amountPaise)}${d.reference ? ` · ${d.reference}` : ''}`;
   if (action === 'institute.staff_invite' || action === 'institute.staff_resend' || action === 'institute.staff_remove') return [d.email, d.role].filter(Boolean).join(' · ') || null;
   if (action === 'institute.update' && Array.isArray(d.changed)) return `changed ${d.changed.join(', ')}`;
+  if (action === 'institute.staff_accept' || action === 'institute.staff_decline') return [d.email, d.role].filter(Boolean).join(' · ') || null;
+  if (action === 'institute.batch_create' || action === 'institute.batch_code') return d.name || null;
+  if (action === 'institute.batch_update') return [d.name, Array.isArray(d.changed) ? d.changed.join(', ') : null, d.freed ? `${d.freed} seats freed` : null].filter(Boolean).join(' · ') || null;
+  if (action === 'institute.student_remove') return [d.student, d.batch].filter(Boolean).join(' · ') || null;
+  if (action === 'institute.student_move') return d.student ? `${d.student}: ${d.from} → ${d.to}` : null;
   if (action === 'institute.create') return d.seats ? `${d.seats} seats` : null;
   return null;
 }

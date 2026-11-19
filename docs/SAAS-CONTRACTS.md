@@ -249,6 +249,12 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `GET/PUT /api/console/institutes/:id`, `POST …/:id/term`, `…/:id/status`, `…/:id/payments`,
   `…/:id/payments/:pid/remove`, `…/:id/staff`, `…/:id/staff/:sid/resend`, `…/:id/staff/:sid/remove`;
   permissions `institutes.view`, `institutes.manage`, `institutes.payments` (sensitive).
+- Institute pages API (`src/institute-portal.js`, docs/INSTITUTES.md §8): `POST /api/me/institute-invites/:sid/accept|decline`;
+  admin: `GET/POST /api/institutes/:id/staff`, `POST …/staff/:sid/resend|remove`, `POST /api/institutes/:id/batches`,
+  `PUT …/batches/:bid` `{ name?, teacherIds?, joining?, archived?, removeStudents? }`, `POST …/batches/:bid/code`,
+  `POST /api/institutes/:id/students/:mid/remove`, `…/move { batchId }`; staff of the batch: `GET …/batches/:bid/students`.
+  `GET /api/me/institutes` also lists `invites` and `emailVerified`. Pages `/institute`, `/institute/:id`,
+  `/institute/:id/batches/:bid` (user, account layout).
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

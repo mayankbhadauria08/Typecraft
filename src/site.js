@@ -143,13 +143,18 @@ async function sessionFor(env, request) {
   try { return await getSession(env, request); } catch { return null; } // tables missing: signed out
 }
 async function whoFor(env, session) {
-  if (!session) return { user: null, entitlements: null, role: null, totals: null };
-  let entitlements = null, role = null, totals = null;
+  if (!session) return { user: null, entitlements: null, role: null, totals: null, institute: false };
+  let entitlements = null, role = null, totals = null, institute = false;
   try { const e = await entitlementsFor(env, session.user.id); entitlements = { plan: e.plan, planName: e.planName, expiresAt: e.expiresAt, features: e.features, limits: e.limits }; } catch { entitlements = null; }
   try { role = await roleOf(env, session.user); } catch { role = null; }
   try { totals = headerTotals(await env.DB.prepare('SELECT xp, streak_count, streak_last FROM user_totals WHERE user_id = ?1').bind(session.user.id).first()); } catch { totals = null; }
   const u = session.user;
-  return { user: { id: u.id, fullName: u.fullName, email: u.email, emailVerified: u.emailVerified }, entitlements, role, totals };
+  // helps run an institute, or is invited to: the account pages show "Institute" (docs/INSTITUTES.md §8)
+  try {
+    institute = !!(await env.DB.prepare(`SELECT 1 FROM institute_staff WHERE (user_id = ?1 AND status = 'active') OR (email = ?2 AND status = 'invited') LIMIT 1`)
+      .bind(u.id, u.email).first());
+  } catch { institute = false; }
+  return { user: { id: u.id, fullName: u.fullName, email: u.email, emailVerified: u.emailVerified }, entitlements, role, totals, institute };
 }
 
 /** The header's streak and XP chip. A streak counts only while its last day is today or yesterday
@@ -262,7 +267,7 @@ async function render(env, url, page, params, who, status) {
   const ctx = {
     env, url, params, siteUrl: base, path: url.pathname, nonce,
     canonicalPath: page.meta.canonical || (page.re ? url.pathname : page.meta.path),
-    user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null,
+    user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null, institute: !!who.institute,
     noindex: !!page.meta.noindex || page.meta.access === 'user' || page.meta.access === 'admin' || isWorkersDev(url) || !!status,
     jsonld: [],
   };

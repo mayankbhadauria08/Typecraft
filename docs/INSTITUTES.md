@@ -10,8 +10,8 @@ Release 1 is built in five pull requests. This file grows with each one.
 | Part | What | State |
 |---|---|---|
 | 1. Foundations (A1–A6) | tables, seat → plan, join codes, seat count and end date, staff checks, weak keys | pull request #28 |
-| 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request 2 |
-| 3. Institute portal (C1–C4) | institute home, teachers, batches, students | |
+| 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request #30 |
+| 3. Institute portal (C1–C4) | institute home, teachers, batches, students | pull request 3 |
 | 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | |
 | 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | |
 
@@ -139,3 +139,31 @@ TypeCraft staff run institutes from the console. Three permissions (Roles and pe
   accept.
 - **History**: every change, by whom and when (`audit_logs`, target `institute:<id>`), for roles with
   `audit.view`.
+
+## 8. The institute's own pages — `src/institute-portal.js`, `/institute`
+
+For the institute's admins and teachers, in the account area. "Institute" appears in the account menu and
+sidebar for anyone who helps run an institute or is invited to (one small lookup per page).
+
+- **`/institute`**: invitations (Accept needs the account's email confirmed: the invitation went to an
+  email address, so only the account that proved it owns that address takes it), and the institutes
+  this account helps run. With exactly one institute it opens that one.
+- **`/institute/:id`**: seats in use and free, last day and days left, a note when it isn't paid yet,
+  paused or ended. **Batches** (admins: all; teachers: theirs) with students, how many haven't
+  practised in the last 7 days, teachers, join code and a "Copy link" button. Admins: **New batch**
+  and **Admins and teachers** (invite a teacher or another admin, send again, remove; an institute
+  always keeps one admin; an admin can leave when another admin exists).
+- **`/institute/:id/batches/:bid`**: the join code, large, with its link (`/join/ABCD-EFGH`), "Copy the
+  link", "Copy the code". **Students** with the day they joined and last practised ("Not this week"
+  marked). Admins also: **New code** (the old one stops working), **Switch joining off / on**, **Move**
+  a student to another batch (keeps the seat and progress), **Remove** (frees the seat; the student's
+  plan from it ends; progress stays), rename, choose the batch's teachers, and **Archive** when it
+  finishes (removes its students and frees their seats; the code goes) or bring it back.
+- Teachers can open their batches and students; everything that changes seats, codes or teachers is
+  for admins (403 for a teacher). Everything is checked on the server (§5).
+- Every change by an institute is in the activity log with the institute as target and `by: 'institute'`,
+  so TypeCraft staff see it in the console's history: `institute.staff_accept`, `staff_decline`,
+  `staff_invite`, `staff_resend`, `staff_remove`, `batch_create`, `batch_update`, `batch_code`,
+  `student_remove`, `student_move`.
+- A pending (not paid) institute can be prepared: batches made, teachers invited, codes handed out;
+  students can join once it is switched on. A closed institute is out of reach for its staff.
