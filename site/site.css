@@ -687,3 +687,13 @@ a.ins-link:hover{border-color:var(--teal)}
 .card.ins-buy-cta{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px}
 .ins-buy-cta h2{font-size:19px;margin:0 0 4px}
 .ins-buy-cta p{margin:0;max-width:60ch}
+/* a batch's scheduled test (docs/INSTITUTES.md §16) */
+.ex-batch{margin-bottom:20px}
+.card.ex-batch-card{gap:10px;border-color:var(--teal)}
+.ex-batch-card h2{font-size:20px;margin:0}
+.ex-batch-card p{margin:0}
+.card.ins-test-results{gap:12px;margin-top:16px}
+.ins-test-results .card-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.ins-test-results h3{font-size:18px;margin:0}
+.ins-test-results p{margin:0}
+

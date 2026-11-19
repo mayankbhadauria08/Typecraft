@@ -15,7 +15,8 @@ Release 1 is built in five pull requests. This file grows with each one.
 | 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | pull request #32 |
 | 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | pull request #34 |
 | Release 2 (D3–D5, D7, C5, G2, B4) | targets, assignments, exam results by batch, leaderboard, invitations, reminders, invoices | pull requests #35, #37, #38 |
-| Release 3 (F1–F3) | buying seats online: new institutes, more seats, renewals, invoice by email (§15) | this pull request |
+| Release 3 (F1–F3) | buying seats online: new institutes, more seats, renewals, invoice by email (§15) | pull request #39 |
+| Later: D6 | scheduled mock test for a batch (§16) | this pull request |
 
 Nobody can join anything until an institute is created in the console and its payment recorded, or its
 seats are bought online and Razorpay confirms the payment (§15).
@@ -325,4 +326,21 @@ needs Razorpay's keys (test keys first). Bank transfer stays as it was.
 - API: `GET /api/institutes/buy`, `GET /api/institutes/:id/buy` (admins), `POST /api/institutes/checkout`
   `{ kind: 'new' | 'seats' | 'renew', … }`, `POST /api/institutes/checkout/verify`, `POST …/checkout/failed`,
   `GET /api/institutes/checkout/orders/:id`; console `GET/PUT /api/console/institutes/pricing`.
+
+## 16. Later (D6): a scheduled mock test — `src/institute-tests.js`, migration 0012
+
+- On a batch's page, **Scheduled tests › Schedule a test** (the batch's teachers and the admins): one of the
+  exam practice tests, a passage (or "pick one for me"), the day, the time it opens (India time), how long it
+  stays open (30 minutes to a whole day) and a note. Up to 20 waiting or open per batch; it can be cancelled.
+- Students of the batch see it on their dashboard (*Your batch › Scheduled tests*) and take it on the exam
+  practice page (`/exam-practice?batchTest=…`), which fixes the passage and says who it is for and when it
+  closes. They must **start** while it is open; then they have the test's own time, plus two minutes to submit.
+- The **first result submitted in time** counts. Results are marked on the server like every exam practice
+  result; a later attempt, another passage, a late one or one without starting is saved as practice and the
+  page says why. The teacher also sees how many times each student opened the passage.
+- **Results**: one table per test (passed first, then by the test's own measure), with students who left the
+  batch since still shown, and **Download CSV**.
+- API: `GET/POST /api/institutes/:id/batches/:bid/tests`, `GET …/tests/:tid`, `GET …/tests/:tid/results.csv`,
+  `POST …/tests/:tid/cancel`; students: `GET /api/me/batch-tests/:tid`, `POST …/start`; `POST /api/exams/results`
+  takes `batchTestId` and answers `batchTest: { counted, why? }`; `GET /api/me/batches` lists `tests`.
 

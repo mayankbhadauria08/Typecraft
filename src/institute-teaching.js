@@ -8,7 +8,7 @@
 //   POST /api/institutes/:id/batches/:bid/assignments/:aid/remove  staff of the batch
 //   PUT  /api/institutes/:id/batches/:bid/leaderboard              staff of the batch   { on }
 //   GET  /api/me/batches                                           signed in            for each of my seats: target, my assignments,
-//                                                                                      the leaderboard if it is on
+//                                                                                      the leaderboard if it is on, scheduled tests
 //
 // Results come from what the student's own practice saved: lesson runs (events), typing tests and exam practice.
 import '../shared/course-meta.js';
@@ -18,6 +18,7 @@ import { requireSession } from './session.js';
 import { audit } from './billing.js';
 import { newId, isId, requireBatch, ready } from './institute-access.js';
 import { loadCourse, lessonTitle } from './course-store.js';
+import { testsForStudent } from './institute-tests.js';
 
 const META = globalThis.TC_META;
 const X = globalThis.TC_EXAMS;
@@ -250,6 +251,7 @@ export async function getMyBatches(request, env) {
         assignments: list.map((a) => ({ id: a.id, kind: a.kind, title: assignmentTitle(a, edits), dueDay: a.due_day, note: a.note, ...stateOf(a, mineFacts, user.id, now),
           link: a.kind === 'lesson' ? '/app' : `/exam-practice?test=${encodeURIComponent(a.ref)}` })),
         leaderboard: on ? leaderboardRows(await boardPeople(env, seat.batch_id), mineFacts) : null,
+        tests: await testsForStudent(env, seat.batch_id, user.id), // scheduled mock tests (src/institute-tests.js)
       });
     }
     return json({ batches: out, today: istDay() });

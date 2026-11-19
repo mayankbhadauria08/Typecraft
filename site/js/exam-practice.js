@@ -2,6 +2,8 @@
    and js/rewards-ui.js (the certificate picture). Works signed out; a free account saves results.
    POST /api/exams/results { id, mode, passageId, typed, seconds, path, today } → { saved, result, verdict }
    GET  /api/exams/results → { results: [...], best, limit }
+   ?batchTest=<id>: a batch's scheduled test (docs/INSTITUTES.md §16). GET /api/me/batch-tests/:id → { test, batch, institute, mine };
+   POST /api/me/batch-tests/:id/start, then the result is saved with batchTestId → { batchTest: { counted, why } }.
    POST /api/exams/results/:id/certificate → { code, shared } */
 (function () {
   'use strict';
@@ -22,8 +24,8 @@
     lastPassage[mode] = p.id;
     return p;
   }
-  function begin(mode) {
-    M = X.MODES[mode]; P = pickPassage(mode); want = X.words(P.text);
+  function begin(mode, passageId) {
+    M = X.MODES[mode]; P = (passageId && X.passage(mode, passageId)) || pickPassage(mode); want = X.words(P.text);
     started = 0; finished = false; clearInterval(timer); timer = 0;
     $('exTestName').textContent = M.name;
     $('exTestRules').textContent = M.minutes + ' minutes. ' + (M.backspace ? 'Backspace works.' : 'Backspace is turned off.') +
@@ -146,6 +148,8 @@
     const seconds = Math.max(1, Math.round(elapsed() * 10) / 10);
     const typed = input.value;
     const r = X.score(M.id, P.id, typed, seconds, { optimal: true });
+    const forBatch = batchRun;
+    batchRun = false; // "Take it again" afterwards is practice
     test.hidden = true; result.hidden = false;
     if (!r.ok) { verdictBox({ passed: false, text: r.message }); K.mount($('exStats')); K.mount($('exSave')); K.mount($('exCert')); return; }
     $('exResultH').textContent = M.name + ': your result';
@@ -154,7 +158,7 @@
     mistakes(r);
     K.mount($('exCert'));
     result.focus();
-    save(r, typed);
+    save(r, typed, forBatch);
   }
 
   /* ---------- saving and certificates ---------- */
@@ -163,16 +167,24 @@
     if (window.crypto && crypto.randomUUID) return 'ex-' + crypto.randomUUID();
     return 'ex-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
   }
-  async function save(r, typed) {
-    if (!r.typedWords || r.seconds < 10) return saveNote('Type for longer to get a result worth saving.');
+  const WHY = { already: 'Your first result for this test is the one that counts; this one is saved as practice.', late: 'It came in too late to count for the test; it is saved as practice.',
+    not_started: 'Start the test from the box at the top to take part; this result is saved as practice.', other_test: 'This was another passage, so it is saved as practice.',
+    cancelled: 'Your teacher cancelled the test; this result is saved as practice.', not_yours: "You're not in this test's batch; this result is saved as practice." };
+  async function save(r, typed, forBatch) {
+    if (!r.typedWords || r.seconds < 10) return saveNote('Type for longer to get a result worth saving.', forBatch ? ' Nothing was sent to your teacher.' : '');
     await mePromise;
     if (!me || !me.user) return saveNote('Want to keep your results and get a certificate when you meet the goal? ', h('a', { href: '/signup?next=%2Fexam-practice', text: 'Create a free account' }), '.');
     saveNote('Saving…');
-    const res = await K.api('POST', '/api/exams/results', { id: newId(), mode: r.mode, passageId: r.passageId, typed, seconds: r.seconds, path: r.path, today: K.today() });
+    const res = await K.api('POST', '/api/exams/results', { id: newId(), mode: r.mode, passageId: r.passageId, typed, seconds: r.seconds, path: r.path, today: K.today(),
+      ...(forBatch ? { batchTestId } : {}) });
     if (!res.ok) return K.mount($('exSave'), K.alert(res.status === 429 || res.status === 503 ? 'info' : 'bad', K.errMsg(res, "We couldn't save this result.")));
     const saved = res.data.result;
     verdictBox(res.data.verdict);
-    saveNote('Saved to your exam results. ', h('a', { href: '#exHistory', text: 'See your attempts' }), '.');
+    const bt = res.data.batchTest;
+    if (bt) {
+      K.mount($('exSave'), K.alert(bt.counted ? 'ok' : 'info', bt.counted ? `This result counts for ${bt.batch ? bt.batch.name : 'your batch'}'s test. Your teacher can see it.` : (WHY[bt.why] || 'It is saved as practice.')));
+      batchTest();
+    } else saveNote('Saved to your exam results. ', h('a', { href: '#exHistory', text: 'See your attempts' }), '.');
     if (saved.passed) offerCertificate(saved);
     history();
   }
@@ -234,9 +246,54 @@
     ], rows, { caption: 'Your recent exam practice attempts' }));
   }
 
+  /* ---------- a batch's scheduled test ---------- */
+  const batchTestId = K.qs('batchTest');
+  let batchRun = false;
+  const hm = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+  async function batchTest() {
+    if (!batchTestId) return;
+    const box = $('exBatch');
+    box.hidden = false;
+    await mePromise;
+    if (!me || !me.user) {
+      return K.mount(box, K.alert('info', "Sign in to take your batch's scheduled test. ", h('a', { href: `/login?next=${encodeURIComponent(location.pathname + location.search)}`, text: 'Sign in' })));
+    }
+    const res = await K.api('GET', `/api/me/batch-tests/${encodeURIComponent(batchTestId)}`);
+    if (!res.ok) return K.mount(box, K.alert(res.status === 503 ? 'info' : 'bad', K.errMsg(res, "We couldn't load the test.")));
+    const { test: t, batch, institute, mine } = res.data;
+    const head = [h('h2', { text: `Scheduled test: ${t.modeName}` }),
+      h('p', { class: 'muted', text: `For ${batch.name} at ${institute.name}. Open ${K.date(t.opensAt)}, ${hm(t.opensAt)} to ${hm(t.closesAt)}. ${t.minutes} minutes once you start typing.` }),
+      t.note ? h('p', { text: t.note }) : null];
+    let body;
+    if (mine.result) {
+      const r = mine.result;
+      body = K.alert(r.passed ? 'ok' : 'info', `You took this test${mine.submittedAt ? ` at ${hm(mine.submittedAt)}` : ''}: ${t.mode === 'ssc-dest' ? `${fmt(r.correctStrokes)} correct key depressions` : t.mode === 'ssc-typing' ? `${fmt(r.strokes)} key depressions` : `${fmt(r.netWpm, 1)} net wpm`}, mistakes ${r.mistakesPct}%. ${r.passed ? 'Goal met.' : 'Goal not met yet.'} Your teacher can see it.`);
+    } else if (t.state === 'upcoming') {
+      body = h('div', null, h('p', { text: `It opens at ${hm(t.opensAt)} on ${K.date(t.opensAt)}. Come back then: this page shows a Start button when it opens.` }),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Check again', onclick: batchTest }));
+    } else if (t.state === 'open') {
+      const btn = h('button', { type: 'button', class: 'btn btn-primary', text: mine.starts ? 'Start again' : 'Start the test' });
+      btn.addEventListener('click', async () => {
+        K.busy(btn, true);
+        const s = await K.api('POST', `/api/me/batch-tests/${encodeURIComponent(batchTestId)}/start`, {});
+        K.busy(btn, false);
+        if (!s.ok) { K.toast(K.errMsg(s), 'bad'); return batchTest(); }
+        batchRun = true;
+        begin(t.mode, t.passageId);
+      });
+      body = h('div', null,
+        h('p', { text: `Everyone in your batch gets the same passage. The first result you submit after starting is the one that counts${mine.starts ? `; you have opened it ${mine.starts} time${mine.starts === 1 ? '' : 's'}, and your teacher sees that` : ''}. Start before ${hm(t.closesAt)}.` }),
+        h('div', { class: 'actions' }, btn));
+    } else {
+      body = K.alert('info', t.state === 'cancelled' ? 'Your teacher cancelled this test.' : `This test closed at ${hm(t.closesAt)} on ${K.date(t.closesAt)}. You can still practise below.`);
+    }
+    K.mount(box, h('div', { class: 'card ex-batch-card' }, head, body));
+  }
+
   $('exAgain').addEventListener('click', () => begin(M.id));
   $('exOther').addEventListener('click', backToChoice);
   history();
+  batchTest();
   const want0 = K.qs('test');
   if (want0 && X.MODES[want0]) begin(want0);
 })();

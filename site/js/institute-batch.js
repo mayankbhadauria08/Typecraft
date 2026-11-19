@@ -189,6 +189,93 @@
     K.toast('Removed.'); teaching();
   }
 
+  /* Scheduled tests (§16): GET …/tests → { tests: [{ id, mode, modeName, short, minutes, passageTitle, opensAt, closesAt, note, state,
+     started, submitted, passed }], students, modes: [{ id, name, minutes, passages: [{ id, title }] }], windows, today, now };
+     POST …/tests { mode, passageId, day, time, windowMinutes, note }; GET …/tests/:tid → { test, rows: [{ name, email, inBatch, state, starts,
+     submittedAt, result: { strokes, correctStrokes, netWpm, mistakesPct, passed } | null }] }; …/tests/:tid/results.csv; POST …/tests/:tid/cancel. */
+  const TEST_STATE = { upcoming: ['pending', 'Not open yet'], open: ['active', 'Open now'], closed: ['created', 'Closed'], cancelled: ['failed', 'Cancelled'] };
+  const testsUrl = () => `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/tests`;
+  const when = (t) => {
+    const a = new Date(t.opensAt), b = new Date(t.closesAt);
+    const hm = (d) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    const sameDay = K.date(t.opensAt) === K.date(t.closesAt);
+    return `${K.date(t.opensAt)}, ${hm(a)} to ${sameDay ? '' : `${K.date(t.closesAt)}, `}${hm(b)}`;
+  };
+  async function tests() {
+    const sec = $('#ib-tests-sec');
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/tests`);
+    if (!res.ok) {
+      if (res.error && res.error.code === 'tests_not_ready') { sec.hidden = true; return; }
+      sec.hidden = false; return K.error($('#ib-tests'), res, tests);
+    }
+    const d = res.data;
+    sec.hidden = !!data.batch.archived && !d.tests.length;
+    if (sec.hidden) return;
+    K.mount($('#ib-tests-act'), data.batch.archived ? null : h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Schedule a test', onclick: () => schedule(d) }));
+    if (!d.tests.length) {
+      return K.mount($('#ib-tests'), h('p', { class: 'muted', text: 'Give the whole batch the same exam practice passage at the same time, like a mock test. Students start it from their dashboard while it is open; you get their results in one table.' }));
+    }
+    K.mount($('#ib-tests'), K.table([
+      { label: 'Test', value: (t) => [h('strong', { text: t.modeName }), h('div', { class: 'muted', text: [t.passageTitle, t.note].filter(Boolean).join(' · ') })] },
+      { label: 'Open', value: (t) => when(t) },
+      { label: '', value: (t) => K.badge(TEST_STATE[t.state][0], TEST_STATE[t.state][1]) },
+      { label: 'Taken', num: true, value: (t) => `${t.submitted} of ${d.students}` },
+      { label: 'Goal met', num: true, value: (t) => (t.submitted ? String(t.passed) : '—') },
+      { label: '', value: (t) => h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Results', onclick: () => results(t) }),
+        t.state === 'upcoming' || t.state === 'open' ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Cancel', onclick: () => cancelTest(t) }) : null) },
+    ], d.tests, { caption: 'Scheduled tests' }));
+  }
+  async function schedule(d) {
+    const first = await K.confirm({ title: 'Schedule a test', text: 'Every student of this batch gets the same passage. They can start it while it is open, from their dashboard.', confirmLabel: 'Next',
+      fields: [{ name: 'mode', label: 'Test', type: 'select', value: d.modes[0].id, options: d.modes.map((m) => ({ value: m.id, label: `${m.name} (${m.minutes} minutes)` })) }] });
+    if (!first) return;
+    const m = d.modes.find((x) => x.id === first.mode);
+    const nextHour = new Date(Date.now() + 330 * 60000 + 3600000).toISOString().slice(11, 13) + ':00';
+    const v = await K.confirm({ title: `Schedule: ${m.name}`, confirmLabel: 'Schedule test',
+      fields: [
+        { name: 'passageId', label: 'Passage', type: 'select', value: '', options: [{ value: '', label: 'Pick one for me' }].concat(m.passages.map((p) => ({ value: p.id, label: p.title }))) },
+        { name: 'day', label: 'Day', type: 'date', required: true, value: d.today, min: d.today },
+        { name: 'time', label: 'Opens at (India time)', type: 'time', required: true, value: nextHour },
+        { name: 'windowMinutes', label: 'Stays open for', type: 'select', value: '60', options: d.windows.map((w) => ({ value: String(w), label: w < 60 ? `${w} minutes` : w === 1440 ? 'a whole day' : `${w / 60} hour${w === 60 ? '' : 's'}` })),
+          hint: `Students must start before it closes; each then has the test's ${m.minutes} minutes.` },
+        { name: 'note', label: 'Note for students (optional)', maxlength: 200, hint: 'For example "Mock test before the CHSL skill test".' }] });
+    if (!v) return;
+    const res = await K.api('POST', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/tests`, { mode: m.id, passageId: v.passageId, day: v.day, time: v.time, windowMinutes: Number(v.windowMinutes), note: v.note });
+    if (!res.ok) return fail(res);
+    K.toast(res.data.test.state === 'open' ? 'The test is open now.' : 'Test scheduled.'); tests();
+  }
+  async function cancelTest(t) {
+    const ok = await K.confirm({ title: `Cancel the ${t.short} test?`, text: t.submitted ? 'Nobody else can start it. The results already in stay.' : 'Students stop seeing it.', confirmLabel: 'Cancel the test', danger: true });
+    if (!ok) return;
+    const res = await K.api('POST', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/tests/${encodeURIComponent(t.id)}/cancel`, {});
+    if (!res.ok) return fail(res);
+    K.toast('Cancelled.'); K.mount($('#ib-test-one')); tests();
+  }
+  const STUDENT_STATE = { submitted: ['active', 'Submitted'], started: ['pending', 'Opened, not submitted'], not_started: ['created', 'Not taken'] };
+  async function results(t) {
+    const box = $('#ib-test-one');
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/tests/${encodeURIComponent(t.id)}`);
+    if (!res.ok) return K.error(box, res, () => results(t));
+    const { test, rows } = res.data;
+    const measure = test.mode === 'ssc-dest' ? ['Correct key depressions', (r) => K.num(r.correctStrokes)]
+      : test.mode === 'ssc-typing' ? ['Key depressions', (r) => K.num(r.strokes)] : ['Net wpm', (r) => K.num(r.netWpm, 1)];
+    K.mount(box, h('article', { class: 'card ins-test-results' },
+      h('div', { class: 'card-head' }, h('h3', { text: `${test.modeName}: ${when(test)}` }),
+        h('a', { class: 'btn btn-ghost btn-sm', href: `${testsUrl()}/${encodeURIComponent(t.id)}/results.csv`, download: '', text: 'Download CSV' })),
+      h('p', { class: 'muted', text: `${test.passageTitle}. Goal: ${test.goal}. The first result each student submitted after starting counts; "opened" counts how often they opened the passage.` }),
+      K.table([
+        { label: 'Student', value: (r) => [h('strong', { text: r.name || r.email }), r.inBatch ? null : h('span', { class: 'muted', text: ' (left the batch)' })] },
+        { label: '', value: (r) => K.badge(STUDENT_STATE[r.state][0], STUDENT_STATE[r.state][1]) },
+        { label: measure[0], num: true, value: (r) => (r.result ? measure[1](r.result) : '—') },
+        { label: 'Mistakes', num: true, value: (r) => (r.result ? `${r.result.mistakesPct}%` : '—') },
+        { label: 'Goal', value: (r) => (r.result ? (r.result.passed ? K.badge('active', 'Met') : K.badge('created', 'Not yet')) : '—') },
+        { label: 'Opened', num: true, value: (r) => String(r.starts) },
+        { label: 'Submitted', value: (r) => (r.submittedAt ? K.dateTime(r.submittedAt) : '—') },
+      ], rows, { caption: `Results: ${test.modeName}` })));
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
   async function certificates() {
     const sec = $('#ib-certs-sec');
     const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/certificates`);
@@ -352,6 +439,7 @@
     }
     students();
     teaching();
+    tests();
     certificates();
     if (data.role === 'admin') { settings(data); invitations(data); } else { $('#ib-admin-sec').hidden = true; $('#ib-inv-sec').hidden = true; }
   }
