@@ -8,7 +8,7 @@ import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '17';
+export const CONSOLE_ASSETS = '18';
 // a name starting with / is a file from elsewhere on the site (the shared course rules in /shared/)
 const asset = (name) => `${name.startsWith('/') ? name : '/site/console/' + name}?v=${CONSOLE_ASSETS}`;
 
@@ -17,7 +17,7 @@ const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 const MARK = '<svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="7" width="34" height="30" rx="8" fill="#177a6c"/><rect x="3" y="3" width="34" height="29" rx="8" fill="#45cdb6"/><path d="M12.5 11.5h15v4.2h-5.3V25h-4.4v-9.3h-5.3z" fill="#0c1615"/></svg>';
 // icons the browser code draws (toasts, dialogs, tables): AC.icon() clones them from here
 const CLIENT_ICONS = ['check', 'x', 'alert', 'info', 'lock', 'shield', 'refresh', 'external', 'minus', 'clock', 'mail', 'user', 'users', 'eye',
-  'search', 'copy', 'note', 'trash', 'download', 'arrowLeft', 'arrowRight', 'chevronRight', 'calendar', 'card', 'devices', 'history', 'package', 'logout', 'chart', 'unlock'];
+  'search', 'copy', 'note', 'trash', 'download', 'arrowLeft', 'arrowRight', 'chevronRight', 'calendar', 'card', 'devices', 'history', 'package', 'logout', 'chart', 'unlock', 'send', 'plus', 'sparkle'];
 
 function head(title) {
   return `<!DOCTYPE html>

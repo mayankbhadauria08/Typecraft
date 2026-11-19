@@ -313,3 +313,15 @@ a.config-item{text-decoration:none}
 .btn-mini:hover{background:var(--raise)}
 .need-kb.kb-share{align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}
 @media (hover:none) and (pointer:coarse){ .need-kb.kb-share{display:flex} }
+
+/* ---------- notices from the team (admin console: Notifications), top of the home screen ---------- */
+.tc-notices[hidden]{display:none!important}
+.tc-notices{display:flex;flex-direction:column;gap:8px;margin:0 0 16px}
+.tc-notice{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:14px;border:1px solid var(--line-strong);
+  background:color-mix(in srgb,var(--teal) 12%,var(--surface));color:var(--text);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.tc-notice.tone-offer{background:color-mix(in srgb,var(--brass,#e2b65f) 16%,var(--surface))}
+.tc-notice.tone-warning{background:color-mix(in srgb,var(--red,#ff8a7e) 16%,var(--surface))}
+.tc-notice p{flex:1;min-width:0;margin:0;font-size:14px;line-height:1.45}
+.tc-notice a{margin-left:6px;font-weight:600;color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.tc-notice-x{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font:500 18px/1 var(--sans);cursor:pointer}
+.tc-notice-x:hover{color:var(--text);border-color:var(--line-strong)}

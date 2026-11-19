@@ -219,7 +219,7 @@ export function sendLater(env, ctx, args) {
 }
 
 /** Re-sends a logged email from its stored payload (never for sensitive templates). */
-async function resendRow(env, row, opts = {}) {
+export async function resendRow(env, row, opts = {}) {
   if (SENSITIVE.has(row.template)) return 'skipped';
   if (!env.RESEND_API_KEY) return 'skipped';
   let payload = {};
@@ -470,7 +470,7 @@ export async function resendWebhook(request, env) {
 }
 
 /* ---------- admin: emails ---------- */
-function publicLog(r) {
+export function publicLog(r) {
   return {
     id: r.id, userId: r.user_id, to: r.to_email, template: r.template, category: r.category, subject: r.subject,
     status: r.status, attempts: r.attempts, lastError: r.last_error, nextAttemptAt: r.next_attempt_at,
@@ -518,6 +518,9 @@ export async function adminRetryEmail(request, env, ctx, params) {
   return json({ email: publicLog(after), result });
 }
 
+/** Sends a logged email again from its stored payload (the console's email log). */
+export const sendAgain = (env, row, opts) => resendRow(env, row, opts);
+
 /* ---------- admin: announcements ---------- */
 function audienceSql(audience) {
   const active = "(s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > ?1))";
@@ -546,6 +549,17 @@ export async function adminAnnouncement(request, env, ctx) {
     return json({ test: true, status: r.status, to: user.email });
   }
   if (!(await hitLimit(env, `announce:${user.id}`, 5, 3600))) throw tooMany(60);
+  // With email campaigns switched on (migration 0010) an announcement is a campaign that starts now, so it
+  // keeps to the daily limit (docs/ADMIN-PHASE-4.md §4). Before that, the old way below.
+  try {
+    const { campaignFromAnnouncement } = await import('./console/campaigns-api.js');
+    const c = await campaignFromAnnouncement(env, ctx, user, { subject, body: text, audience });
+    await audit(env, user.id, 'announcement.send', `audience:${audience}`, { subject, recipients: c.total, campaign: c.id }, request);
+    return json({ queued: c.total, audience, campaignId: c.id, dailyCap: c.dailyCap,
+      message: `Queued for ${c.total} people as a campaign. Up to ${c.dailyCap} campaign emails are sent a day; follow it in the admin console under Email campaigns.` }, 202);
+  } catch (err) {
+    if (!/no such table/i.test(String(err && err.message))) throw err;
+  }
   const recipients = (await env.DB.prepare(audienceSql(audience)).bind(...(audience === 'all' ? [] : [nowIso()])).all()).results;
   const now = nowIso();
   const stmts = recipients.map((r) => env.DB.prepare(

@@ -1,9 +1,11 @@
-// Page frames for Layer 3, business growth (docs/ADMIN-PHASE-4.md): Support and Business reports.
+// Page frames for Layer 3, business growth (docs/ADMIN-PHASE-4.md): Support, Business reports, Email campaigns
+// (with the email log) and Notifications.
 // Each frame carries no data; its script in site/console/ asks for it.
 import { esc } from '../layout.js';
 import { icon } from './icons.js';
 import { lines, select, section, panel, listFrame, recordFrame } from './page-kit.js';
 import { TOPICS } from './support-api.js';
+import { CONSOLE_BASE } from './config.js';
 
 const has = (me, k) => me.permissions.includes(k);
 const tiles = (id, n) => `<div class="tiles" id="${id}">${Array.from({ length: n }, () => '<div class="tile" aria-hidden="true"><span class="skeleton"></span><span class="skeleton skeleton-wide"></span></div>').join('')}</div>`;
@@ -90,6 +92,66 @@ ${block('renewals', 'Plans ending soon', lines(4), '<span class="panel-meta" id=
 </div>`;
 }
 
+/* ---------- Email campaigns ---------- */
+function campaignsBody(me) {
+  const actions = [
+    `<a class="btn btn-quiet" href="${esc(CONSOLE_BASE)}/email-log">${icon('mail')}<span>Email log</span></a>`,
+    has(me, 'campaigns.write') ? `<button type="button" class="btn btn-primary" id="newCampaign">${icon('plus')}<span>New campaign</span></button>` : '',
+  ].join('');
+  return listFrame({
+    title: 'Email campaigns',
+    sub: 'Emails to many customers at once: news, offers, a nudge to come back. They go to people who get product news, a few at a time, within the daily limit.',
+    action: `<div class="block-actions">${actions}</div>`,
+    label: 'Find campaigns',
+    search: { label: 'Search campaigns', placeholder: 'Name or subject' },
+    filters: select('status', 'Status', [['', 'All campaigns'], ['draft', 'Drafts'], ['scheduled', 'Scheduled'], ['sending', 'Sending'], ['sent', 'Sent'], ['cancelled', 'Stopped']]),
+    heads: [['Campaign'], ['Who gets it', 'col-wide'], ['Status', 'col-fit'], ['Progress', 'col-wide'], ['When', 'col-wide']],
+    note: '<div class="limit-bar" id="limitBar" aria-live="polite"></div>',
+  });
+}
+
+function campaignBody() {
+  return recordFrame({
+    back: ['Email campaigns', '/campaigns'],
+    missing: ['Campaign not found', 'There is no campaign with this ID. A draft may have been deleted.'],
+    main: `${section('email', 'The email', lines(5))}
+<section class="block" aria-labelledby="progressTitle" id="progressBlock" hidden><div class="block-head"><h2 id="progressTitle">Progress</h2><span class="panel-meta" id="progressMeta"></span></div>
+<div id="progressBody"></div></section>`,
+    side: `${panel('audience', 'Who gets it', 3)}
+${panel('about', 'About', 3)}
+${panel('history', 'History', 3)}`,
+    sideLabel: 'About this campaign',
+  });
+}
+
+function emailLogBody() {
+  return listFrame({
+    title: 'Email log',
+    sub: 'Every email TypeCraft has sent, newest first: sign-in codes, receipts, replies and campaigns. A failed email is tried again on its own for a day; you can also send it again here.',
+    action: `<a class="btn btn-quiet" href="${esc(CONSOLE_BASE)}/campaigns">${icon('arrowLeft')}<span>Email campaigns</span></a>`,
+    label: 'Find emails',
+    search: { label: 'Search emails', placeholder: 'Email address or subject' },
+    filters: [
+      select('status', 'Status', [['', 'Any status'], ['failed', 'Failed'], ['bounced', 'Bounced'], ['queued', 'Waiting'], ['sent', 'Sent'], ['delivered', 'Delivered'], ['cancelled', 'Cancelled']]),
+      select('kind', 'Kind', [['', 'All kinds']]),
+    ].join('\n'),
+    heads: [['To'], ['Email', 'col-wide'], ['Status', 'col-fit'], ['Tries', 'col-fit'], ['When', 'col-wide'], ['', 'col-fit']],
+    note: '<div class="seg-counts" id="dayCounts" aria-live="polite"></div>',
+  });
+}
+
+/* ---------- Notifications ---------- */
+function noticesBody(me) {
+  return listFrame({
+    title: 'Notifications',
+    sub: 'Short messages for learners: a bar under the website\'s header and a note at the top of the trainer. Learners can close one; it then stays closed for them.',
+    action: has(me, 'notices.manage') ? `<button type="button" class="btn btn-primary" id="newNotice">${icon('plus')}<span>New notification</span></button>` : '',
+    label: 'Find notifications',
+    filters: select('status', 'Status', [['', 'All notifications'], ['live', 'Showing now'], ['scheduled', 'Starts later'], ['ended', 'Ended'], ['off', 'Turned off']]),
+    heads: [['Message'], ['Shown to', 'col-wide'], ['Where', 'col-wide'], ['When', 'col-wide'], ['Status', 'col-fit'], ['', 'col-fit']],
+  });
+}
+
 export const GROWTH_PAGES = [
   { key: 'support', path: '/support', title: 'Support', crumbs: ['Business growth', 'Support'],
     permission: 'support.view', body: supportBody, scripts: ['support.js'] },
@@ -97,4 +159,12 @@ export const GROWTH_PAGES = [
     permission: 'support.view', body: messageBody, scripts: ['support-message.js'] },
   { key: 'reports', path: '/reports', title: 'Business reports', crumbs: ['Business growth', 'Business reports'],
     permission: 'revenue.view', body: reportsBody, scripts: ['charts.js', 'reports.js'] },
+  { key: 'emails', path: '/campaigns', title: 'Email campaigns', crumbs: ['Business growth', 'Email campaigns'],
+    permission: 'emails.view', body: campaignsBody, scripts: ['campaign-kit.js', 'campaigns.js'] },
+  { key: 'emails', match: /^\/campaigns\/(cmp_[\w-]{1,64})$/, names: ['id'], title: 'Campaign', crumbs: ['Business growth', ['Email campaigns', '/campaigns'], 'Campaign'],
+    permission: 'emails.view', body: campaignBody, scripts: ['campaign-kit.js', 'campaign.js'] },
+  { key: 'emails', path: '/email-log', title: 'Email log', crumbs: ['Business growth', ['Email campaigns', '/campaigns'], 'Email log'],
+    permission: 'emails.view', body: emailLogBody, scripts: ['email-log.js'] },
+  { key: 'notifications', path: '/notifications', title: 'Notifications', crumbs: ['Business growth', 'Notifications'],
+    permission: 'notices.view', body: noticesBody, scripts: ['notices.js'] },
 ];

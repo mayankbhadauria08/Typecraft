@@ -130,6 +130,18 @@ in that order.
 3. Replies from the console are emailed from the normal sending address with "reply to" set to
    the support address in Settings, so the customer's answer comes back to that inbox.
 
+## 1h. The admin console, Phase 4b (Email campaigns and Notifications)
+
+Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1g) first: this builds on it.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0010_campaigns.sql` (three new tables, `email_campaigns`,
+   `campaign_sends` and `site_notices`; adds only, no row changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('email_campaigns', 'campaign_sends', 'site_notices')`.
+2. **[You] Merge the 4b pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
+3. Campaigns send at most 80 emails a day (Resend's free plan allows 100 a day for everything). After
+   upgrading Resend, raise the limit in Console › Email campaigns › Change the limit.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

@@ -362,9 +362,24 @@
       try { sessionStorage.setItem('tcKbNote', 'off'); } catch (e) {}
     }));
     try { if (sessionStorage.getItem('tcKbNote') === 'off') document.querySelectorAll('[data-kb-note]').forEach((n) => n.remove()); } catch (e) {}
+    // notices from the team: closing one keeps it closed on every page, and in the trainer (the tc_nd cookie)
+    document.querySelectorAll('[data-notice-close]').forEach((b) => b.addEventListener('click', () => {
+      const bar = b.closest('[data-notice]'); if (!bar) return;
+      closeNotice(bar.getAttribute('data-notice'));
+      const all = bar.parentElement; bar.remove();
+      if (all && !all.children.length) all.remove();
+    }));
     // "Start free" calls to action become "Open the trainer" for signed-in visitors
     const boot = readBoot();
     if (boot && boot.user) document.querySelectorAll('a[data-auth-swap]').forEach((a) => { a.href = a.getAttribute('data-auth-swap') || '/app'; a.innerHTML = 'Open the trainer' + icon('arrowRight'); });
+  }
+
+  /** Remembers a closed notice for 60 days; the last 10 are kept. */
+  function closeNotice(id) {
+    if (!/^ntc_[a-z0-9]{6,24}$/.test(id || '')) return;
+    const m = document.cookie.match(/(?:^|;\s*)tc_nd=([^;]*)/);
+    const ids = (m ? decodeURIComponent(m[1]).split('.') : []).filter((x) => x && x !== id).concat(id).slice(-10);
+    document.cookie = 'tc_nd=' + ids.join('.') + '; Path=/; Max-Age=' + 60 * 86400 + '; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
   }
 
   /** .tabs with buttons [role=tab][aria-controls]; arrow keys move between tabs. */

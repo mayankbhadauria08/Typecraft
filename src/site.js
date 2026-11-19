@@ -6,6 +6,7 @@ import { getSession } from './session.js';
 import * as admin from './admin.js';
 import { roleOf } from './roles.js';
 import { entitlementsFor } from './entitlements.js';
+import { liveNotices, pickNotices, dismissedFrom, viewerOf } from './notices.js';
 import { renderPage, esc } from './layout.js';
 import { PAGES as PUBLIC_PAGES } from './pages/public.js';
 import { PAGES as AUTH_PAGES } from './pages/auth.js';
@@ -245,12 +246,14 @@ export async function servePage(request, env, ctx) {
 
   const { page, params } = found;
   const access = page.meta.access;
+  const noticesP = liveNotices(env); // asked for now, used once the page is drawn: no extra wait
   const session = await sessionFor(env, request);
   const renew = session && session.setCookie ? session.setCookie : null;
 
   if (access === 'guest' && session) return redirect(url, safeNext(url.searchParams.get('next')) || '/dashboard');
   if (access === 'user' && !session) return redirect(url, '/login?next=' + encodeURIComponent(path + url.search));
   const who = await whoFor(env, session);
+  who.notices = pickNotices(await noticesP, viewerOf(who.user, who.entitlements), 'site', dismissedFrom(request));
   if (access === 'admin') {
     const allowed = page.meta.roles || ADMIN_ROLES;
     if (!who.role || !allowed.includes(who.role)) return notFound(request, env, url, session, who);
@@ -267,7 +270,7 @@ async function render(env, url, page, params, who, status) {
   const ctx = {
     env, url, params, siteUrl: base, path: url.pathname, nonce,
     canonicalPath: page.meta.canonical || (page.re ? url.pathname : page.meta.path),
-    user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null,
+    user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null, notices: who.notices || [],
     noindex: !!page.meta.noindex || page.meta.access === 'user' || page.meta.access === 'admin' || isWorkersDev(url) || !!status,
     jsonld: [],
   };
@@ -289,6 +292,7 @@ async function render(env, url, page, params, who, status) {
 async function notFound(request, env, url, session, who) {
   if (session === undefined) session = await sessionFor(env, request);
   if (!who) who = await whoFor(env, session);
+  if (!who.notices) who.notices = pickNotices(await liveNotices(env), viewerOf(who.user, who.entitlements), 'site', dismissedFrom(request));
   const page = { meta: { ...notFoundMeta, access: 'public', layout: 'site' }, body: notFoundBody };
   const html = await render(env, url, page, {}, who, 404);
   return new Response(request.method === 'HEAD' ? null : html.text, { status: 404, headers: pageHeaders(url, { nonce: html.nonce, cache: NO_STORE }) });
