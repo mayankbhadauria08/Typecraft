@@ -877,3 +877,8 @@ progress.meter::-moz-progress-bar { background: var(--accent); border-radius: 99
   .tpl-layout { grid-template-columns: minmax(0, 1fr); }
   .tpl-nav { position: static; max-height: none; }
 }
+
+/* ---------- Administrators, Activity logs, Security (Phase 5b) ---------- */
+.dialog-wide { width: min(640px, calc(100vw - 32px)); max-width: none; }
+.activity-facts { max-height: 60vh; overflow: auto; }
+.activity-facts dd { overflow-wrap: anywhere; }

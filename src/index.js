@@ -9,6 +9,7 @@ import * as api from './api.js';
 import * as admin from './admin.js';
 import { rebuildAll } from './pipeline.js';
 import { runJobs, pruneJobRuns } from './jobs.js';
+import { retention } from './retention.js'; // the nightly privacy clean-up (docs/ADMIN-PHASE-5.md §12)
 // SaaS modules: each exports ROUTES ({'METHOD /path': handler}), PATTERNS ([method, regex, names, handler])
 // and optionally cron(env, ctx, kind). See docs/SAAS-CONTRACTS.md.
 import * as billing from './billing.js';
@@ -153,6 +154,7 @@ export default {
       // the nightly job: every learner's totals are rebuilt from their saved events and compared with the
       // stored ones; differences are corrected and logged (rebuild_runs, rebuild_diffs)
       parts.push(['learner totals', async () => { const r = await rebuildAll(env); console.log('nightly rebuild:', JSON.stringify(r)); }]);
+      parts.push(['privacy clean-up', async () => { const r = await retention(env); console.log('privacy clean-up:', JSON.stringify(r)); }]);
       parts.push(['job record', () => pruneJobRuns(env)]);
     }
     await runJobs(env, ctx, event.cron, parts);

@@ -2,9 +2,10 @@
 
 Phase 5 builds the console's fourth layer, in two pull requests:
 
-- **5a** (this part): Settings, Integrations, System health, the background-job record with failure
+- **5a** (§1–8): Settings, Integrations, System health, the background-job record with failure
   emails, email template previews, and smaller batches for Workers Free.
-- **5b**: Administrators, Activity logs, Security, and the nightly retention clean-up.
+- **5b** (§9–14): Administrators, Activity logs, Security, and the nightly privacy clean-up. With 5b
+  every module in the console's sidebar is built, and nothing is left that only the old `/admin` does.
 
 Decisions behind it (November 2026):
 
@@ -168,3 +169,92 @@ a failing part with its single alert email, runs stopped part-way and jobs that 
 email and payment warnings, the state before migration 0017, the migration list against the folder,
 and the email previews with their headers. `tests/email.test.mjs` checks every template has preview
 data and a description.
+
+## 9. Administrators (`/console/administrators`)
+
+Everyone who can use the console: the Super Admins from `OWNER_EMAILS` (marked "From OWNER_EMAILS", changed
+only in Cloudflare) and everyone given Admin or Support here, with when and by whom, their last admin sign-in,
+and whether they are signed in now.
+
+- **Add**: the email of an existing, active TypeCraft account and a role (Admin or Support). Someone without
+  an account is asked to sign up on the site first. Super Admin can't be given here.
+- **Change role** and **Remove**: not for yourself, and not for `OWNER_EMAILS` accounts. Removing ends the
+  person's console sign-ins at once; their TypeCraft account stays as it is.
+- Each change is logged as `user.role` (with `via: console`) and the person gets an email (`account_update`,
+  security category) saying what changed.
+
+Viewing needs `roles.view` (Super Admin, Admin). Changing needs `admins.manage`: Super Admins only, and it
+asks for the password again. This replaces role changes in the old `/admin/users`.
+
+## 10. Activity logs (`/console/activity-logs`)
+
+Every entry in `audit_logs`: changes made in the admin (old and new), console sign-ins and failed sign-ins,
+payments confirmed by Razorpay, discounts used at checkout. Newest first, 25 a page, with plain-words labels
+("Disabled an account") and a link to what it was about (the customer, payment, institute, campaign, coupon,
+package or support message).
+
+Filters: kind (sign-ins, roles and administrators, settings, customers, plans and access, payments and
+refunds, packages, course, campaigns and offers, support, institutes, everything else), who did it (any
+administrator, or "TypeCraft itself" for payments and scheduled jobs), from and to (India days), and a search:
+a customer's email finds everything done to or by that account. **Details** shows the full entry: what changed
+from what, and the IP address while it is kept.
+
+**Download list**: the same filters as a spreadsheet (up to 5,000 rows). It asks for the password again,
+and the download itself is logged (`audit.export`), because it holds IP addresses.
+
+Permission `audit.view`: Super Admin and Admin.
+
+## 11. Security (`/console/security`)
+
+- **Checks**: emailed code at admin sign-in on; `SESSION_SECRET` installed; every `OWNER_EMAILS` address has
+  an account (one that doesn't could be claimed by whoever signs up with it first); every administrator has
+  confirmed their email; nobody with a role has gone 90 days without signing in; no disabled account still
+  holds a role.
+- **Signed in to the admin console now**: person, device, IP address, how they signed in (password only, or
+  password and emailed code), when, last active. **Sign out** ends one sign-in; **Sign everyone else out**
+  ends all but yours (for example after a password may have leaked).
+- **Sign-in locks**: site accounts after 8 wrong passwords and console sign-ins after 5 (from one address)
+  are locked for 15 minutes; the admin code step after 10 wrong codes for an hour. Accounts with 3 or more
+  wrong tries show here, with **Unlock** (or **Reset count**) for when you know the tries were theirs.
+- **Failed admin sign-ins** in the last 7 days, and the rules above in plain words.
+
+Sessions are named by the first 16 characters of their id; the full id never leaves the server (tested).
+`security.view`: Super Admin and Admin. `security.manage` (sign out, unlock): Super Admin; asks for the
+password again; can be given to Admin.
+
+## 12. The nightly privacy clean-up (`src/retention.js`)
+
+A new part of the nightly job, "privacy clean-up", recorded in the job record like the others:
+
+| What | Kept for | Then |
+| --- | --- | --- |
+| IP addresses in the activity log and on contact messages | 90 days | removed; the entry stays |
+| Email records (`email_logs`) | 1 year | deleted |
+| Browsers you sign in from (`known_devices`) | 1 year after last use | forgotten; the next sign-in from it is "new" |
+| Sign-in and confirmation codes | 1 day | deleted (they expire in minutes) |
+
+Already in place: console sign-ins removed after 30 days, sign-in limit counters after a day, reset and
+confirmation links a week after they expire. Each step handles at most 5,000 rows a night, far inside
+Workers Free's 100,000 rows written a day. The Privacy page (§5) now states these periods instead of "a short
+period".
+
+## 13. Permissions added in 5b, and going live
+
+| Key | Admin | Support | Note |
+| --- | --- | --- | --- |
+| `security.view` | on | off | new |
+| `security.manage` | off | off | new; asks for the password again |
+| `audit.view` | on | off | unchanged; the download asks for the password again |
+| `roles.view`, `admins.manage` | as before | | now also the Administrators page |
+
+5b needs **no database update**. Merge 5a first (and apply 0017, §7), then the 5b pull request. After the
+merge, the old `/admin` has nothing the console lacks; retiring it is Phase 6 (docs/ADMIN-CONSOLE.md §9).
+
+## 14. Tests (5b)
+
+`node --test tests/console-security.test.mjs`: administrators (who may look and change, every refusal,
+emails sent, the new role applying at once, removal ending sign-ins, the log), activity (kinds and labels,
+filters, links, the password-checked download, formula-safe cells), security (sessions without full ids,
+learner and console locks from real wrong passwords, unlocking, ending one or all other sign-ins), the privacy
+clean-up through the real nightly job (and a second night finding nothing), the Privacy page's wording, and
+the three pages.

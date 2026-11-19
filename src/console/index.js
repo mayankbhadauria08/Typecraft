@@ -24,8 +24,11 @@ import * as coupons from './coupons-api.js';
 import * as settings from './settings-api.js';
 import * as system from './system-api.js';
 import * as emailPreview from './email-preview.js';
+import * as admins from './admins-api.js';
+import * as activity from './activity-api.js';
+import * as security from './security-api.js';
 
-const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics, institutes, support, reports, campaigns, notices, coupons, settings, system, emailPreview];
+const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics, institutes, support, reports, campaigns, notices, coupons, settings, system, emailPreview, admins, activity, security];
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006',

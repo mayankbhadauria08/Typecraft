@@ -222,6 +222,17 @@ Full notes: `docs/ADMIN-PHASE-5.md`. Phase 5 comes as two pull requests (5a, the
 5. Recommended: set up `RESEND_WEBHOOK_SECRET` (§2) so the email log knows delivered from bounced.
 6. When you move to Workers Paid: add the variable `WORKERS_PLAN` = `paid` (§2).
 
+## 1o. The admin console, Phase 5b (Administrators, Activity logs, Security)
+
+Full notes: `docs/ADMIN-PHASE-5.md` §9–14. Merge 5a (§1n) first: this builds on it.
+
+1. **No database update.**
+2. **[You] Merge the 5b pull request.** Nothing changes for learners, apart from the Privacy page's
+   "How long we keep it", which now gives exact periods.
+3. Add and remove administrators under Console › Administrators from now on (not /admin/users).
+4. The first nightly run after the merge removes IP addresses older than 90 days and email records
+   older than a year.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |
