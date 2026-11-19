@@ -1,4 +1,4 @@
-// /account/plans — current entitlements, subscription periods, what is and isn't included, buy/renew.
+// /account/plans — current entitlements, institute seats, subscription periods, what is and isn't included, buy/renew.
 export const meta = {
   path: '/account/plans', title: 'Plans', description: 'Your plan, its periods and what it includes.',
   access: 'user', layout: 'account', nav: 'plans', noindex: true,
@@ -11,6 +11,10 @@ export const body = `
 <section class="section grid grid-2">
   <article class="card" aria-labelledby="pl-cur-h"><div class="card-head"><h2 id="pl-cur-h">Current plan</h2></div><div id="pl-current"><div class="skeleton" style="height:6rem"></div></div></article>
   <article class="card" aria-labelledby="pl-feat-h"><div class="card-head"><h2 id="pl-feat-h">What's included</h2></div><div id="pl-features"><div class="skeleton" style="height:10rem"></div></div></article>
+</section>
+<section class="section" aria-labelledby="pl-inst-h" id="pl-inst-sec">
+  <h2 id="pl-inst-h">Your institute</h2>
+  <div id="pl-inst"><div class="skeleton" style="height:3rem"></div></div>
 </section>
 <section class="section" aria-labelledby="pl-subs-h">
   <h2 id="pl-subs-h">Your plan periods</h2>

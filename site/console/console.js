@@ -74,11 +74,14 @@
     campaign: { draft: ['Draft', ''], scheduled: ['Scheduled', 'warn'], sending: ['Sending', 'warn'], sent: ['Sent', 'ok'], cancelled: ['Stopped', 'bad'] },
     notice: { live: ['Showing', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] },
     coupon: { live: ['Works now', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Expired', ''], used_up: ['Used up', ''], off: ['Off', ''] },
-    promotion: { live: ['On now', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] }
+    promotion: { live: ['On now', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] },
+    institute: { pending: ['Not paid yet', 'warn'], active: ['On', 'ok'], suspended: ['Paused', 'bad'], closed: ['Closed', ''] },
+    staff: { invited: ['Invited', 'warn'], active: ['Joined', 'ok'], removed: ['Removed', ''] }
   };
   /** A badge for a state: AC.status('order', 'paid'). */
   function status(kind, key) { var p = (STATUS[kind] || {})[key] || [key, '']; return badge(p[0], p[1]); }
-  var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer' };
+  var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer',
+    cheque: 'Cheque', cash: 'Cash', other: 'Other', razorpay: 'Online (Razorpay)' };
   function method(key) { return key ? (METHOD[key] || key) : '\u2013'; }
   var SOURCE = { purchase: 'Bought', admin: 'Given by staff', promo: 'Promotion' };
   function source(key) { return SOURCE[key] || key; }
@@ -215,7 +218,7 @@
    * A dialog with fields. It stays open until opts.submit(values) succeeds, and shows what the server
    * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
    * opts: { title, text, submitLabel, danger, submit(values) → Promise,
-   *         fields: [{ name, label, type: 'text' | 'textarea' | 'number' | 'select' | 'radio' | 'checks' (an array) | 'checkbox' (true/false)
+   *         fields: [{ name, label, type: 'text' | 'email' | 'date' | 'textarea' | 'number' | 'select' | 'radio' | 'checks' (an array) | 'checkbox' (true/false)
    *                    | 'datetime' (local 'YYYY-MM-DDTHH:MM'), value, required,
    *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint } | { group, options }] }] }
    */
@@ -259,7 +262,7 @@
           if (o.group) return el('optgroup', { label: o.group }, o.options.map(function (x) { return el('option', { value: x.value, text: x.label }); }));
           return el('option', { value: o.value, text: o.label });
         }));
-        else control = el('input', { id: id, type: f.type === 'number' ? 'number' : f.type === 'datetime' ? 'datetime-local' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
+        else control = el('input', { id: id, type: f.type === 'number' || f.type === 'date' || f.type === 'email' ? f.type : f.type === 'datetime' ? 'datetime-local' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
           inputmode: f.inputmode || (f.type === 'number' ? 'numeric' : null), autocomplete: 'off' });
         if (f.value !== undefined && f.value !== null) control.value = String(f.value);
         controls[f.name] = { read: function () { return control.value; }, node: control, first: function () { return control; } };

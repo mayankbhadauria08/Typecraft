@@ -486,7 +486,7 @@ export async function retryEmail(request, env, ctx, params) {
 export async function cron(env, ctx, kind) {
   if (kind !== '*/10 * * * *') return;
   try { await runCampaigns(env); } catch (err) {
-    if (!/no such table/i.test(String(err && err.message))) throw err; // before migration 0012: nothing to send
+    if (!/no such table/i.test(String(err && err.message))) throw err; // before migration 0015: nothing to send
   }
 }
 

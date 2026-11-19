@@ -333,14 +333,14 @@ test('pages: frames without inline code; Support sees campaigns and notification
 });
 
 /* ---------------- before the migration ---------------- */
-test('before migration 0012: the console says so, learners see no notices, the cron does nothing, announcements go the old way', async () => {
+test('before migration 0015: the console says so, learners see no notices, the cron does nothing, announcements go the old way', async () => {
   await K.run('DROP TABLE campaign_sends');
   await K.run('DROP TABLE email_campaigns');
   await K.run('DROP TABLE site_notices');
   forgetAll(S.env);
   const r = await admin('GET', '/api/console/campaigns');
   assert.equal(r.status, 503);
-  assert.match(r.body.error.message, /0012/);
+  assert.match(r.body.error.message, /0015/);
   assert.equal((await admin('GET', '/api/console/notices')).status, 503);
   assert.deepEqual((await K.client()('GET', '/api/notices?place=site')).body.notices, []);
   assert.equal((await K.client()('GET', '/pricing')).status, 200);

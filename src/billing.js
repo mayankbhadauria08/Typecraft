@@ -12,10 +12,12 @@ import { uuid, sha256Hex } from './crypto.js';
 import * as rzp from './razorpay.js';
 import { ensureInvoice, invoiceView } from './invoices.js';
 import { entitlementsFor, has } from './entitlements.js';
+import { keyStatsSql } from './key-stats.js';
 import { sendTemplate } from './mail.js';
 import { todayOf } from './api.js';
 import { remember, PUBLIC_DATA_TTL } from './memo.js';
 import { priceFor, livePromotions, withSales, orderDiscount, cleanCode } from './pricing.js';
+import { instituteWebhook } from './institute-checkout.js';
 
 const DAY_MS = 86400000;
 const MIN_MS = 60000;
@@ -491,14 +493,14 @@ async function processWebhook(env, ctx, type, payload) {
     case 'order.paid': {
       if (!pay) return { status: 'ignored', note: 'no payment' };
       const order = await orderForRazorpay(env, pay.order_id || (ord && ord.id));
-      if (!order) return { status: 'ignored', note: 'unknown order' };
+      if (!order) return instituteWebhook(env, ctx, type, pay, ord); // seats for an institute (src/institute-checkout.js), or unknown
       const r = await handlePayment(env, ctx, order, pay, 'webhook');
       return r.status === 'mismatch' ? { status: 'ignored', note: 'payment does not match order' } : { status: 'processed' };
     }
     case 'payment.failed': {
       if (!pay) return { status: 'ignored', note: 'no payment' };
       const order = await orderForRazorpay(env, pay.order_id);
-      if (!order) return { status: 'ignored', note: 'unknown order' };
+      if (!order) return instituteWebhook(env, ctx, type, pay, ord);
       if (pay.amount !== order.amount_paise) return { status: 'ignored', note: 'payment does not match order' };
       await recordPayment(env, order, { ...pay, status: 'failed' }, 'webhook');
       await markFailed(env, ctx, order, pay.error_description || 'The payment did not go through.');
@@ -697,7 +699,7 @@ export async function getAnalytics(request, env) {
   const [daily, tests, ks, bg, ec] = (await DB.batch([
     DB.prepare('SELECT day, seconds, runs, best_wpm, acc_sum, acc_count, xp FROM daily_totals WHERE user_id = ?1 AND day >= ?2 AND day <= ?3 ORDER BY day').bind(user.id, from, today),
     DB.prepare('SELECT day, COUNT(*) AS n, AVG(wpm) AS wpm, MAX(wpm) AS best, AVG(accuracy) AS acc FROM typing_tests WHERE user_id = ?1 AND day >= ?2 GROUP BY day ORDER BY day').bind(user.id, from),
-    DB.prepare('SELECT k, attempts, errors FROM key_stats WHERE user_id = ?1').bind(user.id),
+    DB.prepare(keyStatsSql('?1')).bind(user.id),
     DB.prepare('SELECT pair, count, total_ms FROM bigram_stats WHERE user_id = ?1 AND count >= 3').bind(user.id),
     DB.prepare('SELECT cls, n FROM error_classes WHERE user_id = ?1').bind(user.id),
   ])).map((r) => r.results);

@@ -11,6 +11,7 @@ import '../../shared/course-meta.js';
 import { HttpError, json } from '../http.js';
 import { loadCourse, lessonTitle, levelName } from '../course-store.js';
 import { entitlementsFor } from '../entitlements.js';
+import { keyStatsSql } from '../key-stats.js';
 import { requireAdmin } from './session.js';
 import { permissionsFor } from './permissions.js';
 import { Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, DAY_MS, PAGE_SIZE } from './lib.js';
@@ -27,7 +28,8 @@ const LEVEL_RANGE = Object.fromEntries(META.LEVELS.map((L) => {
 }));
 /** The level a learner is working on, from the index of the furthest lesson finished (null: none). */
 export const workingOn = (far) => (far == null ? 1 : far + 1 >= META.ORDER.length ? META.LEVELS[META.LEVELS.length - 1].n : META.BY_ID[META.ORDER[far + 1]].level);
-const allDone = (done) => done >= META.ORDER.length;
+export const ORDER_SQL = ORD_SQL;
+export const allDone = (done) => done >= META.ORDER.length;
 
 const SORTS = {
   recent: 'last_day IS NULL, last_day DESC, u.created_at DESC',
@@ -95,19 +97,39 @@ export async function getProgressList(request, env) {
 export async function getProgressOne(request, env, ctx, params) {
   const who = await requireAdmin(env, request, 'progress.view');
   const id = idParam(params.id, 'There is no learner with this ID.');
+  const p = await progressOf(env, id);
+  if (!p) throw new HttpError(404, 'not_found', 'There is no learner with this ID.');
+  const perms = await permissionsFor(env, who.role);
+  let plan = null;
+  try { const ent = await entitlementsFor(env, id); plan = { name: ent.planName, lessons: ent.lessonsWords.Text }; } catch { plan = null; }
+  const { user, ...view } = p;
+  return json({
+    learner: { id: user.id, fullName: user.full_name, email: user.email, joinedAt: user.created_at, disabled: user.account_status !== 'active' },
+    plan,
+    ...view,
+    can: { customer: perms.includes('customers.view') },
+  });
+}
+
+/**
+ * One learner's progress: every lesson, a summary, weak keys and practice by day for 30 days. Shared by the
+ * console (Student progress) and an institute's student page (src/institute-reports.js). → null when there is
+ * no such learner. The numbers are the same wherever they are shown.
+ */
+export async function progressOf(env, id) {
   const DB = env.DB;
   const since = istDay(Date.now() - 29 * DAY_MS);
   const [u, scores, keys, days, place, totals, all] = await DB.batch([
     DB.prepare('SELECT id, full_name, email, created_at, account_status FROM users WHERE id = ?1').bind(id),
     DB.prepare('SELECT lesson_id, status, stars, crown, best_wpm, best_accuracy, attempts, last_played, completed_at FROM lesson_scores WHERE user_id = ?1').bind(id),
-    DB.prepare(`SELECT k, attempts, errors FROM key_stats WHERE user_id = ?1 AND attempts >= ${KEY_MIN} ORDER BY CAST(errors AS REAL) / attempts DESC, attempts DESC LIMIT 10`).bind(id),
+    DB.prepare(`SELECT k, attempts, errors FROM (${keyStatsSql('?1')}) WHERE attempts >= ${KEY_MIN} ORDER BY CAST(errors AS REAL) / attempts DESC, attempts DESC LIMIT 10`).bind(id),
     DB.prepare('SELECT day, seconds, best_wpm, acc_sum, acc_count FROM daily_totals WHERE user_id = ?1 AND day >= ?2 ORDER BY day').bind(id, since),
     DB.prepare('SELECT level, wpm, accuracy, at FROM placement WHERE user_id = ?1').bind(id),
     DB.prepare('SELECT xp, streak_count, streak_best FROM user_totals WHERE user_id = ?1').bind(id),
     DB.prepare('SELECT COALESCE(SUM(seconds), 0) AS secs, MAX(CASE WHEN seconds > 0 THEN day END) AS last_day FROM daily_totals WHERE user_id = ?1').bind(id),
   ]);
   const user = u.results[0];
-  if (!user) throw new HttpError(404, 'not_found', 'There is no learner with this ID.');
+  if (!user) return null;
   const { edits } = await loadCourse(env);
   const by = new Map(scores.results.map((s) => [s.lesson_id, s]));
   let far = null, done = 0, stars = 0, crowns = 0, best = 0, accSum = 0;
@@ -120,12 +142,8 @@ export async function getProgressOne(request, env, ctx, params) {
       attempts: s ? s.attempts : 0, lastPlayed: s ? s.last_played : null, stuck: !!(s && s.status !== 'completed' && s.attempts >= STUCK_TRIES) };
   });
   const xp = totals.results[0] ? totals.results[0].xp : 0;
-  const perms = await permissionsFor(env, who.role);
-  let plan = null;
-  try { const ent = await entitlementsFor(env, id); plan = { name: ent.planName, lessons: ent.lessonsWords.Text }; } catch { plan = null; }
-  return json({
-    learner: { id: user.id, fullName: user.full_name, email: user.email, joinedAt: user.created_at, disabled: user.account_status !== 'active' },
-    plan,
+  return {
+    user,
     summary: {
       lessonsDone: done, totalLessons: META.ORDER.length, level: workingOn(far), levelName: levelName(edits, workingOn(far)), finished: allDone(done),
       bestWpm: Math.round(best), accuracy: done ? Math.round((accSum / done) * 10) / 10 : null, stars, crowns,
@@ -139,8 +157,7 @@ export async function getProgressOne(request, env, ctx, params) {
     weakKeys: keys.results.map((k) => ({ key: k.k, attempts: k.attempts, errors: k.errors, rate: Math.round((k.errors / k.attempts) * 1000) / 10 })),
     days: days.results.map((d) => ({ day: d.day, minutes: Math.round((d.seconds / 60) * 10) / 10, bestWpm: Math.round(d.best_wpm), accuracy: d.acc_count ? Math.round(d.acc_sum / d.acc_count) : null })),
     since, today: istDay(),
-    can: { customer: perms.includes('customers.view') },
-  });
+  };
 }
 
 export const ROUTES = { 'GET /api/console/progress': getProgressList };

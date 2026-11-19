@@ -1,6 +1,6 @@
 // What a plan costs right now (docs/ADMIN-PHASE-4.md §7): its price, lowered by a sale (promotions) or a
 // coupon code typed at checkout, whichever takes more off. Never both. Written in the admin console
-// (src/console/coupons-api.js); kept in migration 0013's tables. Until that migration is applied there are
+// (src/console/coupons-api.js); kept in migration 0016's tables. Until that migration is applied there are
 // no sales, codes are refused politely, and every price is the plan's own.
 //
 // Discounts: a percentage (1 to 90) is rounded to whole rupees; a fixed amount is in paise. Whatever the
@@ -29,7 +29,7 @@ async function loadPromotions(env) {
       .bind(nowIso()).all()).results;
     return rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind, value: r.value, plans: parse(r.plans, []), startsAt: r.starts_at, endsAt: r.ends_at }));
   } catch {
-    return []; // before migration 0013: no sales
+    return []; // before migration 0016: no sales
   }
 }
 /** Sales switched on and not over yet (remembered for a minute; a console change clears it). */
@@ -117,7 +117,7 @@ export async function priceFor(env, pkg, { userId, code = '', now = Date.now() }
   return { listPaise: list, pricePaise: list - (discount ? discount.paise : 0), discount, note };
 }
 
-/** The discount saved for an order, or null (also before migration 0013). */
+/** The discount saved for an order, or null (also before migration 0016). */
 export async function orderDiscount(env, orderId) {
   try {
     return await env.DB.prepare('SELECT * FROM order_discounts WHERE order_id = ?1').bind(orderId).first();

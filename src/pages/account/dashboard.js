@@ -20,6 +20,10 @@ export const body = `
     <div id="dash-today"><div class="skeleton" style="height:4.5rem"></div></div>
   </article>
 </section>
+<section class="section" id="dash-batch" hidden aria-labelledby="dash-batch-h">
+  <h2 id="dash-batch-h">Your batch</h2>
+  <div id="dash-batch-body"></div>
+</section>
 <section class="section" aria-labelledby="dash-stats-h">
   <h2 id="dash-stats-h" class="sr-only">Your numbers</h2>
   <div class="grid grid-4" id="dash-stats">

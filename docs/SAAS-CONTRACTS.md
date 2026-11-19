@@ -229,6 +229,73 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   kind, title, test, wpm, accuracy, seconds, at, code, checkedAt } }`; 404 for unknown, unshared or a
   disabled account (the same message for all three).
 
+## 6c. Institutes — `src/institutes.js`, `src/institute-access.js` (docs/INSTITUTES.md)
+
+- `GET /api/institutes/join?code=` (signed in; 20 an hour per account, 60 per address) → `{ code, institute: { name },
+  batch: { name }, plan: { name }, endsAt, joined, canJoin, problem: { code, message } | null }`; 404 `bad_code`.
+- `POST /api/institutes/join` (signed in) `{ code, adult: true }` → 201 `{ joined, already: false, institute, batch,
+  plan, endsAt }` or 200 `already: true`; 400 fields `code` / `adult`; 409 `not_open`, `ended`, `seats_full`,
+  `other_batch`.
+- `GET /api/me/institutes` (signed in) → `{ seats: [{ id, institute: { name }, batch: { name }, plan: { name },
+  joinedAt, endsAt, givesPlan }], staff: [{ institute: { id, name, status }, role }] }`.
+- `POST /api/me/institutes/:id/leave` (signed in, own seat) → `{ left: true }`.
+- `GET /api/institutes/:id` (active staff) → `{ role, institute: { id, name, city, status, seats, seatsUsed, startsAt,
+  endsAt }, batches: [{ id, name, students, archived }] }` (teachers: their batches only).
+- `GET /api/institutes/:id/batches/:bid` (admin, or a teacher of that batch) → `{ role, institute: { id, name },
+  batch: { id, name, archived, students, joinCode, teachers: [{ id, name }] } }`.
+- Not staff, not their batch, closed institute, unknown id: 404 (one answer for all). Before migration 0009: 503
+  `institutes_not_ready`.
+- Console (`src/console/institutes-api.js`, docs/INSTITUTES.md §7): `GET/POST /api/console/institutes`,
+  `GET/PUT /api/console/institutes/:id`, `POST …/:id/term`, `…/:id/status`, `…/:id/payments`,
+  `…/:id/payments/:pid/remove`, `…/:id/staff`, `…/:id/staff/:sid/resend`, `…/:id/staff/:sid/remove`;
+  permissions `institutes.view`, `institutes.manage`, `institutes.payments` (sensitive).
+- Institute pages API (`src/institute-portal.js`, docs/INSTITUTES.md §8): `POST /api/me/institute-invites/:sid/accept|decline`;
+  admin: `GET/POST /api/institutes/:id/staff`, `POST …/staff/:sid/resend|remove`, `POST /api/institutes/:id/batches`,
+  `PUT …/batches/:bid` `{ name?, teacherIds?, joining?, archived?, removeStudents? }`, `POST …/batches/:bid/code`,
+  `POST /api/institutes/:id/students/:mid/remove`, `…/move { batchId }`; staff of the batch: `GET …/batches/:bid/students`.
+  `GET /api/me/institutes` also lists `invites` and `emailVerified`. Pages `/institute`, `/institute/:id`,
+  `/institute/:id/batches/:bid` (user, account layout).
+- Reports (`src/institute-reports.js`, docs/INSTITUTES.md §9), staff of the batch: `GET /api/institutes/:id/batches/:bid/report`,
+  `…/report.csv`, `…/certificates`; `GET /api/institutes/:id/students/:mid`. `GET /api/certificates/:code` adds `institute`
+  (name or null). Page `/institute/:id/students/:mid`.
+- Console capacity: `GET /api/console/institutes/capacity` (institutes.view) → `{ today, lessonsToday, learnersToday, seatsInUse,
+  databaseBytes | null, freeDatabaseBytes, freeLessonsADay, writesALesson, freeWritesADay }`.
+- Teaching (`src/institute-teaching.js`, docs/INSTITUTES.md §12), staff of the batch: `GET /api/institutes/:id/batches/:bid/teaching`,
+  `PUT …/target` `{ wpm, accuracy, dueDay?, note? }` or `{ clear: true }`, `POST …/assignments` `{ kind, ref, dueDay, note? }`,
+  `POST …/assignments/:aid/remove`, `PUT …/leaderboard` `{ on }`; signed in: `GET /api/me/batches`.
+- Students by email (`src/institute-mail.js`, docs/INSTITUTES.md §13), admins: `POST /api/institutes/:id/batches/:bid/invites`
+  `{ students: [{ name, email }] }` (≤ 25) → `{ sent, skipped: [{ email, why }] }`; `GET …/invites`. Nightly reminders.
+- Email templates `student_invite` `{ name, instituteName*, batchName*, batchCode*, joinPath* }`, `institute_reminder`
+  `{ name, instituteName*, kind*, seats, seatsUsed, lastDay, days, link }`.
+- Institute invoices (`src/institute-invoices.js`, docs/INSTITUTES.md §14): `POST /api/console/institutes/:id/payments/:pid/invoice`
+  (institutes.payments), `GET /api/console/institutes/:id/invoices/:number`; admins: `GET /api/institutes/:id/invoices`,
+  `GET /api/institutes/:id/invoices/:number`. Page `/institute/:id/invoices/:number` (public, bare, noindex; data via the APIs).
+- Seats bought online (`src/institute-checkout.js`, docs/INSTITUTES.md §15): signed in: `GET /api/institutes/buy` → `{ open, packageId,
+  packageName, minSeats, terms: [{ months, pricePerSeatPaise }], maxSeats, maxPaise, emailVerified, you }`; admins: `GET /api/institutes/:id/buy`
+  → `{ open, why, seats, seatsUsed, lastDay, addSeats: { available, days, pricePerSeatPaise, from, to }, renew: { available, opensOn | from,
+  minSeats, terms } }`; email confirmed: `POST /api/institutes/checkout` `{ kind: 'new', seats, months, name, city, contactName, contactEmail,
+  contactPhone, gstin, agree }` | `{ kind: 'seats', instituteId, seats }` | `{ kind: 'renew', instituteId, seats, months }` → `{ orderId,
+  razorpayOrderId, amountPaise, currency, keyId, description, prefill }` (503 `buying_closed`, 403 `verify_email`, 409 `not_for_sale` /
+  `ended` / `too_early`); the payer: `POST /api/institutes/checkout/verify` → `{ status, instituteId?, invoiceNumber? }`, `POST …/failed`,
+  `GET /api/institutes/checkout/orders/:id`. Console: `GET /api/console/institutes/pricing` (institutes.view), `PUT` (institutes.payments)
+  `{ on, packageId, minSeats, prices: { 6, 12 } }`. Webhooks: through `POST /api/webhooks/razorpay`. Page `/institute/buy` (user, account).
+- Email template `institute_payment` `{ name, instituteName*, kind, what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }`
+  (billing); `institute_reminder` also takes `online`.
+- Scheduled tests (`src/institute-tests.js`, docs/INSTITUTES.md §16), staff of the batch: `GET /api/institutes/:id/batches/:bid/tests`
+  → `{ tests: [{ id, mode, modeName, short, minutes, passageId, passageTitle, opensAt, closesAt, note, state, started, submitted, passed }],
+  students, modes, windows, today, now }`; `POST …/tests` `{ mode, passageId, day, time, windowMinutes, note? }` → 201 `{ test }` (409 `too_many`,
+  `archived`); `GET …/tests/:tid` → `{ test, rows: [{ name, email, inBatch, state, starts, startedAt, submittedAt, result }] }`;
+  `GET …/tests/:tid/results.csv`; `POST …/tests/:tid/cancel`. Students of the batch: `GET /api/me/batch-tests/:tid` → `{ test, batch, institute,
+  mine: { starts, submittedAt, result } }`; `POST …/start` (409 `test_upcoming` / `test_closed` / `test_cancelled` / `already`).
+  `POST /api/exams/results` takes `batchTestId` → `batchTest: { counted, why?: already | late | not_started | other_test | cancelled | not_yours }`.
+  `GET /api/me/batches` adds `tests: [{ id, title, opensAt, closesAt, note, state, mine, link }]`.
+- The Monday email (`src/institute-weekly.js`, docs/INSTITUTES.md §17): `GET /api/me/institute-email` → `{ weekly }` (503 `weekly_not_ready`
+  before migration 0013), `PUT` `{ weekly: boolean }`. Template `institute_weekly` `{ name, from*, to*, institutes*: [{ name, link, batches:
+  [{ name, students, practised, time, top, quiet, quietMore, link }] }], settingsUrl }` (transactional).
+- Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
+- Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
+  a seat in an active institute inside its term counts like a plan period of its package.
+
 ## 7. Roles and route protection (site + billing)
 
 - `src/roles.js`: `roleOf(env, user)` → `'owner'|'admin'|'support'|null`
@@ -262,12 +329,14 @@ Each exports `PAGES = [ { meta, body, scripts:['/site/js/x.js'] } ]`.
 | `/practice` | public | Typing Practice (explains course; CTA → `/app`) |
 | `/typing-test` | public | Typing test (works signed out; saved + limited when signed in) |
 | `/pricing` | public | Plans from `GET /api/packages` |
-| `/privacy` `/terms` `/refund-policy` | public | legal (seller details from settings) |
+| `/privacy` `/terms` `/refund-policy` `/institute-terms` | public | legal (seller details from settings) |
+| `/institute-guide` | public | how an institute runs its batches (docs/INSTITUTES.md §10) |
 | `/signup` `/login` `/forgot-password` | guest | |
 | `/reset-password` `/verify-email` `/verify-otp` | public | token/code in `#hash` |
 | `/app` | user | the trainer (`index.html`), with plan locks |
 | `/dashboard` | user | |
-| `/account/profile` `/account/history` `/account/analytics` `/account/plans` `/account/payments` `/account/invoices` `/account/invoices/:number` `/account/settings` | user | |
+| `/account/profile` `/account/history` `/account/analytics` `/account/plans` `/account/payments` `/account/invoices` `/account/invoices/:number` `/account/settings` `/account/certificates` | user | |
+| `/join` `/join/:code` | user | join an institute's batch with its code (docs/INSTITUTES.md §4) |
 | `/checkout?plan=<id>` | user | |
 | `/payment/processing` `/payment/success` `/payment/failure` `/payment/pending` | user | `?order=<id>` |
 | `/admin` `/admin/users` `/admin/packages` `/admin/payments` `/admin/revenue` `/admin/emails` `/admin/settings` | admin | |

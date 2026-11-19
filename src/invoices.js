@@ -48,7 +48,7 @@ export async function ensureInvoice(env, orderId) {
   const number = formatNumber(seq, issuedAt);
   const period = o.validity_days ? `${o.validity_days} days` : 'lifetime access';
   let lines = [{ description: `TypeCraft ${o.package_name} plan (${period})`, quantity: 1, amountPaise: o.amount_paise }];
-  // a coupon or a sale (migration 0013): the plan at its own price, then the discount, adding up to what was paid
+  // a coupon or a sale (migration 0016): the plan at its own price, then the discount, adding up to what was paid
   let d = null;
   try { d = await DB.prepare('SELECT list_price_paise, discount_paise, label FROM order_discounts WHERE order_id = ?1').bind(orderId).first(); } catch { d = null; }
   if (d && d.list_price_paise - d.discount_paise === o.amount_paise) {

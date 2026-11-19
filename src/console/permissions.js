@@ -43,6 +43,9 @@ export const PERMISSIONS = [
   P('payments.export', 'core', 'Payments', 'Download the payments list', 'A spreadsheet of orders with customer names and emails. Asks for your password again.', 1, 0, { sensitive: true }),
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
   P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
+  P('institutes.view', 'core', 'Institutes', 'See institutes', 'Institutes with their seats, term, batches and staff.', 1, 1),
+  P('institutes.manage', 'core', 'Institutes', 'Set up and change institutes', 'Create an institute, invite its admin, change its seats and term, pause or close it.', 1, 0),
+  P('institutes.payments', 'core', 'Institutes', 'Record institute payments', 'Record money an institute paid by bank transfer, UPI or cheque. The first payment switches its seats on. Asks for your password again.', 1, 0, { sensitive: true }),
 
   // ----- Layer 2: learning operations -----
   P('course.view', 'learning', 'Course', 'See the course', 'Levels, modules, lessons and practice packs, with drafts and published versions.', 1, 1),
