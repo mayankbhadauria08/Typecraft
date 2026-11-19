@@ -94,11 +94,13 @@ const SAMPLE = {
   contact_forward: { email: 'x@example.com', topic: 'billing', message: `Help ${EVIL}`, priority: true },
   institute_invite: { instituteName: `Sharma Typing ${EVIL}`, role: 'admin', invitedBy: 'TypeCraft', email: 'boss@example.com', link: '/institute' },
   student_invite: { instituteName: `Sharma ${EVIL}`, batchName: 'Morning', batchCode: 'KQ7M-PX3D', joinPath: '/join/KQ7M-PX3D' },
-  institute_reminder: { instituteName: 'Sharma', kind: 'ends', lastDay: '30 Nov 2026', days: 7, link: '/institute' },
+  institute_reminder: { instituteName: 'Sharma', kind: 'ends', lastDay: '30 Nov 2026', days: 7, link: '/institute', online: true },
+  institute_payment: { instituteName: `Sharma ${EVIL}`, kind: 'new', what: `TypeCraft Pro plan for 20 students ${EVIL}`, amountPaise: 1998000, invoiceNumber: 'TC-2026-000009',
+    invoiceUrl: '/institute/ins_00000000000000000000/invoices/TC-2026-000009', link: 'javascript:alert(1)', seats: 20, lastDay: '2027-11-18' },
 };
 
 test('every template renders a subject, escaped HTML and a text part', () => {
-  assert.equal(TEMPLATE_NAMES.length, 23);
+  assert.equal(TEMPLATE_NAMES.length, 24);
   const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com', unsubscribeUrl: 'https://typecrafttyping.in/api/email/unsubscribe?u=1&t=2' };
   for (const name of TEMPLATE_NAMES) {
     assert.ok(SAMPLE[name], `sample data for ${name}`);

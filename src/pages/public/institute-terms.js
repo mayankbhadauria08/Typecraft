@@ -22,11 +22,12 @@ export default `
     <ul>
       <li>A number of <b>seats</b> for a <b>term</b> (a first and a last day), at a price per seat, as written on your order or invoice. Each seat gives one student the plan named there, from the first day to the last day.</li>
       <li>A seat is used while a student is in one of your batches. When a student leaves or you remove them, the seat is free for another student. Seats can't be moved to another institute.</li>
-      <li>You can add seats or renew for a new term at any time; the price for those is agreed when you ask.</li>
+      <li>You can add seats or renew for a new term at any time; the price for those is agreed when you ask. When we sell seats on the site, the price is the one shown before you pay: seats added during a term are charged for the days left in it, and a renewal starts the day after your current last day. The seat count you choose for a renewal applies as soon as you pay.</li>
     </ul>
     <h2>2. Payment</h2>
     <ul>
       <li>You pay by bank transfer, UPI or another way we agree, before the term starts. Seats switch on when we have recorded your payment, not before.</li>
+      <li>If you pay on the site, the payment is handled by Razorpay. Seats switch on when Razorpay confirms the payment to us, and the invoice is emailed to you. Nothing renews by itself.</li>
       <li>We give you a GST invoice when we are registered for GST; until then, a receipt.</li>
       <li>Refunds follow our <a href="/refund-policy">refund policy</a> unless your order says otherwise.</li>
     </ul>

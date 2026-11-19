@@ -1,6 +1,7 @@
 /* /institute. GET /api/me/institutes → { seats, staff: [{ institute: { id, name, status }, role }],
    invites: [{ id, institute: { name }, role, invitedAt }], emailVerified };
-   POST /api/me/institute-invites/:id/accept → { institute: { id, name }, role }; …/decline. docs/INSTITUTES.md §8. */
+   POST /api/me/institute-invites/:id/accept → { institute: { id, name }, role }; …/decline.
+   GET /api/institutes/buy → { open, … }: when seats are sold online, a way to buy them for a new institute (§15). docs/INSTITUTES.md §8. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
@@ -67,6 +68,11 @@
     }
     invites(d.invites, d.emailVerified);
     institutes(d.staff, d.invites.length > 0);
+    const sale = await K.api('GET', '/api/institutes/buy');
+    K.mount($('#ih-buy'), sale.ok && sale.data.open ? h('div', { class: 'card ins-buy-cta' },
+      h('div', null, h('h2', { text: 'Run a coaching centre?' }),
+        h('p', { class: 'muted', text: `Buy seats online: each gives one student the ${sale.data.packageName} plan for the term, from ${sale.data.terms.map((t) => `${K.money(t.pricePerSeatPaise)} a seat for ${t.months} months`).join(' or ')}. At least ${sale.data.minSeats} seats.` })),
+      h('a', { class: 'btn btn-primary', href: '/institute/buy', text: 'Buy seats' })) : null);
   }
   load();
 })();

@@ -23,8 +23,9 @@ import * as instituteReports from './institute-reports.js'; // batch report, a s
 import * as instituteTeaching from './institute-teaching.js'; // targets, assignments, exam results by batch, leaderboard
 import * as instituteMail from './institute-mail.js'; // students invited by email, reminders to institutes
 import * as instituteInvoices from './institute-invoices.js'; // invoices for institute payments
+import * as instituteCheckout from './institute-checkout.js'; // seats bought online with Razorpay
 import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
-const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, consoleApi];
+const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, instituteCheckout, consoleApi];
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,

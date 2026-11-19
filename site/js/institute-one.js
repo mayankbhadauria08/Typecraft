@@ -2,14 +2,16 @@
    batches: [{ id, name, students, quietThisWeek, teachers, joinCode, archived }] };
    admins: GET /api/institutes/:id/staff → { me, staff: [{ id, email, name, role, status, invitedAt, joinedAt, batches }] },
    POST /api/institutes/:id/batches { name }, POST …/staff { email, role }, …/staff/:sid/resend, …/staff/:sid/remove.
-   docs/INSTITUTES.md §8. */
+   Admins, when seats are sold online: GET /api/institutes/:id/buy → { open, why, seats, seatsUsed, lastDay, maxPaise,
+     addSeats: { available, days, pricePerSeatPaise, from, to }, renew: { available, opensOn | from, minSeats, terms: [{ months, pricePerSeatPaise, to }] } },
+   paid with K.buySeats (institute-pay.js). docs/INSTITUTES.md §8, §15. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
   const id = decodeURIComponent(location.pathname.split('/')[2] || '');
   const lastDay = (endsAt) => new Date(Date.parse(endsAt) - 1).toISOString();
   const joinLink = (code) => `${location.origin}/join/${code}`;
-  let data = null;
+  let data = null, paidNote = null;
 
   function copy(text, what) {
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => K.toast(`${what} copied.`), () => K.toast('Select it and copy it by hand.', 'bad'));
@@ -18,7 +20,7 @@
     const now = new Date().toISOString();
     if (i.status === 'pending') return K.alert('info', "Not paid yet: students can't join until TypeCraft records your payment. You can set up batches and invite teachers now.");
     if (i.status === 'suspended') return K.alert('bad', 'Paused by TypeCraft: your students’ seats don’t give the plan, and nobody can join. Contact TypeCraft.');
-    if (i.endsAt <= now) return K.alert('bad', `Your seats ended on ${K.date(lastDay(i.endsAt))}. Students keep their progress. Contact TypeCraft to renew.`);
+    if (i.endsAt <= now) return K.alert('bad', `Your seats ended on ${K.date(lastDay(i.endsAt))}. Students keep their progress. ${data.role === 'admin' ? 'Renew below, or write to TypeCraft.' : 'Your institute’s admin can renew.'}`);
     if (i.startsAt > now) return K.alert('info', `Your term starts on ${K.date(i.startsAt)}. Students can join from then.`);
     return null;
   }
@@ -116,6 +118,80 @@
     ], res.data.invoices, { caption: 'Invoices' }));
   }
 
+  /* More seats now, or the next term, paid online. Shown only when TypeCraft sells this institute's plan online. */
+  async function buy() {
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/buy`);
+    const sec = $('#io-buy-sec');
+    sec.hidden = !(res.ok && res.data.open);
+    if (sec.hidden) return;
+    const q = res.data;
+    const say = (kind, text) => K.mount($('#io-buy-msg'), kind ? K.alert(kind, text) : null);
+    const done = (out, what) => {
+      if (!K.buyOutcome(out, say)) return;
+      say('ok', `${what} The invoice is in Invoices below, and on its way by email.`);
+      load();
+    };
+    const total = (n, per) => (Number.isInteger(n) && n > 0 ? n * per : null);
+    const payLabel = (paise) => (paise == null ? 'Pay' : `Pay ${K.money(paise)}`);
+    const cards = [];
+
+    if (q.addSeats.available) {
+      const a = q.addSeats;
+      const seats = h('input', { id: 'ioAddSeats', name: 'seats', type: 'number', min: '1', max: '10000', step: '1', inputmode: 'numeric', value: '5' });
+      const btn = h('button', { type: 'submit', class: 'btn btn-primary btn-sm' });
+      const sum = () => { const t = total(Number(seats.value), a.pricePerSeatPaise); btn.textContent = payLabel(t); btn.disabled = t == null || t > q.maxPaise; };
+      const form = h('form', { class: 'card ins-form buy-card', novalidate: true },
+        h('h3', { text: 'Add seats' }),
+        h('p', { class: 'muted', text: `${K.money(a.pricePerSeatPaise)} a seat for the ${a.days} days to your last day, ${K.date(lastDay(data.institute.endsAt))}. They switch on as soon as you pay.` }),
+        h('div', { class: 'field' }, h('label', { for: 'ioAddSeats', text: 'Seats to add' }), seats),
+        h('div', { class: 'actions' }, btn));
+      seats.addEventListener('input', sum);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const out = await K.buySeats({ kind: 'seats', instituteId: id, seats: Number(seats.value) }, { button: btn, say });
+        if (out && out.error && out.error.error && out.error.error.fields) { K.formErrors(form, out.error.error.fields); return; }
+        done(out, `${seats.value} more seats are on.`);
+      });
+      sum();
+      cards.push(form);
+    }
+
+    if (q.renew.available) {
+      const r = q.renew;
+      const seats = h('input', { id: 'ioRenewSeats', name: 'seats', type: 'number', min: String(r.minSeats), max: '10000', step: '1', inputmode: 'numeric', value: String(Math.max(r.minSeats, q.seats)) });
+      const best = r.terms[r.terms.length - 1];
+      const term = h('select', { id: 'ioRenewTerm', name: 'months', 'aria-describedby': 'ioRenewTo' }, r.terms.map((t) => h('option', { value: String(t.months), selected: t === best,
+        text: `${t.months} months: ${K.money(t.pricePerSeatPaise)} a seat` })));
+      const to = h('p', { class: 'hint', id: 'ioRenewTo' });
+      const btn = h('button', { type: 'submit', class: 'btn btn-primary btn-sm' });
+      const chosen = () => r.terms.find((t) => t.months === Number(term.value));
+      const sum = () => {
+        const c = chosen(), t = total(Number(seats.value), c.pricePerSeatPaise);
+        to.textContent = `Your new last day: ${K.date(c.to + 'T12:00:00+05:30')}.`;
+        btn.textContent = payLabel(t); btn.disabled = t == null || Number(seats.value) < r.minSeats || t > q.maxPaise;
+      };
+      const form = h('form', { class: 'card ins-form buy-card', novalidate: true },
+        h('h3', { text: 'Renew' }),
+        h('p', { class: 'muted', text: `The next term starts on ${K.date(r.from + 'T12:00:00+05:30')}. The seat count changes as soon as you pay; at least ${r.minSeats}${r.minSeats > 1 && r.minSeats === q.seatsUsed ? ', the students in your batches now' : ''}.` }),
+        h('div', { class: 'field' }, h('label', { for: 'ioRenewSeats', text: 'Seats' }), seats),
+        h('div', { class: 'field' }, h('label', { for: 'ioRenewTerm', text: 'Term' }), term, to),
+        h('div', { class: 'actions' }, btn));
+      seats.addEventListener('input', sum); term.addEventListener('change', sum);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const out = await K.buySeats({ kind: 'renew', instituteId: id, seats: Number(seats.value), months: Number(term.value) }, { button: btn, say });
+        if (out && out.error && out.error.error && out.error.error.fields) { K.formErrors(form, out.error.error.fields); return; }
+        done(out, 'Your institute is renewed.');
+      });
+      sum();
+      cards.push(form);
+    } else if (q.renew.why === 'early') {
+      cards.push(h('div', { class: 'card buy-card' }, h('h3', { text: 'Renew' }),
+        h('p', { class: 'muted', text: `Renewing opens on ${K.date(q.renew.opensOn + 'T12:00:00+05:30')}, 60 days before your last day.` })));
+    }
+    K.mount($('#io-buy'), cards);
+  }
+
   async function load() {
     const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}`);
     if (!res.ok) {
@@ -127,10 +203,15 @@
     document.title = `${i.name} – TypeCraft`;
     $('#io-title').textContent = i.name;
     $('#io-sub').textContent = [data.role === 'admin' ? 'You are its admin' : 'You teach here', i.city].filter(Boolean).join(' · ');
-    K.mount($('#io-note'), note(i));
+    K.mount($('#io-note'), paidNote || note(i));
     stats(i);
     batches(data);
-    if (data.role === 'admin') { staff(); invoices(); }
+    if (data.role === 'admin') { staff(); invoices(); buy(); }
+  }
+  if (K.qs('paid')) {
+    // back from /institute/buy: the server switched the seats on before sending the browser here
+    paidNote = K.alert('ok', 'Payment confirmed: your institute is set up and its seats are on. Make a batch, then give your students its code. The invoice is on its way by email.');
+    history.replaceState(null, '', location.pathname);
   }
   load();
 })();

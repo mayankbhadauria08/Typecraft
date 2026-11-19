@@ -13,9 +13,12 @@ Release 1 is built in five pull requests. This file grows with each one.
 | 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request #30 |
 | 3. Institute portal (C1–C4) | institute home, teachers, batches, students | pull request #31 |
 | 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | pull request #32 |
-| 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | pull request 5 |
+| 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | pull request #34 |
+| Release 2 (D3–D5, D7, C5, G2, B4) | targets, assignments, exam results by batch, leaderboard, invitations, reminders, invoices | pull requests #35, #37, #38 |
+| Release 3 (F1–F3) | buying seats online: new institutes, more seats, renewals, invoice by email (§15) | this pull request |
 
-Nobody can join anything until an institute is created in the console and its payment recorded.
+Nobody can join anything until an institute is created in the console and its payment recorded, or its
+seats are bought online and Razorpay confirms the payment (§15).
 
 ## 1. Words
 
@@ -284,3 +287,42 @@ Every change is in the institute's history: `institute.target_set`, `target_clea
 - The printable page `/institute/:id/invoices/:number` ("Print or save as PDF") holds no data: it asks the
   institute's API (its admins) or the console's (TypeCraft staff with a money permission). The institute's
   admins see **Invoices** on their institute page.
+
+## 15. Release 3: buying seats online — `src/institute-checkout.js`, migration 0011
+
+Built against **Razorpay test mode**. Nothing is sold online until you switch it on in the console, and it
+needs Razorpay's keys (test keys first). Bank transfer stays as it was.
+
+- **Prices** — Console › Institutes › *Seats sold online* › Change (`institutes.payments`): on or off, the plan
+  a seat gives, the fewest seats, and a price per seat for 6 and/or 12 months (leave one empty to not sell it).
+  Saved in `platform_settings` 'institute_pricing' and in the activity log. Buying is open only when it is
+  on, a plan and a price are set, Razorpay is connected and payments aren't paused in Settings.
+- **A new institute** — `/institute/buy` (signed in, email confirmed): name, city, contact, GSTIN, seats (at
+  least the minimum), term, and "I accept the terms for institutes". The page's total is a preview; the
+  server works out the amount. Once Razorpay confirms, the institute is created **active** with the term
+  starting that day, the payer is its admin, the payment is recorded (method "Online (Razorpay)", reference
+  = Razorpay payment ID), the invoice is made, and it is emailed to the payer and the contact email
+  (template `institute_payment`).
+- **More seats** — an admin's institute page, *Add seats*: for the days left to the last day, at the longest
+  term's price for those days (a month = 365/12 days), rounded up to the rupee per seat.
+- **Renewal** — opens 60 days before the last day and stays open after it. The new term starts the day after
+  the current last day (or today, if that has passed); the seat count changes at once and must be at least the
+  students in batches now.
+- Online top-ups and renewals are offered only to **active** institutes on the plan sold online; others write
+  to you. One payment goes up to ₹5,00,000; above that, bank transfer.
+- **Money rules** (as for plans): seats change only when Razorpay itself confirms: the payment fetched from
+  Razorpay after a valid checkout signature, a signed webhook (billing.js hands events for unknown plan orders
+  to `instituteWebhook`), or the 10-minute check, which also cancels orders unpaid for a day and repairs a
+  missing invoice or email. The change happens once: the call that moves the order to 'paid' writes a
+  `claim_id`, and every change in the same transaction requires it, so the page, the webhook and the check
+  arriving together still create one institute, one payment and one invoice.
+- If an institute was **closed** between checkout and payment, the money is recorded but nothing changes; the
+  order says "refund it from the Razorpay dashboard" and the history says *NOT APPLIED*. Refunds of online
+  institute payments are made in the Razorpay dashboard.
+- The console shows online payments as "Online (Razorpay)", recorded by "Paid online", and the history as
+  *Checkout started online* and *Paid online*. Reminder emails say the institute can add seats or renew
+  online when it can.
+- API: `GET /api/institutes/buy`, `GET /api/institutes/:id/buy` (admins), `POST /api/institutes/checkout`
+  `{ kind: 'new' | 'seats' | 'renew', … }`, `POST /api/institutes/checkout/verify`, `POST …/checkout/failed`,
+  `GET /api/institutes/checkout/orders/:id`; console `GET/PUT /api/console/institutes/pricing`.
+

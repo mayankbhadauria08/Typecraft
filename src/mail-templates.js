@@ -28,7 +28,8 @@
 //   contact_forward               { name*, email*, topic, message*, userId, priority (bool), plan, messageId }
 //   institute_invite              { name, instituteName*, role* ('admin' | 'teacher'), invitedBy, email*, link* }
 //   student_invite                { name, instituteName*, batchName*, batchCode*, joinPath* }  (not 'code'/'link': kept for retries)
-//   institute_reminder            { name, instituteName*, kind* ('seats' | 'ends'), seats, seatsUsed, lastDay, days, link }
+//   institute_reminder            { name, instituteName*, kind* ('seats' | 'ends'), seats, seatsUsed, lastDay, days, link, online (bool) }
+//   institute_payment             { name, instituteName*, kind ('new' | 'seats' | 'renew'), what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }
 // URLs given in data may be absolute https URLs or site paths ('/pricing'); anything else is dropped.
 
 const ACCENT = '#0b6e63';
@@ -155,6 +156,7 @@ const HEADS = {
   institute_invite: ['Institute', null],
   student_invite: ['Institute', null],
   institute_reminder: ['Institute', null],
+  institute_payment: ['Payment', 'Payment received'],
 };
 const DARK = '#0f1b19';
 
@@ -442,9 +444,23 @@ export const TEMPLATES = {
       : `${d.instituteName}: your TypeCraft seats end on ${d.lastDay}`;
     return layout(site, { subject: subject.replace(/[\r\n]+/g, ' '), preheader: seats ? 'Add seats before you run out.' : 'Renew to keep your students practising.', blocks: [
       P(hi(d)),
-      P(seats ? `${d.seatsUsed} of your ${d.seats} seats are in use. When every seat is taken, new students can't join your batches. To add seats, reply to this email.`
-        : `Your institute's seats end on ${d.lastDay}${d.days != null ? `, in ${d.days} day${d.days === 1 ? '' : 's'}` : ''}. After that your students go back to the Free plan; their progress and your batches stay. To renew, reply to this email.`),
+      P(seats ? `${d.seatsUsed} of your ${d.seats} seats are in use. When every seat is taken, new students can't join your batches. ${d.online ? 'You can add seats online from your institute page, or reply to this email.' : 'To add seats, reply to this email.'}`
+        : `Your institute's seats end on ${d.lastDay}${d.days != null ? `, in ${d.days} day${d.days === 1 ? '' : 's'}` : ''}. After that your students go back to the Free plan; their progress and your batches stay. ${d.online ? 'You can renew online from your institute page, or reply to this email.' : 'To renew, reply to this email.'}`),
       Button('Open your institute', url(site, d.link) || `${site.siteUrl}/institute`),
+    ] });
+  },
+
+  institute_payment(d, site) {
+    const subject = `${String(d.instituteName || 'Your institute').replace(/[\r\n]+/g, ' ')}: payment received, invoice ${d.invoiceNumber || ''}`.trim();
+    const done = d.kind === 'new' ? 'Your institute is set up and its seats are on. Make a batch, then give your students its code.'
+      : d.kind === 'renew' ? 'Your institute is renewed.' : 'Your extra seats are on.';
+    return layout(site, { subject, preheader: `${money(d.amountPaise)} received. Thank you.`, blocks: [
+      P(hi(d)),
+      P(`Thank you: we received ${money(d.amountPaise)} for ${d.instituteName}. ${done}`),
+      Rows([['For', d.what], ['Seats', d.seats != null ? String(d.seats) : null], ['Last day', d.lastDay || null],
+        ['Invoice', d.invoiceNumber || null], ['Amount', money(d.amountPaise)]]),
+      Button('View and print invoice', url(site, d.invoiceUrl) || `${site.siteUrl}/institute`),
+      Small(`Open your institute any time at ${url(site, d.link) || `${site.siteUrl}/institute`}. Only its admins can open the invoice.`),
     ] });
   },
 

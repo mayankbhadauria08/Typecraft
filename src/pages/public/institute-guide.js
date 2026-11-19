@@ -14,7 +14,7 @@ export default `
     <p class="lede">How a coaching centre runs its typing batches on TypeCraft, from the first login to printing certificates. It takes about ten minutes to set up.</p></header>
   <div class="prose" style="padding-bottom:40px">
     <h2>1. Get your seats</h2>
-    <p>Tell us how many students you want to train and for how long: <a href="/contact?topic=institutes">write to us</a>. We agree the seats, the term and the price, you pay by bank transfer or UPI, and we switch your seats on. Your admin gets an email invitation.</p>
+    <p>Tell us how many students you want to train and for how long: <a href="/contact?topic=institutes">write to us</a>. We agree the seats, the term and the price, you pay by bank transfer or UPI, and we switch your seats on. Your admin gets an email invitation. When we sell seats on the site, you can also buy them yourself at <a href="/institute/buy">Buy seats</a>: you become the admin, and the seats switch on as soon as the payment is confirmed.</p>
     <h2>2. Accept the invitation</h2>
     <p>Sign in, or create an account, with the email address the invitation went to, and confirm that address from the email we send. Then open <a href="/institute">Institute</a> and press Accept. Before we have your payment you can already prepare: make batches and invite teachers.</p>
     <h2>3. Make a batch for each class</h2>
@@ -30,7 +30,7 @@ export default `
     <h2>8. When a batch finishes</h2>
     <p>Press <b>Archive the batch</b>. Its students are removed and their seats go back to you for the next batch. Students keep their own progress. To move one student to another batch, use <b>Move</b>.</p>
     <h2>9. More seats, or another year</h2>
-    <p>Write to us before your last day. We add seats or move your last day on; your batches and history carry on.</p>
+    <p>Write to us before your last day. We add seats or move your last day on; your batches and history carry on. When seats are sold on the site, your institute page also has <b>Add seats</b> (priced for the days left in your term) and, from 60 days before your last day, <b>Renew</b>.</p>
     <p>What your staff can see, and the rest of the rules, are in our <a href="/institute-terms">terms for institutes</a> and <a href="/privacy">privacy policy</a>.</p>
   </div>
 </div>

@@ -270,6 +270,17 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - Institute invoices (`src/institute-invoices.js`, docs/INSTITUTES.md §14): `POST /api/console/institutes/:id/payments/:pid/invoice`
   (institutes.payments), `GET /api/console/institutes/:id/invoices/:number`; admins: `GET /api/institutes/:id/invoices`,
   `GET /api/institutes/:id/invoices/:number`. Page `/institute/:id/invoices/:number` (public, bare, noindex; data via the APIs).
+- Seats bought online (`src/institute-checkout.js`, docs/INSTITUTES.md §15): signed in: `GET /api/institutes/buy` → `{ open, packageId,
+  packageName, minSeats, terms: [{ months, pricePerSeatPaise }], maxSeats, maxPaise, emailVerified, you }`; admins: `GET /api/institutes/:id/buy`
+  → `{ open, why, seats, seatsUsed, lastDay, addSeats: { available, days, pricePerSeatPaise, from, to }, renew: { available, opensOn | from,
+  minSeats, terms } }`; email confirmed: `POST /api/institutes/checkout` `{ kind: 'new', seats, months, name, city, contactName, contactEmail,
+  contactPhone, gstin, agree }` | `{ kind: 'seats', instituteId, seats }` | `{ kind: 'renew', instituteId, seats, months }` → `{ orderId,
+  razorpayOrderId, amountPaise, currency, keyId, description, prefill }` (503 `buying_closed`, 403 `verify_email`, 409 `not_for_sale` /
+  `ended` / `too_early`); the payer: `POST /api/institutes/checkout/verify` → `{ status, instituteId?, invoiceNumber? }`, `POST …/failed`,
+  `GET /api/institutes/checkout/orders/:id`. Console: `GET /api/console/institutes/pricing` (institutes.view), `PUT` (institutes.payments)
+  `{ on, packageId, minSeats, prices: { 6, 12 } }`. Webhooks: through `POST /api/webhooks/razorpay`. Page `/institute/buy` (user, account).
+- Email template `institute_payment` `{ name, instituteName*, kind, what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }`
+  (billing); `institute_reminder` also takes `online`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

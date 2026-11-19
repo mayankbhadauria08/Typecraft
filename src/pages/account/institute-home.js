@@ -1,5 +1,5 @@
 // /institute — the institutes this account helps run, and invitations to accept (docs/INSTITUTES.md §8).
-// Data: GET /api/me/institutes; POST /api/me/institute-invites/:id/accept | decline.
+// Data: GET /api/me/institutes; POST /api/me/institute-invites/:id/accept | decline; GET /api/institutes/buy (§15).
 export const meta = {
   path: '/institute', title: 'Institute', description: 'The institutes you help run, and invitations to accept.',
   access: 'user', layout: 'account', nav: 'institute', noindex: true,
@@ -17,5 +17,6 @@ export const body = `
   <h2 id="ih-list-h">Your institutes</h2>
   <div id="ih-list"><div class="skeleton" style="height:5rem"></div></div>
 </section>
+<section class="section" id="ih-buy" aria-label="Buy seats"></section>
 `;
 export default body;

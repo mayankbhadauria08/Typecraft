@@ -145,6 +145,18 @@ institutes are only created in the console (part 2).
    only). Before this, Release 1 works and the Release 2 parts stay hidden or say they aren't switched on.
 2. **[You] Merge** the Release 2 pull requests in order, after Release 1's.
 
+## 1i. Institutes, Release 3 (buying seats online, Razorpay test mode)
+
+1. **[Claude, after your OK] Database**: after 0010, take a restore bookmark, then apply
+   `migrations/0011_institute_orders.sql` one statement at a time (one table and one index; adds only).
+2. **[You] Merge** the Release 3 pull request after Release 2's.
+3. **[You] Razorpay test keys** in Cloudflare (`RAZORPAY_KEY_ID` = `rzp_test_…`, `RAZORPAY_KEY_SECRET`,
+   `RAZORPAY_WEBHOOK_SECRET`; the same webhook as for plans, with `payment.captured`, `payment.failed`,
+   `order.paid`).
+4. **[You] Prices**: Console › Institutes › Seats sold online › Change. Leave it **Off** until you have bought
+   seats once with a Razorpay test card, added seats and renewed, and seen the invoice email arrive.
+5. **[You] Live**: only after the test run, swap in the `rzp_live_…` keys. No real-money test is needed or done.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

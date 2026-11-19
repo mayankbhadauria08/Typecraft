@@ -43,36 +43,46 @@ export function invoiceView(row, payment = null) {
     subtotalPaise: row.amount_paise,
     tax: { gstin: seller.gstin || null, ratePercent: 0, amountPaise: 0, note: seller.gstin ? 'GST is not added to this invoice.' : 'GST not applicable.' },
     totalPaise: row.amount_paise,
-    // the payment as recorded; if it was removed later, as the invoice's line kept it
-    payment: payment ? { method: METHOD[payment.method] || payment.method, reference: payment.reference || '', paidOn: payment.paid_on } : (parse(row.lines, [])[0] || {}).payment || null,
+    // the payment as the invoice's line kept it when it was made (older lines without it: the payment row)
+    payment: (parse(row.lines, [])[0] || {}).payment
+      || (payment ? { method: METHOD[payment.method] || payment.method, reference: payment.reference || '', paidOn: payment.paid_on } : null),
   };
 }
 
-/* ---------------- making one (console) ---------------- */
+/* ---------------- making one ---------------- */
+/** The invoice of a recorded payment, made if it doesn't exist yet. → { row, payment, made } or null (no such payment). */
+export async function makeInvoice(env, instituteId, paymentId, { description = null, method = null } = {}) {
+  const DB = env.DB;
+  const p = await DB.prepare(`SELECT x.*, i.name, i.contact_name, i.contact_email, i.contact_phone, i.city, i.gstin, i.seats, i.price_paise, i.starts_at, i.ends_at, k.name AS package_name
+                                FROM institute_payments x JOIN institutes i ON i.id = x.institute_id JOIN packages k ON k.id = i.package_id
+                               WHERE x.id = ?1 AND x.institute_id = ?2`).bind(paymentId, instituteId).first();
+  if (!p) return null;
+  const have = await DB.prepare('SELECT * FROM institute_invoices WHERE payment_id = ?1').bind(p.id).first();
+  if (have) return { row: have, payment: p, made: false };
+  const sellerRow = await DB.prepare("SELECT value FROM platform_settings WHERE key = 'seller'").first();
+  const seller = parse(sellerRow && sellerRow.value, {});
+  const issuedAt = nowIso(), seq = await nextSeq(env), number = formatNumber(seq, issuedAt);
+  const billed = { name: p.name, contactName: p.contact_name, email: p.contact_email, phone: p.contact_phone, city: p.city, gstin: p.gstin || null };
+  const part = p.price_paise > 0 && p.amount_paise < p.seats * p.price_paise ? ' (part payment)' : '';
+  const lines = [{ description: description || `TypeCraft ${p.package_name} plan for ${p.seats} students (seats), ${firstDay(p.starts_at)} to ${lastDay(p.ends_at)}${part}`, quantity: 1, amountPaise: p.amount_paise,
+    payment: { method: method || METHOD[p.method] || p.method, reference: p.reference || '', paidOn: p.paid_on } }];
+  await DB.prepare(`INSERT INTO institute_invoices (id, number, seq, institute_id, payment_id, amount_paise, billed_to, seller, lines, issued_at)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) ON CONFLICT (payment_id) DO NOTHING`)
+    .bind(uuid(), number, seq, p.institute_id, p.id, p.amount_paise, JSON.stringify(billed), JSON.stringify(seller), JSON.stringify(lines), issuedAt).run();
+  const row = await DB.prepare('SELECT * FROM institute_invoices WHERE payment_id = ?1').bind(p.id).first();
+  return { row, payment: p, made: true };
+}
+
 export async function postInvoice(request, env, ctx, params) {
   const who = await requireAdmin(env, request, 'institutes.payments');
   if (!isId(params.id, 'ins') || !isId(params.pid, 'ipay')) throw new HttpError(404, 'not_found', 'There is no payment with this ID.');
   return later(async () => {
-    const DB = env.DB;
-    const p = await DB.prepare(`SELECT x.*, i.name, i.contact_name, i.contact_email, i.contact_phone, i.city, i.gstin, i.seats, i.price_paise, i.starts_at, i.ends_at, k.name AS package_name
-                                  FROM institute_payments x JOIN institutes i ON i.id = x.institute_id JOIN packages k ON k.id = i.package_id
-                                 WHERE x.id = ?1 AND x.institute_id = ?2`).bind(params.pid, params.id).first();
-    if (!p) throw new HttpError(404, 'not_found', 'There is no payment with this ID.');
-    const have = await DB.prepare('SELECT * FROM institute_invoices WHERE payment_id = ?1').bind(p.id).first();
-    if (have) return json({ invoice: invoiceView(have, p), made: false });
-    const sellerRow = await DB.prepare("SELECT value FROM platform_settings WHERE key = 'seller'").first();
-    const seller = parse(sellerRow && sellerRow.value, {});
-    const issuedAt = nowIso(), seq = await nextSeq(env), number = formatNumber(seq, issuedAt);
-    const billed = { name: p.name, contactName: p.contact_name, email: p.contact_email, phone: p.contact_phone, city: p.city, gstin: p.gstin || null };
-    const part = p.price_paise > 0 && p.amount_paise < p.seats * p.price_paise ? ' (part payment)' : '';
-    const lines = [{ description: `TypeCraft ${p.package_name} plan for ${p.seats} students (seats), ${firstDay(p.starts_at)} to ${lastDay(p.ends_at)}${part}`, quantity: 1, amountPaise: p.amount_paise,
-      payment: { method: METHOD[p.method] || p.method, reference: p.reference || '', paidOn: p.paid_on } }];
-    await DB.prepare(`INSERT INTO institute_invoices (id, number, seq, institute_id, payment_id, amount_paise, billed_to, seller, lines, issued_at)
-                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) ON CONFLICT (payment_id) DO NOTHING`)
-      .bind(uuid(), number, seq, p.institute_id, p.id, p.amount_paise, JSON.stringify(billed), JSON.stringify(seller), JSON.stringify(lines), issuedAt).run();
-    const row = await DB.prepare('SELECT * FROM institute_invoices WHERE payment_id = ?1').bind(p.id).first();
-    await audit(env, { actorId: who.user.id, action: 'institute.invoice', target: `institute:${p.institute_id}`, detail: { number: row.number, amountPaise: row.amount_paise, paymentId: p.id }, ip: clientIp(request) });
-    return json({ invoice: invoiceView(row, p), made: true }, 201);
+    const r = await makeInvoice(env, params.id, params.pid);
+    if (!r) throw new HttpError(404, 'not_found', 'There is no payment with this ID.');
+    if (r.made) {
+      await audit(env, { actorId: who.user.id, action: 'institute.invoice', target: `institute:${params.id}`, detail: { number: r.row.number, amountPaise: r.row.amount_paise, paymentId: params.pid }, ip: clientIp(request) });
+    }
+    return json({ invoice: invoiceView(r.row, r.payment), made: r.made }, r.made ? 201 : 200);
   });
 }
 

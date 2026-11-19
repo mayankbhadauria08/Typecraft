@@ -667,3 +667,23 @@ a.ins-link:hover{border-color:var(--teal)}
 .my-batch{gap:12px}
 .my-batch h3{font-size:17px;margin:0}
 .my-batch ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px}
+/* buying seats online (docs/INSTITUTES.md §15) */
+.buy-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:20px;align-items:start}
+@media (max-width:820px){.buy-grid{grid-template-columns:1fr}}
+.buy-form h2,.buy-summary h2{font-size:19px;margin:6px 0 0}
+.buy-form fieldset{display:flex;flex-direction:column;gap:8px}
+.buy-term{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:11px;cursor:pointer}
+.buy-term:has(input:checked){border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.buy-form .buy-term input{width:18px;height:18px;min-height:0;padding:0;margin:0;box-shadow:none;accent-color:var(--teal);flex:none}
+.buy-term-name{font-weight:600;flex:1}
+.card.buy-summary{position:sticky;top:84px;gap:12px}
+.buy-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+.buy-dl dd{margin:0}
+.buy-dl dt:last-of-type,.buy-dl dd:last-of-type{font-weight:600;font-size:18px;color:var(--text)}
+.buy-small{font-size:13px;margin:0}
+.buy-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.buy-card h3{font-size:18px;margin:0}
+.buy-card p{margin:0}
+.card.ins-buy-cta{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px}
+.ins-buy-cta h2{font-size:19px;margin:0 0 4px}
+.ins-buy-cta p{margin:0;max-width:60ch}
