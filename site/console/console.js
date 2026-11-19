@@ -69,7 +69,8 @@
     refund: { pending: ['On its way', 'warn'], processed: ['Sent', 'ok'], failed: ['Failed', 'bad'] },
     plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended early', 'bad'] },
     access: { allow: ['Opened', 'ok'], deny: ['Closed', 'bad'] },
-    email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] }
+    email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] },
+    support: { new: ['New', 'warn'], answered: ['Answered', 'ok'], closed: ['Closed', ''] }
   };
   /** A badge for a state: AC.status('order', 'paid'). */
   function status(kind, key) { var p = (STATUS[kind] || {})[key] || [key, '']; return badge(p[0], p[1]); }
@@ -111,7 +112,9 @@
       if (isNaN(left)) return '';
       if (left < 1) return 'in under a minute';
       if (left < 60) return 'in ' + left + ' min';
-      return 'in ' + Math.floor(left / 60) + ' h ' + (left % 60) + ' min';
+      if (left < 48 * 60) return 'in ' + Math.floor(left / 60) + ' h ' + (left % 60) + ' min';
+      var days = Math.round(left / 1440);
+      return 'in ' + days + ' days';
     }
   };
 

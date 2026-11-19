@@ -58,8 +58,9 @@ export const PERMISSIONS = [
   P('emails.view', 'growth', 'Email', 'See the email log', 'Emails sent to customers and whether they were delivered.', 1, 1),
   P('emails.retry', 'growth', 'Email', 'Retry failed emails', 'Send a failed email again.', 1, 0),
   P('emails.announce', 'growth', 'Email', 'Send announcements', 'Email an announcement to all, paid or free customers.', 1, 0),
-  P('support.view', 'growth', 'Support', 'See customer messages', 'Messages sent through the contact form.', 1, 1),
-  P('support.manage', 'growth', 'Support', 'Update customer messages', 'Mark a message answered or closed.', 1, 1),
+  P('support.view', 'growth', 'Support', 'See customer messages', 'Messages sent through the contact form, with replies and notes.', 1, 1),
+  P('support.reply', 'growth', 'Support', 'Reply to customers', 'Email a reply to a customer message from the console.', 1, 1),
+  P('support.manage', 'growth', 'Support', 'Update customer messages', 'Mark a message answered or closed, give it to someone on the team, and write notes.', 1, 1),
 
   // ----- Layer 4: infrastructure -----
   P('settings.view', 'infra', 'Settings', 'See platform settings', 'Business details, support contact and which services are set up.', 1, 0),

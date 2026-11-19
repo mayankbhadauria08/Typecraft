@@ -12,6 +12,7 @@ import { LAYERS as MODULE_LAYERS } from './modules.js';
 import { skeletonRows, lines, select, section, listFrame, downloadButton } from './page-kit.js';
 import { CORE_PAGES } from './pages-core.js';
 import { LEARNING_PAGES } from './pages-learning.js';
+import { GROWTH_PAGES } from './pages-growth.js';
 
 /* ---------- Home ---------- */
 // What the current admin (/admin) looks after, by the console module that takes it over.
@@ -197,6 +198,7 @@ export const PAGES = [
     permission: 'customers.view', body: customerBody, scripts: ['plan-actions.js', 'access-actions.js', 'customer.js'] },
   ...CORE_PAGES,
   ...LEARNING_PAGES,
+  ...GROWTH_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
 ];

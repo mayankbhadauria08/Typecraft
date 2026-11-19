@@ -15,12 +15,14 @@ import * as unlock from './unlock-api.js';
 import * as course from './course-api.js';
 import * as progress from './progress-api.js';
 import * as analytics from './analytics-api.js';
+import * as support from './support-api.js';
+import * as reports from './reports-api.js';
 
-const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics];
+const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics, support, reports];
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006',
-  course_drafts: '0007', course_releases: '0007' };
+  course_drafts: '0007', course_releases: '0007', support_replies: '0009', support_assignments: '0009' };
 const whenReady = (handler) => async (request, env, ctx, params) => {
   try { return await handler(request, env, ctx, params); } catch (err) {
     const m = String(err && err.message).match(/no such table: (\w+)/i);

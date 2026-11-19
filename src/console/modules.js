@@ -39,9 +39,9 @@ export const LAYERS = [
       { key: 'coupons', label: 'Coupons', icon: 'hash', phase: 4 },
       { key: 'promotions', label: 'Promotions', icon: 'sparkle', phase: 4 },
       { key: 'emails', label: 'Email campaigns', icon: 'mail', phase: 4 },
-      { key: 'support', label: 'Support', icon: 'inbox', phase: 4 },
+      { key: 'support', label: 'Support', icon: 'inbox', path: '/support', permission: 'support.view' },
       { key: 'notifications', label: 'Notifications', icon: 'send', phase: 4 },
-      { key: 'reports', label: 'Business reports', icon: 'receipt', phase: 4 },
+      { key: 'reports', label: 'Business reports', icon: 'receipt', path: '/reports', permission: 'revenue.view' },
     ],
   },
   {
