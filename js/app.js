@@ -740,7 +740,7 @@ function renderPlacementOffer(){
   document.getElementById('placementGo').addEventListener('click', openPlacement);
   document.getElementById('placementSkip').addEventListener('click', () => { try{ localStorage.setItem('typingMasterPlacementDismissed','1'); }catch(e){} el.hidden = true; });
 }
-function renderHome(){ renderTierFilter(); renderHomeStats(); renderPlacementOffer(); renderContinuePanel(); renderRewardBits(); renderCourseMap(); renderDashboard(); renderReviewPanel(); renderCoachPanel(); Plan.renderHome(); }
+function renderHome(){ renderTierFilter(); renderHomeStats(); renderPlacementOffer(); renderContinuePanel(); renderRewardBits(); renderCourseMap(); renderDashboard(); renderReviewPanel(); renderCoachPanel(); Plan.renderHome(); paintInstall(); }
 
 function openLesson(lessonId, startStage){
   if(!Plan.lessonAllowed(lessonId)) return Plan.lockedLesson(lessonId, () => openLesson(lessonId, startStage));
@@ -2727,3 +2727,49 @@ function openArcadeFromHash(){
   openFunMode();
 }
 window.addEventListener('hashchange', openArcadeFromHash);
+
+/* ---------- installing TypeCraft on a computer (Chrome, Edge) ----------
+   beforeinstallprompt is kept and our own buttons ([data-install]) open it: the account menu item, and a card on
+   the home screen once the first lesson is done (one "Not now" hides it for good). Never on touch-only screens:
+   a phone has no keyboard to type with. Firefox and Safari never fire the event; /get-the-app explains those. */
+// var and function declarations: renderHome() calls paintInstall() during start-up, before this part of the file runs
+var Install = { prompt: null, installed: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true };
+function touchOnly(){ return matchMedia('(hover: none) and (pointer: coarse)').matches; }
+function lessonsDoneCount(){
+  const t = Progress.view ? Progress.view.totals : null;
+  return t ? t.lessonsDone : Object.values(progress).filter(p => p.stars > 0).length;
+}
+function paintInstall(){
+  if(!Install) return;
+  const can = !!Install.prompt && !Install.installed && !touchOnly();
+  document.querySelectorAll('[data-install]').forEach(b => { if(!b.closest('#installCard')) b.hidden = !can; });
+  let hidden = false; try { hidden = localStorage.getItem('tcInstallCard') === 'hidden'; } catch(e) {}
+  const card = document.getElementById('installCard');
+  if(card) card.hidden = !(can && !hidden && lessonsDoneCount() >= 1);
+}
+async function runInstall(){
+  if(!Install.prompt) return;
+  const p = Install.prompt; Install.prompt = null;
+  closeAccountMenu();
+  p.prompt();
+  try { const c = await p.userChoice; if(c && c.outcome === 'accepted') Install.installed = true; } catch(e) {}
+  paintInstall();
+}
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); Install.prompt = e; paintInstall(); });
+window.addEventListener('appinstalled', () => { Install.installed = true; Install.prompt = null; paintInstall(); toast('TypeCraft is installed. Open it from your Start menu, taskbar or Dock.'); });
+document.querySelectorAll('[data-install]').forEach(b => b.addEventListener('click', runInstall));
+document.getElementById('installCardHide').addEventListener('click', () => {
+  try { localStorage.setItem('tcInstallCard', 'hidden'); } catch(e) {}
+  paintInstall();
+});
+
+/* ---------- phones: send the link to your computer ---------- */
+document.querySelectorAll('[data-share-link]').forEach(b => b.addEventListener('click', async () => {
+  const url = location.origin + '/app';
+  if(navigator.share){
+    try { await navigator.share({ title: 'TypeCraft', text: 'Open TypeCraft on my computer: ', url }); return; }
+    catch(e) { if(e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link copied. Paste it into WhatsApp or an email to yourself.'); }
+  catch(e) { window.prompt('Copy this link and send it to yourself:', url); }
+}));
