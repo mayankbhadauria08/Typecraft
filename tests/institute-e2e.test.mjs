@@ -20,7 +20,7 @@ const IST = 330 * 60000;
 const day = (n = 0) => new Date(Date.now() + IST + n * 86400000).toISOString().slice(0, 10);
 const verify = (who) => K.run('UPDATE users SET email_verified = 1 WHERE id = ?1', who.id);
 let e = 0;
-const run = (lessonId) => ({ id: `ev-e2e-${++e}`, type: 'run', lessonId, wpm: 31, accuracy: 96, errors: 3, seconds: 180, at: new Date().toISOString(), tz: -330 });
+const run = (lessonId) => ({ id: `ev-e2e-${++e}`, type: 'run', lessonId, wpm: 31, accuracy: 96, errors: 3, seconds: 180, at: new Date().toISOString(), tz: 330 }); // India: minutes ahead of UTC, as the app sends it
 
 test('an institute, from setting up to the end of a batch', async () => {
   const owner = await K.consoleLogin(await K.owner());
