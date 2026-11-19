@@ -228,3 +228,29 @@ Only numbers TypeCraft saved from the student's own practice; staff can't type a
    at `/institute` with the invited email).
 6. Console › Institutes › New institute, with their admin's email. Record their payment when it reaches
    your bank.
+
+## 12. Release 2: targets, assignments, exam practice by batch, leaderboard — `src/institute-teaching.js`
+
+Migration `0010_institutes_teaching.sql` holds every table Release 2 needs (`batch_leaderboards`,
+`batch_targets`, `assignments`, `student_invites`, `institute_reminders`, `institute_invoices`); all
+`CREATE … IF NOT EXISTS`. Before it is applied, the batch page leaves this part out and students see
+their batch without targets (503 `teaching_not_ready` for the staff API).
+
+On a batch's page, under **Target and assignments** (admins and the batch's teachers):
+- **Target**: a speed at an accuracy, by a day (optional), with a note for students. A student has reached
+  it when any lesson run, typing test or exam practice result (net speed, 100 − mistakes %) was at least
+  that fast at that accuracy or better. Speeds are rounded down.
+- **Assignments**: a course lesson or an exam practice test, by a day. Done = the lesson finished (at any
+  time) / a test of that kind saved after the assignment was given. "Done late" when it happened after
+  the day; "Not done" when the day has passed. At most 50 open a batch; removing keeps what students did.
+- **Exam practice**: each student's best net speed for each test, "Passed" or how many tries.
+- **Leaderboard**: off until staff turn it on (a row in `batch_leaderboards`). Top 10 best speeds of the
+  last 7 days, first names only. Staff see it while it is off; students only when it is on.
+
+Students see **Your batch** on their dashboard (`GET /api/me/batches`): the target and their own best,
+assignments with links (the trainer, or that exam practice test) and their state, and the leaderboard if
+it is on. Only their own results, plus first names and speeds on the leaderboard. The privacy policy and
+the institute terms say so.
+
+Every change is in the institute's history: `institute.target_set`, `target_clear`, `assignment_add`,
+`assignment_remove`, `leaderboard`.

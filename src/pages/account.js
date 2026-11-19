@@ -21,7 +21,8 @@ const COURSE = '/shared/course-meta.js';
 const page = (mod, script, extra = []) => ({ meta: mod.meta, body: mod.body, scripts: [...extra, KIT, `/site/js/${script}.js`] });
 
 export const PAGES = [
-  page(dashboard, 'account-dashboard', [COURSE]),
+  // the student's batch: target, assignments, leaderboard (docs/INSTITUTES.md §12)
+  { ...page(dashboard, 'account-dashboard', [COURSE]), scripts: [...page(dashboard, 'account-dashboard', [COURSE]).scripts, '/site/js/my-batch.js'] },
   page(profile, 'account-profile'),
   page(history, 'account-history'),
   page(certificates, 'account-certificates', ['/js/rewards-ui.js']),

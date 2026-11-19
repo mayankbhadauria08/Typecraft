@@ -657,3 +657,13 @@ a.ins-link:hover{border-color:var(--teal)}
 #ib-admin-sec h2{margin-bottom:14px}
 .ins-stat-wide{max-width:none}
 .ins-keys{display:inline-flex;gap:4px;flex-wrap:wrap}
+.ins-teach{margin-bottom:22px}
+.ins-teach .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ins-teach h3,.ins-sub-head h3{font-size:18px;margin:0}
+.ins-sub-head{margin-top:22px}
+.ins-board{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px}
+.ins-board li{display:flex;justify-content:space-between;gap:12px}
+.ins-names{margin:6px 0 0;padding-left:1.1em}
+.my-batch{gap:12px}
+.my-batch h3{font-size:17px;margin:0}
+.my-batch ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px}

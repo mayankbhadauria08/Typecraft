@@ -198,6 +198,7 @@ const SAMPLE = [
   [/\/batches\/\$\{[^}]+\}/, '/batches/bat_00000000000000000000'],
   [/\/staff\/\$\{[^}]+\}/, '/staff/stf_00000000000000000000'],
   [/\/students\/\$\{[^}]+\}/, '/students/mem_00000000000000000000'],
+  [/\/assignments\/\$\{[^}]+\}/, '/assignments/asg_00000000000000000000'],
 ];
 function apiCalls() {
   const out = new Set();

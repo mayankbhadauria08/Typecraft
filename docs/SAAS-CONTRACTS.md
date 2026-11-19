@@ -260,6 +260,9 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   (name or null). Page `/institute/:id/students/:mid`.
 - Console capacity: `GET /api/console/institutes/capacity` (institutes.view) → `{ today, lessonsToday, learnersToday, seatsInUse,
   databaseBytes | null, freeDatabaseBytes, freeLessonsADay, writesALesson, freeWritesADay }`.
+- Teaching (`src/institute-teaching.js`, docs/INSTITUTES.md §12), staff of the batch: `GET /api/institutes/:id/batches/:bid/teaching`,
+  `PUT …/target` `{ wpm, accuracy, dueDay?, note? }` or `{ clear: true }`, `POST …/assignments` `{ kind, ref, dueDay, note? }`,
+  `POST …/assignments/:aid/remove`, `PUT …/leaderboard` `{ on }`; signed in: `GET /api/me/batches`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

@@ -16,6 +16,17 @@ export const body = `
   <div class="ins-sec-head"><h2 id="ib-students-h">Students</h2><div id="ib-students-act"></div></div>
   <div id="ib-students"><div class="skeleton" style="height:8rem"></div></div>
 </section>
+<section class="section" id="ib-teach-sec" hidden aria-labelledby="ib-teach-h">
+  <h2 id="ib-teach-h">Target and assignments</h2>
+  <div class="grid grid-2 ins-teach">
+    <article class="card" aria-labelledby="ib-target-h"><div class="card-head"><h3 id="ib-target-h">Target</h3><div id="ib-target-act"></div></div><div id="ib-target"></div></article>
+    <article class="card" aria-labelledby="ib-board-h"><div class="card-head"><h3 id="ib-board-h">Leaderboard this week</h3><div id="ib-board-act"></div></div><div id="ib-board"></div></article>
+  </div>
+  <div class="ins-sec-head ins-sub-head"><h3>Assignments</h3><div id="ib-asg-act"></div></div>
+  <div id="ib-asg"></div>
+  <div class="ins-sec-head ins-sub-head"><h3>Exam practice</h3></div>
+  <div id="ib-exams"></div>
+</section>
 <section class="section" id="ib-certs-sec" hidden aria-labelledby="ib-certs-h">
   <div class="ins-sec-head"><h2 id="ib-certs-h">Certificates</h2><div id="ib-certs-act"></div></div>
   <div id="ib-certs"></div>
