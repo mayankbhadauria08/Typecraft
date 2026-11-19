@@ -1,6 +1,7 @@
 import { icon } from '../../layout.js';
 
 export const meta = {
+  needsKeyboard: true,   // phones see a note offering to send the link to a computer
   path: '/typing-test',
   title: 'Free typing speed test (WPM and accuracy)',
   ogTitle: 'Typing speed test · TypeCraft',
