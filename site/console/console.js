@@ -76,7 +76,7 @@
   /** A badge for a state: AC.status('order', 'paid'). */
   function status(kind, key) { var p = (STATUS[kind] || {})[key] || [key, '']; return badge(p[0], p[1]); }
   var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer',
-    cheque: 'Cheque', cash: 'Cash', other: 'Other' };
+    cheque: 'Cheque', cash: 'Cash', other: 'Other', razorpay: 'Online (Razorpay)' };
   function method(key) { return key ? (METHOD[key] || key) : '\u2013'; }
   var SOURCE = { purchase: 'Bought', admin: 'Given by staff', promo: 'Promotion' };
   function source(key) { return SOURCE[key] || key; }

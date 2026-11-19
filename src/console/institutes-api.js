@@ -51,7 +51,7 @@ async function instituteRow(env, id) {
 /* ---------- input ---------- */
 const text = (v, max) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max + 1) : '');
 /** The details any institute has; `partial` checks only the keys present. → { v, fields } */
-function checkDetails(body, partial) {
+export function checkDetails(body, partial) {
   const v = {}, fields = {};
   const has = (k) => !partial || body[k] !== undefined;
   if (has('name')) {
@@ -226,6 +226,12 @@ export async function getInstitute(request, env, ctx, params) {
       try { invoiced = new Map((await DB.prepare('SELECT payment_id, number FROM institute_invoices WHERE institute_id = ?1').bind(i.id).all()).results.map((r) => [r.payment_id, r.number])); }
       catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
     }
+    // payments made online through Razorpay (migration 0011; none before it)
+    let online = new Set();
+    if (money) {
+      try { online = new Set((await DB.prepare('SELECT institute_payment_id AS id FROM institute_orders WHERE institute_id = ?1 AND institute_payment_id IS NOT NULL').bind(i.id).all()).results.map((r) => r.id)); }
+      catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
+    }
     return json({
       institute: fullView(i, money, used.results[0].n),
       money: money ? { pricePaise: i.price_paise, duePaise: i.seats * i.price_paise, paidPaise: paid } : null,
@@ -233,8 +239,8 @@ export async function getInstitute(request, env, ctx, params) {
         archived: !!b.archived_at, teachers: b.teachers || '', createdAt: b.created_at })),
       staff: staff.results.map((s) => ({ id: s.id, email: s.email, name: s.full_name || null, role: s.role, status: s.status,
         invitedAt: s.invited_at, joinedAt: s.joined_at, removedAt: s.removed_at })),
-      payments: money ? payments.results.map((p) => ({ id: p.id, amountPaise: p.amount_paise, method: p.method, reference: p.reference, paidOn: p.paid_on,
-        note: p.note, recordedBy: p.recorder || 'Unknown', createdAt: p.created_at, invoice: invoiced.get(p.id) || null })) : null,
+      payments: money ? payments.results.map((p) => ({ id: p.id, amountPaise: p.amount_paise, method: online.has(p.id) ? 'razorpay' : p.method, reference: p.reference, paidOn: p.paid_on,
+        note: p.note, recordedBy: p.recorder || (online.has(p.id) ? 'Paid online' : 'Unknown'), createdAt: p.created_at, invoice: invoiced.get(p.id) || null, online: online.has(p.id) })) : null,
       history: perms.includes('audit.view') ? history.results.map((a) => {
         const d = parseJson(a.detail, {});
         return { action: a.action, reason: d.reason || null, note: historyNote(a.action, d, money), actor: a.actor || 'System', createdAt: a.created_at };
@@ -266,6 +272,12 @@ function historyNote(action, d, money) {
   if (action === 'institute.student_move') return d.student ? `${d.student}: ${d.from} → ${d.to}` : null;
   if (action === 'institute.create') return d.seats ? `${d.seats} seats` : null;
   if (action === 'institute.invoice' && money) return d.number ? `${d.number} · ${rupees(d.amountPaise || 0)}` : null;
+  if (action === 'institute.order') return [d.kind === 'new' ? `${d.seats} seats for ${d.months} months` : d.kind === 'seats' ? `${d.seats} more seats` : `renewal: ${d.seats} seats for ${d.months} months`,
+    money && d.amountPaise ? rupees(d.amountPaise) : null].filter(Boolean).join(' · ');
+  if (action === 'institute.order_paid') {
+    const what = d.kind === 'new' ? `${d.seats} seats for ${d.months} months` : d.kind === 'seats' ? `${d.seats} more seats` : `renewed: ${d.seats} seats for ${d.months} months`;
+    return [what, money && d.amountPaise ? rupees(d.amountPaise) : null, d.applied === false ? 'NOT APPLIED: the institute is closed, refund it in Razorpay' : null].filter(Boolean).join(' · ');
+  }
   return null;
 }
 

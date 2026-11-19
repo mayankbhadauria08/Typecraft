@@ -15,6 +15,7 @@ import * as instituteOne from './account/institute-one.js';
 import * as instituteBatch from './account/institute-batch.js';
 import * as instituteStudent from './account/institute-student.js';
 import * as instituteInvoice from './account/institute-invoice.js';
+import * as instituteBuy from './account/institute-buy.js';
 
 const KIT = '/site/js/pages-kit.js';
 // course-meta.js (static, shared with the app) gives lesson titles for "Continue lesson".
@@ -38,7 +39,9 @@ export const PAGES = [
   { ...page(join, 'account-join'), meta: join.codeMeta },
   // the institute's own pages, for its admin and teachers (docs/INSTITUTES.md §8)
   page(instituteHome, 'institute-home'),
-  page(instituteOne, 'institute-one'),
+  // seats bought online with Razorpay (docs/INSTITUTES.md §15): institute-pay.js needs the kit first
+  { meta: instituteBuy.meta, body: instituteBuy.body, scripts: [KIT, '/site/js/institute-pay.js', '/site/js/institute-buy.js'] },
+  { meta: instituteOne.meta, body: instituteOne.body, scripts: [KIT, '/site/js/institute-pay.js', '/site/js/institute-one.js'] },
   page(instituteBatch, 'institute-batch', ['/js/rewards-ui.js']),
   page(instituteStudent, 'institute-student'),
   page(instituteInvoice, 'institute-invoice'),

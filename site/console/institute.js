@@ -2,7 +2,7 @@
    GET /api/console/institutes/:id → { institute: { id, name, city, status, packageId, packageName, contactName, contactEmail, contactPhone, gstin, notes,
        seats, seatsUsed, startsAt, endsAt, startDate, lastDay, pricePaise | null }, money: { pricePaise, duePaise, paidPaise } | null,
        batches: [{ id, name, students, joinCode, archived, teachers }], staff: [{ id, email, name, role, status, invitedAt, joinedAt, removedAt }],
-       payments: [{ id, amountPaise, method, reference, paidOn, note, recordedBy, createdAt }] | null, history: [...] | null,
+       payments: [{ id, amountPaise, method ('razorpay' when paid online), reference, paidOn, note, recordedBy, createdAt, invoice, online }] | null, history: [...] | null,
        can: { manage, payments }, today }
    Changes: AC.institutes (institute-actions.js). */
 (function () {
@@ -14,7 +14,7 @@
     'institute.payment': 'Payment recorded', 'institute.payment_remove': 'Payment removed', 'institute.staff_invite': 'Invitation sent',
     'institute.staff_resend': 'Invitation sent again', 'institute.staff_remove': 'Removed from the institute',
     'institute.staff_accept': 'Invitation accepted', 'institute.staff_decline': 'Invitation declined', 'institute.batch_create': 'Batch created',
-    'institute.batch_update': 'Batch changed', 'institute.invoice': 'Invoice made', 'institute.batch_code': 'New join code', 'institute.student_remove': 'Student removed', 'institute.student_move': 'Student moved'
+    'institute.batch_update': 'Batch changed', 'institute.invoice': 'Invoice made', 'institute.order': 'Checkout started online', 'institute.order_paid': 'Paid online', 'institute.batch_code': 'New join code', 'institute.student_remove': 'Student removed', 'institute.student_move': 'Student moved'
   };
   var page = null;
   var after = function (changed) { if (changed) page.load(); };

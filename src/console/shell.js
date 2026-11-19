@@ -8,7 +8,7 @@ import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '19';
+export const CONSOLE_ASSETS = '20';
 // a name starting with / is a file from elsewhere on the site (the shared course rules in /shared/)
 const asset = (name) => `${name.startsWith('/') ? name : '/site/console/' + name}?v=${CONSOLE_ASSETS}`;
 

@@ -800,6 +800,7 @@ tr.row-quiet td { color: var(--ink-3); }
 
 .cap-panel { margin-bottom: 16px; }
 .cap-panel p { margin-top: 6px; }
+.cap-panel .panel-head .btn { margin-top: 0; }
 .cap-meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 10px; }
 .cap-fill { display: block; height: 100%; background: var(--teal-deep); }
 .cap-warn .cap-fill { background: var(--bad); }

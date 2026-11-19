@@ -8,7 +8,8 @@
 //                                                           to the institute's admins and its contact email
 import { HttpError, json, readJson, fieldError, cleanEmail, nowIso, clientIp } from './http.js';
 import { hitLimit } from './session.js';
-import { audit } from './billing.js';
+import { audit, paymentsAvailable } from './billing.js';
+import { pricing } from './institute-checkout.js';
 import { sendTemplate, siteUrl } from './mail.js';
 import { newId, requireBatch, showJoinCode } from './institute-access.js';
 
@@ -93,11 +94,14 @@ export async function sendReminders(env, ctx, now = Date.now()) {
   const iso = new Date(now).toISOString();
   const soon = new Date(now + 30 * DAY_MS).toISOString();
   const rows = (await DB.prepare(
-    `SELECT i.id, i.name, i.seats, i.ends_at, i.contact_email, i.contact_name,
+    `SELECT i.id, i.name, i.seats, i.ends_at, i.contact_email, i.contact_name, i.package_id,
             (SELECT COUNT(*) FROM institute_students s WHERE s.institute_id = i.id AND s.status = 'active') AS used
        FROM institutes i WHERE i.status = 'active' AND i.ends_at > ?1 LIMIT 500`
   ).bind(iso).all()).results;
   const out = { seats: 0, ends30: 0, ends7: 0 };
+  // when seats are sold online, the email says so (for institutes on the plan sold online)
+  const sold = rows.length ? await pricing(env) : null;
+  const onlineFor = sold && sold.on && (await paymentsAvailable(env)) ? sold.packageId : null;
   for (const i of rows) {
     const daysLeft = Math.ceil((Date.parse(i.ends_at) - now) / DAY_MS);
     const due = [];
@@ -115,7 +119,7 @@ export async function sendReminders(env, ctx, now = Date.now()) {
       if (i.contact_email && !to.has(i.contact_email)) to.set(i.contact_email, i.contact_name || '');
       for (const [email, name] of to) {
         await sendTemplate(env, ctx, { to: email, template: 'institute_reminder', data: { name, instituteName: i.name, kind: template, seats: i.seats, seatsUsed: i.used,
-          lastDay: words(lastDayOf(i.ends_at)), days: daysLeft, link: `${siteUrl(env)}/institute/${i.id}` } });
+          lastDay: words(lastDayOf(i.ends_at)), days: daysLeft, link: `${siteUrl(env)}/institute/${i.id}`, online: !!onlineFor && i.package_id === onlineFor } });
       }
       out[kind === 'seats_90' ? 'seats' : kind === 'ends_7' ? 'ends7' : 'ends30']++;
     }
