@@ -1,29 +1,44 @@
+// /typing-test — a timed typing test with live speed and accuracy (site/js/typing-test.js), its FAQ,
+// and links to the exam pages. testWidget() is also used by /10-minute-typing-test.
 import { icon } from '../../layout.js';
+import { faqSection, linkCards, EXAM_PAGES, GUIDES } from './exam-seo.js';
+
+/** Test lengths in seconds. The server keeps tests up to 900 s (src/billing.js postTest). */
+export const LENGTHS = [[15, '15 s'], [30, '30 s'], [60, '1 min'], [120, '2 min'], [300, '5 min'], [600, '10 min'], [900, '15 min']];
+const clock = (d) => (d > 120 ? `${Math.floor(d / 60)}:00` : `${d}<small>s</small>`);
 
 export const meta = {
   needsKeyboard: true,   // phones see a note offering to send the link to a computer
   path: '/typing-test',
   title: 'Free typing speed test (WPM and accuracy)',
   ogTitle: 'Typing speed test · TypeCraft',
-  description: 'Check your typing speed in 15, 30, 60 or 120 seconds. Live words per minute and accuracy, no sign-up needed. Save your results with a free account.',
+  description: 'Check your typing speed in 15 seconds to 15 minutes. Live words per minute and accuracy, no sign-up needed. Save your results with a free account.',
+  crumb: 'Typing test',
   changefreq: 'weekly',
 };
 
-export default `
-<div class="container">
-  <header class="page-head" style="padding-bottom:18px">
-    <span class="eyebrow">Typing test</span>
-    <h1>How fast do you type?</h1>
-    <p class="lede">Pick a length, click the sheet and start typing. The clock starts on your first key. Mistakes stay on the page, as in a real test; you can fix them with Backspace.</p>
-  </header>
+export const faq = [
+  ['How is typing speed worked out?',
+    'Correctly typed characters, spaces included, divided by five (the usual length of a "word"), per minute. Accuracy is the share of all the keys you pressed that were right, so a mistake counts even after you fix it.'],
+  ['What speed do government typing tests ask for?',
+    'SSC\'s typing test for LDC and JSA asks for 35 words a minute in English or 30 in Hindi, over 10 minutes. Its data entry tests ask for 8,000 key depressions an hour, about 27 words a minute. Madhya Pradesh\'s CPCT asks for 30 net words a minute in English. The <a href="/exam-practice">exam pages</a> have the details.'],
+  ['Why is my speed here different from an exam result?',
+    'Exams usually mark whole words: a word with a mistake in it is a full or half mistake, and net speed takes mistakes off your gross speed. This test counts characters. <a href="/guides/gross-and-net-typing-speed">Gross and net speed</a> explains the difference.'],
+  ['Which length should I take?',
+    'One minute is a quick check. For exam practice, take the length of your exam: <a href="/10-minute-typing-test">10 minutes</a> for the SSC typing test, 15 minutes for data entry tests and CPCT.'],
+  ['Do I need an account?',
+    'No. Anyone can take the test. With a free account your results are saved to your history, so you can see your speed change; the free plan saves a few tests a day.'],
+  ['Can I take it on my phone?',
+    'It needs a physical keyboard. Use a computer, or a tablet with a keyboard attached.'],
+];
 
+/** The test itself, with `selected` seconds chosen. ?d=<seconds> in the address picks another listed length. */
+export function testWidget(selected = 60) {
+  return `
   <section class="tt" id="tt" aria-label="Typing test">
     <div class="tt-bar">
       <div class="tabs" role="group" aria-label="Test length" id="ttDur">
-        <button type="button" data-d="15" aria-pressed="false">15 s</button>
-        <button type="button" data-d="30" aria-pressed="false">30 s</button>
-        <button type="button" data-d="60" aria-pressed="true">60 s</button>
-        <button type="button" data-d="120" aria-pressed="false">2 min</button>
+        ${LENGTHS.map(([d, label]) => `<button type="button" data-d="${d}" aria-pressed="${d === selected}">${label}</button>`).join('')}
       </div>
       <div class="tabs" role="group" aria-label="Text" id="ttKind">
         <button type="button" data-k="words" aria-pressed="true">Common words</button>
@@ -33,7 +48,7 @@ export default `
     </div>
 
     <div class="tt-live" aria-live="off">
-      <div class="stat"><span class="stat-label">Time left</span><span class="stat-value" id="ttTime">60<small>s</small></span></div>
+      <div class="stat"><span class="stat-label">Time left</span><span class="stat-value" id="ttTime">${clock(selected)}</span></div>
       <div class="stat"><span class="stat-label">Speed</span><span class="stat-value" id="ttWpm">0<small>wpm</small></span></div>
       <div class="stat"><span class="stat-label">Accuracy</span><span class="stat-value" id="ttAcc">100<small>%</small></span></div>
       <div class="stat"><span class="stat-label">Errors</span><span class="stat-value" id="ttErr">0</span></div>
@@ -61,7 +76,17 @@ export default `
       <div id="rSave" aria-live="polite"></div>
       <div class="actions"><button type="button" class="btn btn-primary" id="ttAgain">${icon('refresh')} Try again</button><a class="btn btn-ghost" href="/practice">How to get faster</a></div>
     </div>
-  </section>
+  </section>`;
+}
+
+export default `
+<div class="container">
+  <header class="page-head" style="padding-bottom:18px">
+    <span class="eyebrow">Typing test</span>
+    <h1>How fast do you type?</h1>
+    <p class="lede">Pick a length, click the sheet and start typing. The clock starts on your first key. Mistakes stay on the page, as in a real test; you can fix them with Backspace.</p>
+  </header>
+${testWidget(60)}
 </div>
 
 <section class="section" aria-labelledby="how-h">
@@ -84,4 +109,15 @@ export default `
     </div>
   </div>
 </section>
+
+<section class="section" aria-labelledby="exams-h">
+  <div class="container">
+    <h2 id="exams-h" class="section-title">Practising for a typing exam?</h2>
+    ${linkCards(EXAM_PAGES, '/typing-test')}
+    <h3 style="margin:28px 0 14px">Guides</h3>
+    ${linkCards(GUIDES)}
+  </div>
+</section>
+
+${faqSection(faq, 'Typing test: questions')}
 `;

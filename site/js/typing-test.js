@@ -1,4 +1,5 @@
-/* Typing test (/typing-test): a timed test with live speed and accuracy.
+/* Typing test (/typing-test, /10-minute-typing-test): a timed test with live speed and accuracy.
+   The length is the pressed button in #ttDur, or ?d=<seconds> when it names one of them.
    Works signed out; signed-in results are saved with POST /api/me/tests (daily limit on Free). */
 (function () {
   'use strict';
@@ -59,7 +60,15 @@
   }
 
   /* ---------- state ---------- */
-  var duration = 60, kind = 'words';
+  var kind = 'words';
+  var duration = (function () {
+    var group = $('ttDur'); if (!group) return 60;
+    var want = new URLSearchParams(location.search).get('d');
+    var btn = want && /^\d{1,4}$/.test(want) ? group.querySelector('[data-d="' + want + '"]') : null;
+    if (btn) group.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === btn ? 'true' : 'false'); });
+    var on = btn || group.querySelector('[aria-pressed="true"]');
+    return (on && parseInt(on.getAttribute('data-d'), 10)) || 60;
+  })();
   var target = '', typed = '';
   var started = 0, timer = 0, finished = false;
   var keys = 0, wrongKeys = 0;
@@ -122,7 +131,9 @@
   }
   function live() {
     var s = stats();
-    setStat('ttTime', Math.max(0, Math.ceil(duration - elapsed())), 's');
+    var left = Math.max(0, Math.ceil(duration - elapsed()));
+    if (duration > 120) setStat('ttTime', Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
+    else setStat('ttTime', left, 's');
     setStat('ttWpm', started ? s.wpm : 0, 'wpm');
     setStat('ttAcc', s.acc, '%');
     setStat('ttErr', s.errs);
@@ -181,7 +192,7 @@
     if (s.chars < 5) return saveNote('Type a little more to get a result worth saving.');
     var who = window.TC && TC.me ? await TC.me() : null;
     if (!who || !who.user) {
-      return saveNote('Want to keep your results and see your progress?', { href: '/signup?next=%2Ftyping-test', text: 'Create a free account' });
+      return saveNote('Want to keep your results and see your progress?', { href: '/signup?next=' + encodeURIComponent(location.pathname), text: 'Create a free account' });
     }
     var d = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
     var r = await TC.api('POST', '/api/me/tests', {

@@ -88,3 +88,39 @@ verify page says checking isn't switched on yet, and the app prints certificates
 
 
 Institutes (docs/INSTITUTES.md §9): the verify answer also carries `institute` (where the holder had a seat when they earned the certificate, or null), and the certificate picture prints "Trained at <institute>" when given one.
+
+## 5. Exam pages and guides (build sequence step 3)
+
+Public pages that explain each exam and send people to the practice tests. Search engines can
+find them: they are in the sitemap, the footer ("Exams"), the Resources menu (Guides), the exam
+practice page and the typing test page. All are server-rendered with no page script, apart from
+the 10-minute test.
+
+| Page | What it has | JSON-LD |
+| --- | --- | --- |
+| `/ssc-chsl-typing-test` | LDC/JSA typing test: rules table, marking, our test next to the real one, tips, FAQ | BreadcrumbList, FAQPage |
+| `/ssc-dest-typing-test` | CGL DEST and CHSL DEO skill test: rules, what 8,000 an hour means, FAQ | BreadcrumbList, FAQPage |
+| `/cpct-typing-test` | MP CPCT: rules, the score scale, Backspace off, FAQ | BreadcrumbList, FAQPage |
+| `/10-minute-typing-test` | the typing test set to 10 minutes, exam totals for 10 minutes, FAQ | BreadcrumbList, FAQPage |
+| `/guides` | the guides and exam pages | none |
+| `/guides/ssc-typing-test-marking` | full and half mistakes from SSC's guidelines, a worked example | Article, BreadcrumbList |
+| `/guides/key-depressions-per-hour` | KDPH, converting, correct key depressions, worked examples | Article, BreadcrumbList |
+| `/guides/gross-and-net-typing-speed` | gross and net speed, mistakes %, character accuracy versus word marking | Article, BreadcrumbList |
+
+- Files: `src/pages/public/exam-seo.js` (the lists that link the pages, tables, FAQ section,
+  JSON-LD), one file per page, registered in `src/pages/public.js`.
+- `/typing-test` now offers 15 s to 15 minutes (`LENGTHS` in `src/pages/public/typing-test.js`;
+  the server keeps up to 900 s) and reads `?d=<seconds>`; it also gained an FAQ and links to the
+  exam pages. The account history filter lists the new lengths.
+- **Facts.** Rules come from the exams' notices and guidelines where we could read them, and each
+  file's header comment names its sources. Where a notice is silent (SSC's error allowance, CPCT's
+  Backspace rule) the page says so instead of guessing. Every exam page says the tests are
+  TypeCraft's practice, not the exams' software, and names the official site. `CHECKED` in
+  `exam-seo.js` is the date the facts were checked: re-check the pages when a new notice comes
+  out (SSC CHSL and CGL each year) and update it.
+- `tests/exam-pages.test.mjs` checks that the pages render with valid JSON-LD, are in the sitemap
+  and linked from the site, that every link on them works, and that what they say about our
+  practice tests (lengths, passage sizes, goals, the worked example's marking) matches
+  `shared/exam-rules.js`. Change a test's rules there and this test tells you which page to update.
+- Search Console and Bing are not set up yet, and the sitemap has not been submitted (owner's
+  decision, build sequence step 2).

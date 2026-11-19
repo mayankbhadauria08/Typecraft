@@ -302,7 +302,7 @@ form{margin:0}
 
 /* ---------- footer ---------- */
 .site-foot{border-top:1px solid var(--line);margin-top:clamp(40px,6vw,80px);padding:48px 0 calc(28px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--sunk) 60%,transparent))}
-.foot-grid{display:grid;gap:32px;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr))}
+.foot-grid{display:grid;gap:32px;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr))}
 .foot-brand{display:flex;flex-direction:column;gap:14px}
 .foot-brand p{font-size:14.5px;max-width:40ch}
 .site-foot nav{display:flex;flex-direction:column;gap:9px}
@@ -581,7 +581,7 @@ form{margin:0}
 @media (max-width:1040px){
   .games{grid-template-columns:repeat(2,minmax(0,1fr))}
   .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .foot-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .foot-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   .foot-brand{grid-column:1/-1}
 }
 @media (max-width:900px){
