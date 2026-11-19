@@ -194,20 +194,6 @@ test('scheduled for later: nothing goes before its time; it can be taken off the
   assert.equal(list.body.items[0].progress.cancelled, stop.body.notSent);
 });
 
-test('the old /admin announcement now goes out as a campaign, so it keeps to the daily limit', async () => {
-  outbox.length = 0;
-  const r = await owner('POST', '/api/admin/announcements', { subject: 'Big news', body: 'We have new lessons.', audience: 'all' });
-  assert.equal(r.status, 202, JSON.stringify(r.body));
-  assert.equal(r.body.queued, 3);
-  assert.match(r.body.campaignId, /^cmp_/);
-  await K.settle();
-  const c = (await owner('GET', `/api/console/campaigns/${r.body.campaignId}`)).body;
-  assert.equal(c.campaign.name, 'Announcement: Big news');
-  assert.equal(c.campaign.status, 'sent');
-  assert.equal(c.progress.sent, 3);
-  assert.deepEqual(outbox.map((m) => m.to[0]).sort(), ['asha@example.com', 'neha@example.com', 'ravi@example.com']);
-});
-
 /* ---------------- the email log ---------------- */
 test('the email log: every email with filters; a failed one can be sent again, a code never', async () => {
   const all = await support('GET', '/api/console/emails');
@@ -215,6 +201,8 @@ test('the email log: every email with filters; a failed one can be sent again, a
   assert.ok(all.body.total >= 5);
   assert.equal(all.body.kinds.announcement, 'Campaign or announcement');
   assert.equal(all.body.can.retry, false);
+  await K.run(`INSERT INTO email_logs (id, user_id, to_email, template, category, subject, payload, status, provider, attempts, created_at, updated_at)
+               VALUES ('em_ann_neha', ?1, 'neha@example.com', 'announcement', 'platform', 'Big news', '{}', 'sent', 'resend', 1, ?2, ?2)`, C.paid, new Date().toISOString());
   const ann = await support('GET', '/api/console/emails?kind=announcement&q=neha');
   assert.ok(ann.body.items.length >= 1 && ann.body.items.every((e) => e.to === 'neha@example.com' && e.template === 'announcement'));
   assert.ok(ann.body.items.every((e) => e.retryable === false), 'Support cannot retry');
@@ -313,27 +301,27 @@ test('learners see the right notices: on the website under the header, in the tr
 /* ---------------- pages ---------------- */
 test('pages: frames without inline code; Support sees campaigns and notifications without the buttons to write', async () => {
   const D = await draft(admin, { name: 'Page check' });
-  for (const p of ['/console/campaigns', `/console/campaigns/${D}`, '/console/email-log', '/console/notifications']) {
+  for (const p of ['/admin/campaigns', `/admin/campaigns/${D}`, '/admin/email-log', '/admin/notifications']) {
     const r = await owner('GET', p);
     assert.equal(r.status, 200, p);
     assertNoInlineCode(r.text);
   }
-  const list = (await owner('GET', '/console/campaigns')).text;
+  const list = (await owner('GET', '/admin/campaigns')).text;
   assert.ok(list.includes('id="newCampaign"') && list.includes('id="limitBar"') && list.includes('/site/console/campaigns.js?v='));
-  assert.match(list, /<a class="nav-item is-current" href="\/console\/campaigns" aria-current="page">/);
-  const asSupport = (await support('GET', '/console/campaigns')).text;
+  assert.match(list, /<a class="nav-item is-current" href="\/admin\/campaigns" aria-current="page">/);
+  const asSupport = (await support('GET', '/admin/campaigns')).text;
   assert.ok(!asSupport.includes('id="newCampaign"'));
-  assert.ok((await owner('GET', '/console/notifications')).text.includes('id="newNotice"'));
-  assert.ok(!(await support('GET', '/console/notifications')).text.includes('id="newNotice"'));
+  assert.ok((await owner('GET', '/admin/notifications')).text.includes('id="newNotice"'));
+  assert.ok(!(await support('GET', '/admin/notifications')).text.includes('id="newNotice"'));
   await K.setPermission('support', 'notices.view', false);
   try {
-    assert.equal((await support('GET', '/console/notifications')).status, 403);
+    assert.equal((await support('GET', '/admin/notifications')).status, 403);
     assert.equal((await support('GET', '/api/console/notices')).status, 403);
   } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'notices.view'"); }
 });
 
 /* ---------------- before the migration ---------------- */
-test('before migration 0015: the console says so, learners see no notices, the cron does nothing, announcements go the old way', async () => {
+test('before migration 0015: the console says so, learners see no notices, the cron does nothing', async () => {
   await K.run('DROP TABLE campaign_sends');
   await K.run('DROP TABLE email_campaigns');
   await K.run('DROP TABLE site_notices');
@@ -346,8 +334,5 @@ test('before migration 0015: the console says so, learners see no notices, the c
   assert.equal((await K.client()('GET', '/pricing')).status, 200);
   const { cron } = await import('../src/console/campaigns-api.js');
   await cron(S.env, null, '*/10 * * * *');
-  const a = await owner('POST', '/api/admin/announcements', { subject: 'Old way', body: 'Still works.', audience: 'all' });
-  assert.equal(a.status, 202, JSON.stringify(a.body));
-  assert.equal(a.body.campaignId, undefined);
   await K.settle();
 });

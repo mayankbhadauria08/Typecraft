@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '12';
+export const ASSET_VERSION = '13';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -61,15 +61,6 @@ export const ACCOUNT_NAV = [
   ['/account/profile', 'Profile', 'user'],
   ['/account/settings', 'Settings', 'settings'],
 ];
-export const ADMIN_NAV = [
-  ['/admin', 'Overview', 'grid'],
-  ['/admin/users', 'Users', 'users'],
-  ['/admin/packages', 'Packages', 'package'],
-  ['/admin/payments', 'Payments', 'card'],
-  ['/admin/revenue', 'Revenue', 'trend'],
-  ['/admin/emails', 'Emails', 'mail'],
-  ['/admin/settings', 'Settings', 'settings'],
-];
 
 function initials(name, email) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -89,6 +80,7 @@ function current(path, href) {
 function userMenu(ctx, withTheme) {
   const u = ctx.user;
   const first = String(u.fullName || '').trim().split(/\s+/)[0] || 'Account';
+  // staff: the admin console (src/console/, signed in separately there)
   const admin = ctx.role ? `<a role="menuitem" href="/admin">${icon('shield')}<span>Admin</span></a>` : '';
   return `<details class="user-menu">
   <summary aria-label="Account menu for ${esc(u.fullName || u.email)}"><span class="avatar" aria-hidden="true">${esc(initials(u.fullName, u.email))}</span><span class="um-name">${esc(first)}</span>${planBadge(ctx.entitlements)}${icon('chevronDown')}</summary>
@@ -188,10 +180,9 @@ function siteFooter(ctx) {
 
 function shellLayout(ctx, body, nav, label) {
   const items = nav.map(([href, text, ic]) =>
-    `<a href="${href}"${current(ctx.path, href) && !(href === '/admin' && ctx.path !== '/admin') ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`).join('');
-  const tag = label === 'Admin' ? `<span class="badge badge-warn">${esc(ctx.role || 'admin')}</span>` : '';
+    `<a href="${href}"${current(ctx.path, href) ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`).join('');
   return `<header class="app-head"><div class="head-row">
-  ${brand('/')}${tag}
+  ${brand('/')}
   <div class="head-actions">${themeButton}${ctx.user ? userMenu(ctx) : ''}</div>
 </div></header>
 <div class="shell">
@@ -210,8 +201,6 @@ function layoutBody(layout, ctx, body) {
 <footer class="auth-foot"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Help</a></footer>`;
     case 'account':
       return shellLayout(ctx, body, ctx.institute ? withInstitute(ACCOUNT_NAV) : ACCOUNT_NAV, 'Account');
-    case 'admin':
-      return shellLayout(ctx, body, ADMIN_NAV, 'Admin');
     default:
       return `${siteHeader(ctx)}${noticeBars(ctx)}<main id="main" class="site-main" tabindex="-1">${ctx.needsKeyboard ? KEYBOARD_NOTE : ''}${body}</main>${siteFooter(ctx)}`;
   }

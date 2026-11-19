@@ -30,15 +30,6 @@ export function packageView(p, labels) {
   };
 }
 
-/** A package as stored, for the current /admin: its own feature keys and limits, nothing derived. */
-export function storedPackageView(p, labels) {
-  return {
-    id: p.id, name: p.name, description: p.description, pricePaise: p.price_paise, currency: p.currency, validityDays: p.validity_days,
-    features: parse(p.features, []).map((key) => ({ key, label: labels[key] || key })), limits: parse(p.limits, {}), highlight: !!p.highlight,
-    lessons: (({ text, Text, short, count, all }) => ({ text, Text, short, count, all }))(A.describe(lessonsOf(p))),
-  };
-}
-
 /** The feature catalogue without the two lesson features (each package's `lessons` says that instead). */
 export const catalogueView = (rows) => rows.filter((f) => !LESSON_FEATURES.includes(f.key));
 

@@ -11,7 +11,7 @@
 (function () {
   'use strict';
   var doc = document, root = doc.documentElement;
-  var base = root.getAttribute('data-console-base') || '/console';
+  var base = root.getAttribute('data-console-base') || '/admin';
   var boot = {};
   try { boot = JSON.parse(doc.getElementById('console-boot').textContent) || {}; } catch (e) { boot = {}; }
   var me = boot.me || null;

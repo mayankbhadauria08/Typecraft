@@ -274,43 +274,39 @@ test('payments download: only with the permission and a fresh password check; ce
 
 /* ---------------- pages ---------------- */
 test('payment pages: frames by permission, the sidebar shows where you are, strict headers', async () => {
-  const anon = await K.client()('GET', '/console/payments?status=failed');
-  assert.equal(anon.status, 302); assert.equal(anon.headers.get('location'), S.base + '/console/login?next=%2Fconsole%2Fpayments%3Fstatus%3Dfailed');
+  const anon = await K.client()('GET', '/admin/payments?status=failed');
+  assert.equal(anon.status, 302); assert.equal(anon.headers.get('location'), S.base + '/admin/login?next=%2Fadmin%2Fpayments%3Fstatus%3Dfailed');
 
-  const page = await admin('GET', '/console/payments');
+  const page = await admin('GET', '/admin/payments');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
   assert.ok(page.headers.get('content-security-policy').includes("default-src 'none'"));
   assert.equal(page.headers.get('cache-control'), 'private, no-store');
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/payments" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/payments" aria-current="page">/);
   for (const name of ['q', 'status', 'package', 'from', 'to']) assert.ok(page.text.includes(`name="${name}"`), name);
   assert.ok(page.text.includes('id="exportBtn"') && page.text.includes('/site/console/payments.js?v='));
-  assert.ok(!(await support('GET', '/console/payments')).text.includes('id="exportBtn"'), 'no download button without the permission');
+  assert.ok(!(await support('GET', '/admin/payments')).text.includes('id="exportBtn"'), 'no download button without the permission');
   assert.ok(!/Riya Sharma|riya\.sharma|ord_[a-f0-9]{24}/.test(page.text), 'the frame carries no payment data; the script asks for it');
 
-  const one = await owner('GET', `/console/payments/${O.paid.id}`);
+  const one = await owner('GET', `/admin/payments/${O.paid.id}`);
   assert.equal(one.status, 200);
   assertNoInlineCode(one.text);
-  assert.match(one.text, /<a class="nav-item is-current" href="\/console\/payments" aria-current="page">/);
-  assert.match(one.text, /<a class="crumb" href="\/console\/payments">Payments<\/a>/);
+  assert.match(one.text, /<a class="nav-item is-current" href="\/admin\/payments" aria-current="page">/);
+  assert.match(one.text, /<a class="crumb" href="\/admin\/payments">Payments<\/a>/);
   for (const id of ['recTitle', 'recActions', 'attemptsBody', 'refundsBody', 'activityBody', 'orderBody', 'customerBody', 'planBody']) assert.ok(one.text.includes(`id="${id}"`), id);
   const boot = JSON.parse(one.text.match(/<script type="application\/json" id="console-boot">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(boot.page, { key: 'payments', title: 'Payment', params: { id: O.paid.id } });
-  assert.ok(!(await support('GET', `/console/payments/${O.paid.id}`)).text.includes('id="activityBody"'));
+  assert.ok(!(await support('GET', `/admin/payments/${O.paid.id}`)).text.includes('id="activityBody"'));
 
-  // Home lists it as ready, and the old "Phase 2" tag is gone from its row
-  const home = (await owner('GET', '/console')).text;
-  assert.match(home, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>, <a href="\/console\/payments">Payments<\/a>/);
-  // Phase 5b took over the last parts of the current admin (the activity log, administrator roles): nothing is
-  // listed as managed there any more
-  assert.match(home, /<a href="\/console\/campaigns">Email campaigns<\/a>/);
-  assert.match(home, /<a href="\/console\/administrators">Administrators<\/a>/);
+  // Home: the menu has every module (the old admin is gone since Phase 6)
+  const home = (await owner('GET', '/admin')).text;
+  for (const p of ['customers', 'payments', 'campaigns', 'administrators']) assert.ok(home.includes(`href="/admin/${p}"`), p);
   assert.ok(!/still managed in the current admin/.test(home));
   await K.setPermission('support', 'payments.view', false);
   try {
-    assert.equal((await support('GET', '/console/payments')).status, 403);
-    assert.equal((await support('GET', `/console/payments/${O.paid.id}`)).status, 403);
-    assert.ok(!(await support('GET', '/console')).text.includes('href="/console/payments"'), 'and no link in the sidebar or on Home');
+    assert.equal((await support('GET', '/admin/payments')).status, 403);
+    assert.equal((await support('GET', `/admin/payments/${O.paid.id}`)).status, 403);
+    assert.ok(!(await support('GET', '/admin')).text.includes('href="/admin/payments"'), 'and no link in the sidebar or on Home');
   } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'payments.view'"); }
   for (const f of ['payments.js', 'payment.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
@@ -519,13 +515,13 @@ test('before migration 0006: a refund under the usual rule works; a choice for t
 });
 
 test('refunds page: the frame by permission; the payment page offers a refund only to who may send one', async () => {
-  const page = await support('GET', '/console/refunds');
+  const page = await support('GET', '/admin/refunds');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/refunds" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/refunds" aria-current="page">/);
   for (const name of ['q', 'status', 'from', 'to']) assert.ok(page.text.includes(`name="${name}"`), name);
   assert.ok(!page.text.includes('id="exportBtn"') && page.text.includes('/site/console/refunds.js?v='));
-  assert.equal((await K.client()('GET', '/console/refunds')).status, 302);
+  assert.equal((await K.client()('GET', '/admin/refunds')).status, 302);
   // the button is drawn by the page's script from can.refund
   assert.equal((await admin('GET', `/api/console/payments/${O.paid.id}`)).body.can.refund, false, 'Admin has no payments.refund by default');
   await K.setPermission('admin', 'payments.refund', true);

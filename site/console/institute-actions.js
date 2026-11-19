@@ -20,7 +20,7 @@
   var emailNote = function (status) {
     return status === 'sent' ? 'The invitation email is on its way.'
       : status === 'cancelled' ? 'The invitation is saved, but the email was held back: too many emails to this address in the last hour.'
-        : 'The invitation is saved, but the email could not be sent. Check Email in the current admin, or send it again later.';
+        : 'The invitation is saved, but the email could not be sent. Check the email log, or send it again later.';
   };
 
   function create(packages, today) {

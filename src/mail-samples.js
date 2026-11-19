@@ -26,7 +26,7 @@ export const SAMPLES = {
   contact_received: { name: 'Asha Verma', topic: 'billing', message: 'I paid for Pro but my account still says Free.' },
   support_reply: { name: 'Asha Verma', body: 'Your Pro plan is active now. Sorry for the wait.\n\nThe payment had reached us, but the bank confirmed it late.', staffName: 'Rahul', original: 'I paid for Pro but my account still says Free.', subject: 'Re: your message to TypeCraft (payments and plans)' },
   contact_forward: { name: 'Asha Verma', email: 'asha@example.com', topic: 'billing', message: 'I paid for Pro but my account still says Free.', priority: true },
-  system_alert: { title: 'A background job failed', failures: [{ part: 'payments', error: 'Razorpay did not answer in time' }], link: '/console/system-health' },
+  system_alert: { title: 'A background job failed', failures: [{ part: 'payments', error: 'Razorpay did not answer in time' }], link: '/admin/system-health' },
   institute_invite: { name: 'Sunil Sharma', instituteName: 'Sharma Typing Centre', role: 'admin', invitedBy: 'TypeCraft', email: 'sunil@example.com', link: '/institute' },
   student_invite: { name: 'Ravi', instituteName: 'Sharma Typing Centre', batchName: 'Morning batch', batchCode: 'KQ7M-PX3D', joinPath: '/join/KQ7M-PX3D' },
   institute_reminder: { name: 'Sunil Sharma', instituteName: 'Sharma Typing Centre', kind: 'ends', lastDay: '26 Nov 2026', days: 7, link: '/institute', online: true },

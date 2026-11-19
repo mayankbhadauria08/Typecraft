@@ -76,15 +76,15 @@ export async function getDashboard(request, env) {
   // needs attention: only what this role may open, each with where to look
   const attention = [];
   // text: [for one, for more]
-  const add = (perm, count, text, href, external = false) => {
-    if (count > 0 && (!perm || can(perm))) attention.push({ count, text: count === 1 ? text[0] : text[1], href, external });
+  const add = (perm, count, text, href) => {
+    if (count > 0 && (!perm || can(perm))) attention.push({ count, text: count === 1 ? text[0] : text[1], href });
   };
   add('payments.view', one('stuck').n, ['payment started over 15 minutes ago and still not confirmed', 'payments started over 15 minutes ago and still not confirmed'],
     `${CONSOLE_BASE}/payments?status=pending`);
   add('refunds.view', one('refundsOpen').pending, ['refund still on its way', 'refunds still on their way'], `${CONSOLE_BASE}/refunds?status=pending`);
   add('refunds.view', one('refundsOpen').failed, ['refund that failed', 'refunds that failed'], `${CONSOLE_BASE}/refunds?status=failed`);
-  add('emails.view', one('emails').n, ['email that failed in the last 7 days', 'emails that failed in the last 7 days'], '/admin/emails', true);
-  add('support.view', one('messages').n, ['new message from the contact form', 'new messages from the contact form'], '/admin/emails', true);
+  add('emails.view', one('emails').n, ['email that failed in the last 7 days', 'emails that failed in the last 7 days'], `${CONSOLE_BASE}/email-log?status=failed`);
+  add('support.view', one('messages').n, ['new message from the contact form', 'new messages from the contact form'], `${CONSOLE_BASE}/support?status=new`);
   if (can('settings.view')) {
     const off = setupItems(env).filter((i) => !i.ready).map((i) => i.label.toLowerCase()).join(', ');
     add(null, setupItems(env).filter((i) => !i.ready).length, ['service not set up: ' + off, 'services not set up: ' + off], CONSOLE_BASE);

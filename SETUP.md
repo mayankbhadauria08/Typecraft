@@ -112,9 +112,9 @@ For local email testing, create a file `.dev.vars` (it is git-ignored) containin
 | `src/index.js` | The Worker: `/api/*` routes, plus a daily clean-up of expired sessions and links. Everything else is served straight from `index.html`. |
 | `src/auth.js`, `src/account.js`, `src/progress.js` | Sign-in and passwords; profile and account deletion; learning progress. |
 | `src/session.js`, `src/http.js`, `src/crypto.js` | Sessions, rate limits, email, request checks, validation, password hashing. |
-| `src/pipeline.js`, `src/api.js`, `src/admin.js` | Next version: the event pipeline and nightly rebuild; the learner APIs; the owner's health numbers and `/admin`. |
+| `src/pipeline.js`, `src/api.js`, `src/admin.js` | Next version: the event pipeline and nightly rebuild; the learner APIs; the learning health numbers shown in the admin console's System health. |
+| `src/console/` | The admin console at `/admin` (docs/ADMIN-CONSOLE.md). |
 | `shared/rewards-rules.js` | Badges, daily quests, XP, streak freezes, certificates and Workshop unlocks: one set of rules for the browser and the server. |
-| `admin.html` | The owner's health page (served by the Worker to `OWNER_EMAILS` only). |
 | `migrations/` | The database tables (`0001_accounts.sql`, `0002_next.sql`). |
 | `tests/` | API tests and a local test server. `tests/d1-shim.mjs` stands in for D1 using Node's built-in SQLite. |
 | `wrangler.jsonc`, `.assetsignore`, `_headers` | Worker config; files kept private; security headers. |
@@ -151,7 +151,6 @@ All responses are JSON: `{ "ok": true, … }` or `{ "ok": false, "error": { "cod
 | `GET /api/user/export` | All of the learner's data as a JSON download |
 | `POST /api/user/reset` | Clears the learner's progress (body `{ "confirm": "RESET" }`); the account stays |
 | `GET /api/user/ghosts/:key` | A saved Ghost Race replay |
-| `GET /api/admin/health` | Owner only (`OWNER_EMAILS`) |
 
 ### Security
 

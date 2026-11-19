@@ -4,7 +4,7 @@
          plans: { paying, endingIn7Days, byPackage: [{ id, name, customers }] },
          payments: { paid: { now, before }, failed: { now, before }, waiting },
          money: { gross, refunds, net: { now, before }, currency } | null (without revenue.view),
-         attention: [{ count, text, href, external }], chart: [{ day, signups, paid, netPaise | null }], at }
+         attention: [{ count, text, href }], chart: [{ day, signups, paid, netPaise | null }], at }
    The period is kept in the address (?range=), so a reload shows the same. No automatic refresh: the Refresh button asks again. */
 (function () {
   'use strict';
@@ -44,8 +44,8 @@
     // needs attention
     var att = AC.clear(byId('attentionBody'));
     att.appendChild(d.attention.length ? el('ul', { class: 'attention' }, d.attention.map(function (a) {
-      return el('li', null, [AC.icon('alert'), el('a', { href: a.href, target: a.external ? '_blank' : null, rel: a.external ? 'noopener' : null },
-        [el('strong', { text: count(a.count) }), ' ' + a.text + (a.external ? ' (in the current admin)' : '')])]);
+      return el('li', null, [AC.icon('alert'), el('a', { href: a.href },
+        [el('strong', { text: count(a.count) }), ' ' + a.text])]);
     })) : el('p', { class: 'all-clear' }, [AC.icon('check'), 'Nothing needs attention.']));
 
     fill('customerTiles', [

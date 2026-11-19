@@ -374,75 +374,28 @@ test('email preferences: defaults, round-trip, validation, sign-in required', as
 });
 
 /* ---------------- admin ---------------- */
-test('admin email list and retry: 404 for learners, list for support, retry for owners', async () => {
+// The email log, retries and contact messages are the console's now (tests/console-campaigns.test.mjs,
+// tests/console-support.test.mjs); campaigns send announcements (tests/console-campaigns.test.mjs).
+test('an announcement carries a working unsubscribe link, and the old announcement endpoint is gone', async () => {
   const learner = await signup('learner-x@example.com');
-  assert.equal((await learner('GET', '/api/admin/emails')).status, 404);
-  assert.equal((await learner('GET', '/api/admin/contact')).status, 404);
   assert.equal((await learner('POST', '/api/admin/announcements', { subject: 'x', body: 'y', test: true })).status, 404);
-  assert.equal((await client()('GET', '/api/admin/emails')).status, 404);
-
-  const support = await signup('support-x@example.com');
-  await env.DB.prepare("INSERT INTO admin_users (user_id, role, created_at) VALUES (?1, 'support', '2026-11-15T00:00:00Z')").bind(support.user.id).run();
-  const list = await support('GET', '/api/admin/emails?status=failed');
-  assert.equal(list.status, 200);
-  assert.ok(list.body.emails.length > 0 && list.body.emails.every((e) => e.status === 'failed'));
-  assert.ok(list.body.emails.every((e) => !('payload' in e)));
-  const failedWelcome = list.body.emails.find((e) => e.template === 'welcome' && e.retryable);
-  assert.equal((await support('POST', `/api/admin/emails/${failedWelcome.id}/retry`, {})).status, 403);
-
-  const owner = await signup('boss@example.com');
-  const search = await owner('GET', '/api/admin/emails?q=retry%40example');
-  assert.ok(search.body.emails.length >= 1 && search.body.emails.every((e) => e.to.includes('retry@example')));
-  const otpRow = (await owner('GET', '/api/admin/emails?q=otp_login')).body.emails.find((e) => e.status === 'failed');
-  assert.equal((await owner('POST', `/api/admin/emails/${otpRow.id}/retry`, {})).status, 400);
-  const retried = await owner('POST', `/api/admin/emails/${failedWelcome.id}/retry`, {});
-  assert.equal(retried.status, 200); assert.equal(retried.body.email.status, 'sent');
-  const audit = await env.DB.prepare("SELECT * FROM audit_logs WHERE action = 'email.retry'").first();
-  assert.equal(audit.actor_id, owner.user.id);
-
-  const msgs = await support('GET', '/api/admin/contact?status=new');
-  assert.equal(msgs.status, 200); assert.ok(msgs.body.messages.length >= 1);
-  const upd = await support('POST', `/api/admin/contact/${msgs.body.messages[0].id}`, { status: 'answered' });
-  assert.equal(upd.status, 200);
-});
-
-test('announcements: a test goes to the admin; the real one is batched to opted-in, verified users with an unsubscribe link', async () => {
-  const owner = client();
-  await owner('POST', '/api/auth/login', { email: 'boss@example.com', password: pw });
-  const t = await owner('POST', '/api/admin/announcements', { subject: 'New packs', body: 'Hello!\n\nTry them.', audience: 'all', test: true });
-  assert.equal(t.status, 200); assert.equal(t.body.status, 'sent');
-  assert.equal(mailsTo('boss@example.com').pop().subject, 'New packs');
-
-  await env.DB.prepare("UPDATE users SET email_verified = 1 WHERE email IN ('prefs@example.com', 'learner-x@example.com', 'device@example.com')").run();
+  const u = await env.DB.prepare("SELECT id, full_name FROM users WHERE email = 'learner-x@example.com'").first();
   const before = outbox.length;
-  const r = await owner('POST', '/api/admin/announcements', { subject: 'Big news', body: 'We have new packs.', audience: 'all' });
-  assert.equal(r.status, 202);
-  await settle();
-  const sent = outbox.slice(before);
-  const to = sent.map((m) => m.to[0]);
-  assert.ok(to.includes('learner-x@example.com') && to.includes('device@example.com'));
-  assert.ok(!to.includes('prefs@example.com'), 'opted out');
-  assert.equal(sent.length, r.body.queued);
-  const mail = sent.find((m) => m.to[0] === 'learner-x@example.com');
+  const r = await sendTemplate(env, null, { to: 'learner-x@example.com', userId: u.id, template: 'announcement', data: { name: u.full_name, subject: 'Big news', body: 'We have new packs.' } });
+  assert.equal(r.status, 'sent');
+  const mail = outbox.slice(before).find((m) => m.to[0] === 'learner-x@example.com');
   assert.match(mail.html, /Unsubscribe from announcements/);
-  assert.match(mail._headers['Content-Type'], /json/);
   const link = mail.text.match(/Unsubscribe from announcements: (\S+)/)[1];
-  const u = new URL(link);
-  assert.equal(u.pathname, '/api/email/unsubscribe');
+  const url = new URL(link);
+  assert.equal(url.pathname, '/api/email/unsubscribe');
   // the page itself changes nothing; the POST does
-  const page = await realFetch(`${base}${u.pathname}${u.search}`);
+  const page = await realFetch(`${base}${url.pathname}${url.search}`);
   assert.equal(page.status, 200);
-  const un = await client()('POST', '/api/email/unsubscribe', { u: u.searchParams.get('u'), t: u.searchParams.get('t') });
+  const un = await client()('POST', '/api/email/unsubscribe', { u: url.searchParams.get('u'), t: url.searchParams.get('t') });
   assert.equal(un.status, 200);
-  const learnerPrefs = await env.DB.prepare("SELECT announcements FROM email_preferences p JOIN users u ON u.id = p.user_id WHERE u.email = 'learner-x@example.com'").first();
-  assert.equal(learnerPrefs.announcements, 0);
-  assert.equal((await client()('POST', '/api/email/unsubscribe', { u: u.searchParams.get('u'), t: 'f'.repeat(40) })).status, 400);
-  assert.equal((await owner('POST', '/api/admin/announcements', { subject: '', body: '', audience: 'everyone' })).status, 400);
-  // nobody has a paid plan in this database: 'paid' reaches no one, 'free' reaches the opted-in
-  assert.equal((await owner('POST', '/api/admin/announcements', { subject: 'Paid only', body: 'Thanks.', audience: 'paid' })).body.queued, 0);
-  const free = await owner('POST', '/api/admin/announcements', { subject: 'Free only', body: 'Upgrade.', audience: 'free' });
-  assert.equal(free.status, 202); assert.ok(free.body.queued >= 1);
-  await settle();
+  const prefs = await env.DB.prepare('SELECT announcements FROM email_preferences WHERE user_id = ?1').bind(u.id).first();
+  assert.equal(prefs.announcements, 0);
+  assert.equal((await client()('POST', '/api/email/unsubscribe', { u: url.searchParams.get('u'), t: 'f'.repeat(40) })).status, 400);
 });
 
 /* ---------------- Resend webhook ---------------- */

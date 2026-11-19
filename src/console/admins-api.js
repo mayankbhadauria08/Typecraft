@@ -8,7 +8,7 @@
 //
 // Administrators are existing TypeCraft accounts only: the person signs up on the site first. Super Admins
 // are the accounts in OWNER_EMAILS (a Cloudflare setting) and can't be changed here. Nobody changes their own
-// role. Each change is logged as 'user.role' (as in the old /admin) and the person gets an email about it;
+// role. Each change is logged as 'user.role' and the person gets an email about it;
 // taking the role away also ends their console sessions. admins.manage is for Super Admins only and asks
 // for the password again.
 import { HttpError, json, readJson, fieldError, clientIp, nowIso, cleanEmail } from '../http.js';

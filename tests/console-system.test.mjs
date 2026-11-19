@@ -102,19 +102,10 @@ test('payments switch: paused means no new orders; test mode follows the install
   assert.equal(off.status, 200); assert.match(off.body.message, /paused/);
   const order = await learner('POST', '/api/checkout/order', { packageId: 'pro' });
   assert.equal(order.status, 503); assert.equal(order.body.error.code, 'payments_unavailable');
+  // a test-mode switch stored by the old /admin page means nothing (test mode follows the key) and goes on the next save
+  await K.run("UPDATE platform_settings SET value = '{\"enabled\":false,\"testMode\":true}' WHERE key = 'payments'");
   assert.equal((await owner('PUT', '/api/console/settings/payments', { enabled: true })).status, 200);
-
-  // the old /admin page: test mode follows the key, and a testMode sent back is ignored and dropped
-  await K.run("UPDATE platform_settings SET value = '{\"enabled\":true,\"testMode\":true}' WHERE key = 'payments'");
-  const old = await ownerWho.learner('GET', '/api/admin/settings');
-  assert.equal(old.status, 200); assert.equal(old.body.paymentsMode, 'test'); assert.equal(old.body.settings.payments.testMode, undefined);
-  const put = await ownerWho.learner('PUT', '/api/admin/settings', { payments: { enabled: false, testMode: false } });
-  assert.equal(put.status, 200, JSON.stringify(put.body));
-  assert.deepEqual(JSON.parse((await K.one("SELECT value FROM platform_settings WHERE key = 'payments'")).value), { enabled: false });
-  const fields = await ownerWho.learner('PUT', '/api/admin/settings', { seller: { email: 'nope' } });
-  assert.equal(fields.status, 400); assert.ok(fields.body.error.fields['seller.email']);
-  await ownerWho.learner('PUT', '/api/admin/settings', { payments: { enabled: true } });
-  assert.ok(!readFileSync(new URL('../site/js/admin-settings.js', import.meta.url), 'utf8').includes('pay.testMode'), 'the old page no longer reads a test-mode switch');
+  assert.deepEqual(JSON.parse((await K.one("SELECT value FROM platform_settings WHERE key = 'payments'")).value), { enabled: true });
 });
 
 test('sign-ups switch: closed means no new accounts; everyone with one still signs in', async () => {
@@ -198,7 +189,7 @@ test('a failing part: the others still run, the run is marked, and the Super Adm
   assert.equal(alerts.length, 1);
   assert.deepEqual(alerts[0].to, ['boss@example.com']);
   assert.match(alerts[0].text, /payments/); assert.match(alerts[0].text, /Razorpay did not answer/);
-  assert.match(alerts[0].html, /https:\/\/typecraft\.test\/console\/system-health/);
+  assert.match(alerts[0].html, /https:\/\/typecraft\.test\/admin\/system-health/);
   assert.equal((await K.one("SELECT category FROM email_logs WHERE template = 'system_alert'")).category, 'security');
   // again within 6 hours: recorded, but no second email
   await runJobs(S.env, ctx, '*/10 * * * *', [['payments', async () => { throw new Error('still down'); }]]);
@@ -288,10 +279,10 @@ test('email templates: every email with sample data, in a sandboxed frame the co
   const one = await support('GET', '/api/console/email-templates/payment_success');
   assert.equal(one.status, 200);
   assert.match(one.body.subject, /payment/i); assert.match(one.body.text, /₹199/);
-  assert.equal(one.body.previewUrl, '/console/email-preview/payment_success');
+  assert.equal(one.body.previewUrl, '/admin/email-preview/payment_success');
   assert.equal((await support('GET', '/api/console/email-templates/nope')).status, 404);
 
-  const page = await support('GET', '/console/email-preview/payment_success');
+  const page = await support('GET', '/admin/email-preview/payment_success');
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-type'), /text\/html/);
   const csp = page.headers.get('content-security-policy');
@@ -299,27 +290,27 @@ test('email templates: every email with sample data, in a sandboxed frame the co
   assert.ok(!/script-src/.test(csp));
   assert.equal(page.headers.get('x-frame-options'), 'SAMEORIGIN');
   assert.match(page.text, /₹199/); assert.ok(!/<script/i.test(page.text));
-  assert.equal((await support('GET', '/console/email-preview/nope')).status, 404);
-  const anon = await K.client()('GET', '/console/email-preview/payment_success');
+  assert.equal((await support('GET', '/admin/email-preview/nope')).status, 404);
+  const anon = await K.client()('GET', '/admin/email-preview/payment_success');
   assert.equal(anon.status, 302);
   await K.setPermission('support', 'emails.view', false);
   try {
-    assert.equal((await support('GET', '/console/email-preview/payment_success')).status, 403);
+    assert.equal((await support('GET', '/admin/email-preview/payment_success')).status, 403);
     assert.equal((await support('GET', '/api/console/email-templates')).status, 403);
   } finally { await K.setPermission('support', 'emails.view', true); }
 
-  const frame = await support('GET', '/console/email-templates');
+  const frame = await support('GET', '/admin/email-templates');
   assert.equal(frame.status, 200);
   assertNoInlineCode(frame.text);
   assert.match(frame.text, /<iframe id="tplFrame" class="tpl-frame" title="Email preview" sandbox=""/);
   assert.ok(frame.headers.get('content-security-policy').includes("frame-src 'self'"));
-  assert.match(frame.text, /<a class="nav-item is-current" href="\/console\/campaigns"/);
-  assert.match((await support('GET', '/console/campaigns')).text, /href="\/console\/email-templates"/);
+  assert.match(frame.text, /<a class="nav-item is-current" href="\/admin\/campaigns"/);
+  assert.match((await support('GET', '/admin/campaigns')).text, /href="\/admin\/email-templates"/);
 });
 
 /* ---------------- pages ---------------- */
 test('the Settings, Integrations and System health pages: in the menu by permission, no inline code', async () => {
-  for (const [path, perm, script] of [['/console/settings', 'settings.view', 'settings.js'], ['/console/integrations', 'integrations.view', 'integrations.js'], ['/console/system-health', 'health.view', 'health.js']]) {
+  for (const [path, perm, script] of [['/admin/settings', 'settings.view', 'settings.js'], ['/admin/integrations', 'integrations.view', 'integrations.js'], ['/admin/system-health', 'health.view', 'health.js']]) {
     const page = await admin('GET', path);
     assert.equal(page.status, 200, path);
     assertNoInlineCode(page.text);
@@ -327,9 +318,9 @@ test('the Settings, Integrations and System health pages: in the menu by permiss
     assert.match(page.text, new RegExp(`<a class="nav-item is-current" href="${path.replace(/\//g, '\\/')}"`));
     assert.equal((await support('GET', path)).status, 403, `${path}: Support has no ${perm} by default`);
   }
-  const side = (await support('GET', '/console')).text;
-  assert.ok(!side.includes('href="/console/settings"') && !side.includes('href="/console/system-health"'));
-  const home = (await admin('GET', '/console')).text;
-  assert.match(home, /href="\/console\/settings">Settings<\/a>/);
+  const side = (await support('GET', '/admin')).text;
+  assert.ok(!side.includes('href="/admin/settings"') && !side.includes('href="/admin/system-health"'));
+  const home = (await admin('GET', '/admin')).text;
+  assert.ok(home.includes('href="/admin/settings"'));
   assert.ok(!/[Ss]ettings[^.<]* still managed in the current admin/.test(home));
 });

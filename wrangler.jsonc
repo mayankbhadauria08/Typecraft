@@ -1,5 +1,5 @@
 // Cloudflare Worker configuration for TypeCraft (see SETUP.md).
-// index.html (the app) is only sent to signed-in browsers. /api/*, /admin, /console and the
+// index.html (the app) is only sent to signed-in browsers. /api/*, /admin (the console) and the
 // pages run the Worker code in src/.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -30,7 +30,7 @@
   ],
 
   // Email settings (RESEND_API_KEY, EMAIL_FROM, optional APP_URL) and OWNER_EMAILS
-  // (comma-separated emails allowed to open /admin) are set as secrets in the
+  // (comma-separated emails that are Super Admin in the console at /admin) are set as secrets in the
   // Cloudflare dashboard, never in this file. keep_vars stops a
   // deploy from removing anything set there.
   "keep_vars": true,

@@ -33,7 +33,7 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
 9. **[Claude] Custom domain** (after step 2 shows "Active" in Cloudflare): Worker → Settings →
    Domains & Routes → add `typecrafttyping.in` and `www.typecrafttyping.in` (the Worker sends www to
    the apex). Then test the full journey in Razorpay Test Mode with Razorpay's test card/UPI.
-10. **[You] Seller details**: /admin/settings → your legal name and address (shown on invoices and
+10. **[You] Seller details**: /admin/settings (Console › Settings) → your legal name and address (shown on invoices and
     the legal pages; placeholders until then).
 11. **[You] Go live with real money**: after Razorpay activates your account (KYC + website review),
     replace the two key secrets with the `rzp_live_…` pair and add a Live-mode webhook with the same
@@ -41,7 +41,7 @@ Who does what: **[You]** = needs your login (GoDaddy, Google Workspace, Resend, 
 
 ## 1b. The new admin console (Phase 1)
 
-Lives at `/console` beside the current `/admin`. Full notes: `docs/ADMIN-CONSOLE.md`.
+Lives at `/admin` since Phase 6 (§1p); this step said `/console` at the time. Full notes: `docs/ADMIN-CONSOLE.md`.
 
 1. **[Claude] Database**: apply `migrations/0005_admin_console.sql` to the live D1 (adds two
    tables only; restore bookmark first). Until then `/console/login` says the console isn't
@@ -229,9 +229,27 @@ Full notes: `docs/ADMIN-PHASE-5.md` §9–14. Merge 5a (§1n) first: this builds
 1. **No database update.**
 2. **[You] Merge the 5b pull request.** Nothing changes for learners, apart from the Privacy page's
    "How long we keep it", which now gives exact periods.
-3. Add and remove administrators under Console › Administrators from now on (not /admin/users).
+3. Add and remove administrators under Console › Administrators from now on.
 4. The first nightly run after the merge removes IP addresses older than 90 days and email records
    older than a year.
+
+## 1p. The admin console, Phase 6 (the console becomes the admin)
+
+Full notes: `docs/ADMIN-PHASE-6.md`. Merge Phases 4 and 5 first (they are on `main`).
+
+1. **No new database update**, but apply the waiting ones first. Live D1 does not have
+   migrations 0009–0017 yet (§1g–§1n). Without 0014 the console's Support page says "not switched
+   on yet", and after this merge there is no other admin page that lists contact messages (they
+   still reach the support inbox by email). Without 0015 there are no email campaigns (the old
+   announcement form is gone). **[Claude, after your OK]** apply 0009–0017 in the D1 console, with a
+   restore bookmark first, before merging this.
+2. **[You] Merge the Phase 6 pull request.** Nothing changes for learners.
+3. The admin is now at **typecrafttyping.in/admin** and asks for the console sign-in (email,
+   password, and the emailed code once `SESSION_SECRET` and email are set up). Being signed in
+   to the site is no longer enough.
+4. Old `/console/…` bookmarks and links in past alert emails redirect to the same page under
+   `/admin`. `/admin.html` redirects to `/admin`.
+5. Update your bookmark to `/admin`. Nothing else to do.
 
 ## 2. Secrets and settings checklist
 

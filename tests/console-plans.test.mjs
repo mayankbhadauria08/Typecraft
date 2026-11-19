@@ -241,15 +241,15 @@ test('the customer page carries what the plan dialogs need, only for who may use
 });
 
 test('subscriptions page: the frame by permission', async () => {
-  const page = await admin('GET', '/console/subscriptions');
+  const page = await admin('GET', '/admin/subscriptions');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/subscriptions" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/subscriptions" aria-current="page">/);
   for (const name of ['q', 'state', 'package', 'source']) assert.ok(page.text.includes(`name="${name}"`), name);
   assert.ok(page.text.includes('/site/console/plan-actions.js?v=') && page.text.includes('/site/console/subscriptions.js?v='));
   assert.ok(!page.text.includes('id="extendAllBtn"'), 'only with subscriptions.bulk');
-  assert.ok((await owner('GET', '/console/subscriptions')).text.includes('id="extendAllBtn"'));
-  assert.ok((await admin('GET', `/console/customers/${U.riya}`)).text.includes('/site/console/plan-actions.js?v='));
+  assert.ok((await owner('GET', '/admin/subscriptions')).text.includes('id="extendAllBtn"'));
+  assert.ok((await admin('GET', `/admin/customers/${U.riya}`)).text.includes('/site/console/plan-actions.js?v='));
   for (const f of ['plan-actions.js', 'subscriptions.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);
@@ -367,13 +367,13 @@ test('learning access on the customer page; the list page frame', async () => {
   assert.equal(d.accessTargets.lesson[0].name, 'Lesson 1: Meet the keyboard');
   const s = (await support('GET', `/api/console/customers/${cust}`)).body;
   assert.equal(s.can.access, false); assert.equal(s.accessTargets, null); assert.equal(s.access.length, 1);
-  const frame = await admin('GET', `/console/customers/${cust}`);
+  const frame = await admin('GET', `/admin/customers/${cust}`);
   assert.ok(frame.text.includes('id="accessBody"') && frame.text.includes('/site/console/access-actions.js?v='));
 
-  const page = await support('GET', '/console/access');
+  const page = await support('GET', '/admin/access');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/access" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/access" aria-current="page">/);
   for (const name of ['q', 'state', 'kind', 'effect']) assert.ok(page.text.includes(`name="${name}"`), name);
   for (const f of ['access-actions.js', 'access.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
@@ -494,34 +494,23 @@ test('packages: changing one; a big price change needs confirming; one recommend
   assert.deepEqual(JSON.parse(last.detail).highlightTakenFrom, ['pro-yearly'], 'taking the highlight off another package is recorded');
 });
 
-test('packages: the current admin uses the same rules', async () => {
-  const learner = await K.account({ role: 'admin', name: 'Old Admin', email: 'old-admin@example.com' });
-  // the current admin works with the normal sign-in (the learner session of an Admin)
-  let r = await learner.learner('PUT', '/api/admin/packages/free', { pricePaise: 100 });
-  assert.equal(r.status, 400); assert.ok(r.body.error.fields.pricePaise);
-  r = await learner.learner('PUT', '/api/admin/packages/starter', { highlight: true });
-  assert.equal(r.status, 200, r.text);
-  assert.deepEqual((await K.many('SELECT id FROM packages WHERE highlight = 1')).map((x) => x.id), ['starter'], 'one recommended there too');
-  await learner.learner('PUT', '/api/admin/packages/pro', { highlight: true });
-});
-
 test('packages pages: frames by permission; Support may look, not change', async () => {
-  const list = await support('GET', '/console/packages');
+  const list = await support('GET', '/admin/packages');
   assert.equal(list.status, 200);
   assertNoInlineCode(list.text);
-  assert.match(list.text, /<a class="nav-item is-current" href="\/console\/packages" aria-current="page">/);
-  assert.ok(!list.text.includes('href="/console/packages/new"'), 'no New package for Support');
-  assert.ok((await admin('GET', '/console/packages')).text.includes('href="/console/packages/new"'));
-  assert.equal((await support('GET', '/console/packages/new')).status, 403);
-  const fresh = await admin('GET', '/console/packages/new');
+  assert.match(list.text, /<a class="nav-item is-current" href="\/admin\/packages" aria-current="page">/);
+  assert.ok(!list.text.includes('href="/admin/packages/new"'), 'no New package for Support');
+  assert.ok((await admin('GET', '/admin/packages')).text.includes('href="/admin/packages/new"'));
+  assert.equal((await support('GET', '/admin/packages/new')).status, 403);
+  const fresh = await admin('GET', '/admin/packages/new');
   assert.equal(fresh.status, 200); assertNoInlineCode(fresh.text);
   assert.ok(fresh.text.includes('id="f-id"') && fresh.text.includes('Create package'));
   const boot = JSON.parse(fresh.text.match(/<script type="application\/json" id="console-boot">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(boot.page.params, {}, '/packages/new is the new-package page, not a package called new');
-  const one = await support('GET', '/console/packages/pro');
+  const one = await support('GET', '/admin/packages/pro');
   assert.equal(one.status, 200);
   assert.ok(one.text.includes('data-readonly') && !one.text.includes('id="pkgSave"') && !one.text.includes('id="f-id"'));
-  assert.ok((await admin('GET', '/console/packages/pro')).text.includes('id="pkgSave"'));
+  assert.ok((await admin('GET', '/admin/packages/pro')).text.includes('id="pkgSave"'));
   for (const f of ['packages.js', 'package.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
     assert.equal(r.status, 200); assert.ok(!/innerHTML|document\.write|eval\(/.test(r.text), f);

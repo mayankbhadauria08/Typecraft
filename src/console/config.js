@@ -1,8 +1,8 @@
 // Admin console settings shared by the server modules in src/console/.
 // See docs/ADMIN-CONSOLE.md.
 
-/** Where the console's pages live. Becomes '/admin' when it replaces the current admin pages. */
-export const CONSOLE_BASE = '/console';
+/** Where the console's pages live. Since Phase 6 the console is the admin: /console redirects here (src/site.js). */
+export const CONSOLE_BASE = '/admin';
 
 // __Host- cookies: Secure, Path=/, no Domain (see src/http.js). Strict: never sent on cross-site requests.
 export const ADMIN_COOKIE = '__Host-tc_admin';
