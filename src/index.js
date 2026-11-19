@@ -8,6 +8,7 @@ import * as progress from './progress.js';
 import * as api from './api.js';
 import * as admin from './admin.js';
 import { rebuildAll } from './pipeline.js';
+import { runJobs, pruneJobRuns } from './jobs.js';
 // SaaS modules: each exports ROUTES ({'METHOD /path': handler}), PATTERNS ([method, regex, names, handler])
 // and optionally cron(env, ctx, kind). See docs/SAAS-CONTRACTS.md.
 import * as billing from './billing.js';
@@ -29,7 +30,22 @@ import * as instituteTests from './institute-tests.js'; // scheduled mock tests 
 import * as instituteWeekly from './institute-weekly.js'; // the Monday email to teachers and admins
 import * as notices from './notices.js';         // notices for learners on the site and in the trainer (docs/ADMIN-PHASE-4.md §5)
 import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
+// names for System health's job record (a module with a cron and no name here shows as "part N")
+const CRON_NAMES = new Map([[billing, 'payments'], [mail, 'email'], [instituteCheckout, 'institute payments'], [instituteMail, 'institute reminders'],
+  [instituteWeekly, 'institute Monday email'], [consoleApi, 'console (campaigns, old sign-ins)']]);
 const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, notices, institutes, institutePortal, instituteReports, instituteTeaching, instituteMail, instituteInvoices, instituteCheckout, instituteTests, instituteWeekly, consoleApi];
+
+/** Expired sign-ins, reset and confirmation links, and old rate-limit windows. */
+async function cleanUp(env) {
+  const now = new Date().toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?1').bind(now),
+    env.DB.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ?1').bind(weekAgo),
+    env.DB.prepare('DELETE FROM email_tokens WHERE expires_at <= ?1').bind(weekAgo),
+    env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?1').bind(Math.floor(Date.now() / 1000) - 24 * 3600),
+  ]);
+}
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,
@@ -121,31 +137,24 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  // Nightly: clean-up of expired sessions and links and old rate-limit windows,
-  // then every learner's totals are rebuilt from their saved events and compared
-  // with the stored ones; differences are corrected and logged (rebuild_runs, rebuild_diffs).
+  // Every 10 minutes and nightly: clean-up of expired sessions and links and old rate-limit windows, then each
+  // part's own work (payments, email, institutes, campaigns); nightly also the learners' totals.
   // Learning history is kept until the account is deleted.
   async scheduled(event, env, ctx) {
     if (!env.DB) return;
-    const now = new Date().toISOString();
-    const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    await env.DB.batch([
-      env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?1').bind(now),
-      env.DB.prepare('DELETE FROM password_reset_tokens WHERE expires_at <= ?1').bind(weekAgo),
-      env.DB.prepare('DELETE FROM email_tokens WHERE expires_at <= ?1').bind(weekAgo),
-      env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?1').bind(Math.floor(Date.now() / 1000) - 24 * 3600),
-    ]);
-    // every 10 minutes: email retries, payment reconciliation; daily: expiries and reminders
-    for (const m of MODULES) {
-      if (typeof m.cron !== 'function') continue;
-      try { await m.cron(env, ctx, event.cron); } catch (err) { console.error('cron failed:', err && err.message); }
+    // each part runs on its own (one failing never stops the next); the run is recorded in job_runs for
+    // System health, and a failure is emailed to the Super Admins (src/jobs.js, docs/ADMIN-PHASE-5.md §3)
+    const parts = [['clean-up', () => cleanUp(env)]];
+    MODULES.forEach((m, i) => {
+      if (typeof m.cron === 'function' && CRON_NAMES.has(m)) parts.push([CRON_NAMES.get(m), () => m.cron(env, ctx, event.cron)]);
+      else if (typeof m.cron === 'function') parts.push([`part ${i + 1}`, () => m.cron(env, ctx, event.cron)]);
+    });
+    if (event.cron === '17 21 * * *') {
+      // the nightly job: every learner's totals are rebuilt from their saved events and compared with the
+      // stored ones; differences are corrected and logged (rebuild_runs, rebuild_diffs)
+      parts.push(['learner totals', async () => { const r = await rebuildAll(env); console.log('nightly rebuild:', JSON.stringify(r)); }]);
+      parts.push(['job record', () => pruneJobRuns(env)]);
     }
-    if (event.cron !== '17 21 * * *') return; // the rest is the nightly job
-    try {
-      const r = await rebuildAll(env);
-      console.log('nightly rebuild:', JSON.stringify(r));
-    } catch (err) {
-      console.error('nightly rebuild failed:', err && err.message);
-    }
+    await runJobs(env, ctx, event.cron, parts);
   },
 };

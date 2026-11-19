@@ -12,6 +12,7 @@ import { getAdminSession } from './session.js';
 import { describe } from './auth.js';
 import { renderShell, renderLogin, messageBody } from './shell.js';
 import { findConsolePage } from './pages.js';
+import { servePreview } from './email-preview.js';
 import { LAYERS } from './modules.js';
 import { CONSOLE_BASE } from './config.js';
 
@@ -37,6 +38,7 @@ function navPrefs(request) {
 }
 
 // No inline scripts or styles anywhere in the console, and nothing loaded from other sites but the fonts.
+// Frames: only the console's own email previews (./email-preview.js), which carry their own stricter policy.
 const CSP = [
   "default-src 'none'",
   "script-src 'self'",
@@ -44,6 +46,7 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data:",
   "connect-src 'self'",
+  "frame-src 'self'",
   "form-action 'self'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -104,6 +107,8 @@ export async function serveConsole(request, env, ctx) {
   }
 
   const me = await describe(env, who);
+  const preview = await servePreview(request, env, sub, async (permission) => me.permissions.includes(permission));
+  if (preview) return preview;
   const prefs = navPrefs(request);
   const found = findConsolePage(sub);
   const page = found && found.page;

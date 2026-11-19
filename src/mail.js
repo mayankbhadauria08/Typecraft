@@ -9,6 +9,7 @@
 // OTP, password reset and verification emails are never retried and their codes/links are
 // never stored: the person asks for a new one instead.
 import { HttpError, json, readJson, clientIp, fieldError, cleanName, cleanEmail, nowIso } from './http.js';
+import { perRun } from './limits.js';
 import { uuid } from './crypto.js';
 import { getSession, requireSession, hitLimit, tooMany, emailEnabled } from './session.js';
 import { requirePermission } from './console/session.js';
@@ -24,8 +25,9 @@ const MIN = 60 * 1000;
 export const RETRY_DELAYS_MS = [5 * MIN, 30 * MIN, 120 * MIN, 720 * MIN];
 const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1; // first try + 4 retries
 const STALE_MS = 15 * MIN;                       // a 'queued' row this old was cut off mid-send
-const RETRY_BATCH = 50;                          // failed emails retried per cron run
-export const ANNOUNCE_BATCH = 100;               // announcement emails sent per run (request or cron)
+// how many emails one run sends: src/limits.js (small on Workers Free, where a run may call Resend at most 50 times)
+const RETRY_BATCH = 50;                          // the most failed emails retried per cron run (Workers Paid)
+export const ANNOUNCE_BATCH = 100;               // the most announcement emails sent per run (Workers Paid)
 const ANNOUNCE_MAX_AUDIENCE = 20000;
 
 /** Templates whose content is a secret (code or link): no retry, nothing secret in the log. */
@@ -37,9 +39,9 @@ const CATEGORY = {
   payment_success: 'billing', payment_failed: 'billing', invoice: 'billing', subscription_renewal_reminder: 'billing',
   subscription_expired: 'billing', refund_processed: 'billing',
   announcement: 'platform', account_update: 'transactional', test_completed: 'transactional',
-  contact_received: 'support', contact_forward: 'support', support_reply: 'support',
-  contact_received: 'support', contact_forward: 'support', institute_invite: 'transactional',
+  contact_received: 'support', contact_forward: 'support', support_reply: 'support', institute_invite: 'transactional',
   student_invite: 'transactional', institute_reminder: 'transactional', institute_payment: 'billing', institute_weekly: 'transactional',
+  system_alert: 'security',
 };
 const CATEGORIES = ['auth', 'security', 'transactional', 'billing', 'platform', 'support'];
 // per recipient per template, per hour
@@ -98,6 +100,13 @@ function storedData(template, data) {
     out[k] = v;
   }
   return out;
+}
+
+/** For the console's email previews (src/console/email-preview.js): the template filled with sample data, never sent. */
+export async function renderPreview(env, template, data) {
+  const site = { siteUrl: siteUrl(env), supportEmail: await supportEmail(env) };
+  if (template === 'announcement') site.unsubscribeUrl = `${site.siteUrl}/account/settings`;
+  return renderTemplate(template, data, site);
 }
 
 async function renderFor(env, template, data, userId) {
@@ -238,7 +247,8 @@ export async function resendRow(env, row, opts = {}) {
 /* ---------- cron: retries and announcement batches ---------- */
 export async function cron(env, ctx, kind) {
   if (kind !== '*/10 * * * *') return;
-  await processQueue(env, { cap: RETRY_BATCH + ANNOUNCE_BATCH });
+  const n = perRun(env);
+  await processQueue(env, { cap: n.emailRetries + n.announcements });
 }
 
 /** One pass over due work. Returns counts. Exported for tests. */
@@ -571,9 +581,10 @@ export async function adminAnnouncement(request, env, ctx) {
   for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
   await audit(env, user.id, 'announcement.send', `audience:${audience}`, { subject, recipients: recipients.length }, request);
   // the first batch goes now (after the response); the 10-minute cron sends the rest
-  const first = processQueue(env, { cap: ANNOUNCE_BATCH, onlyAnnouncements: true }).catch(() => {});
+  const batch = perRun(env).announcements;
+  const first = processQueue(env, { cap: batch, onlyAnnouncements: true }).catch(() => {});
   await runLater(ctx, first);
-  return json({ queued: recipients.length, audience, batchSize: ANNOUNCE_BATCH, message: `Queued for ${recipients.length} people. Up to ${ANNOUNCE_BATCH} are sent every 10 minutes.` }, 202);
+  return json({ queued: recipients.length, audience, batchSize: batch, message: `Queued for ${recipients.length} people. Up to ${batch} are sent every 10 minutes.` }, 202);
 }
 
 /* ---------- admin: contact messages ---------- */

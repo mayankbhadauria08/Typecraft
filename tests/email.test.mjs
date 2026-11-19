@@ -100,10 +100,11 @@ const SAMPLE = {
     invoiceUrl: '/institute/ins_00000000000000000000/invoices/TC-2026-000009', link: 'javascript:alert(1)', seats: 20, lastDay: '2027-11-18' },
   institute_weekly: { from: '16 November', to: '22 November', settingsUrl: '/institute', institutes: [{ name: `Sharma ${EVIL}`, link: 'javascript:alert(1)',
     batches: [{ name: `Morning ${EVIL}`, students: 4, practised: 2, time: '1 h 5 min', top: [`Asha ${EVIL} (40 min)`], quiet: ['Ravi'], quietMore: 0, link: '/institute' }] }] },
+  system_alert: { title: `A background job failed ${EVIL}`, failures: [{ part: `payments ${EVIL}`, error: `D1_ERROR ${EVIL}` }], link: 'javascript:alert(1)' },
 };
 
 test('every template renders a subject, escaped HTML and a text part', () => {
-  assert.equal(TEMPLATE_NAMES.length, 26);
+  assert.equal(TEMPLATE_NAMES.length, 27);
   const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com', unsubscribeUrl: 'https://typecrafttyping.in/api/email/unsubscribe?u=1&t=2' };
   for (const name of TEMPLATE_NAMES) {
     assert.ok(SAMPLE[name], `sample data for ${name}`);
@@ -465,4 +466,17 @@ test('Resend webhook: verified events mark delivered/bounced; bad or old signatu
   const bounce = JSON.stringify({ type: 'email.bounced', data: { email_id: providerId } });
   await realFetch(`${base}/api/webhooks/resend`, { method: 'POST', headers: svix(bounce), body: bounce });
   assert.equal((await log(r.id)).status, 'bounced');
+});
+
+test('every template has preview sample data and a description', async () => {
+  const { SAMPLES, ABOUT, GROUPS } = await import('../src/mail-samples.js');
+  const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com' };
+  for (const name of TEMPLATE_NAMES) {
+    assert.ok(SAMPLES[name], `preview sample for ${name}`);
+    assert.ok(ABOUT[name] && ABOUT[name].title && ABOUT[name].about && GROUPS.includes(ABOUT[name].group), `description for ${name}`);
+    const out = renderTemplate(name, SAMPLES[name], site);
+    assert.ok(out.subject && out.html && out.text, `${name} renders from its sample`);
+  }
+  assert.deepEqual(Object.keys(SAMPLES).sort(), [...TEMPLATE_NAMES].sort());
+  assert.deepEqual(Object.keys(ABOUT).sort(), [...TEMPLATE_NAMES].sort());
 });

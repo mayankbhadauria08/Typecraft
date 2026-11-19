@@ -14,10 +14,12 @@ import { CORE_PAGES } from './pages-core.js';
 import { LEARNING_PAGES } from './pages-learning.js';
 import { GROWTH_PAGES } from './pages-growth.js';
 import { INSTITUTE_PAGES } from './pages-institutes.js';
+import { INFRA_PAGES } from './pages-infra.js';
 
 /* ---------- Home ---------- */
 // What the current admin (/admin) looks after, by the console module that takes it over.
-const OLD_ADMIN = [['customers', 'customers'], ['payments', 'payments'], ['packages', 'packages'], ['emails', 'emails']];
+const OLD_ADMIN = [['customers', 'customers'], ['payments', 'payments'], ['packages', 'packages'], ['emails', 'emails'], ['settings', 'settings'],
+  ['activity-logs', 'the activity log'], ['administrators', 'administrator roles']];
 
 const wordList = (words) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
 
@@ -201,6 +203,7 @@ export const PAGES = [
   ...INSTITUTE_PAGES,
   ...LEARNING_PAGES,
   ...GROWTH_PAGES,
+  ...INFRA_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
 ];

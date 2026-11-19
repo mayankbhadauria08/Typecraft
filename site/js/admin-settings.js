@@ -1,11 +1,11 @@
 /* /admin/settings (owner/admin). Data: GET /api/admin/settings → {settings:{seller:{name, legalName, address, email, phone, gstin},
-   support:{email, hours, replyDays}, payments:{enabled, testMode}, signups:{open}}, paymentsConfigured, webhookConfigured};
-   PUT /api/admin/settings {seller, support, payments, signups} (only known fields; testMode is sent back unchanged) → {settings}. */
+   support:{email, hours, replyDays}, payments:{enabled}, signups:{open}}, paymentsConfigured, webhookConfigured, paymentsMode: 'test'|'live'|null};
+   PUT /api/admin/settings {seller, support, payments, signups} → {settings}. Test or live follows the Razorpay key. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
   const form = $('#as-form');
-  let loaded = null, role = null, configured = { payments: true, webhook: true };
+  let loaded = null, role = null, configured = { payments: true, webhook: true, mode: null };
   const canWrite = () => role === 'owner' || role === 'admin';
 
   function legend(t) { return h('legend', { class: 'card-head' }, h('h2', { text: t })); }
@@ -36,13 +36,13 @@
       input('support.hours', 'Support hours', sup.hours, { hint: 'Shown on the contact page, e.g. Mon–Sat, 10:00–18:00 IST.' }),
       input('support.replyDays', 'Reply within (working days)', sup.replyDays, { type: 'number', min: 1 }));
     K.mount($('#as-payments'), legend('Payments'),
-      h('p', null, 'Mode: ', pay.testMode ? K.badge('pending', 'Test mode') : K.badge('active', 'Live'), ' ',
+      h('p', null, 'Mode: ', configured.mode === 'live' ? K.badge('active', 'Live') : configured.mode === 'test' ? K.badge('pending', 'Test mode') : K.badge('failed', 'No key'), ' ',
         configured.payments ? null : K.badge('failed', 'Razorpay keys missing'), ' ',
         configured.webhook ? null : K.badge('pending', 'Webhook secret missing')),
-      h('p', { class: 'muted', text: pay.testMode ? 'Test mode: no real money moves. It follows the Razorpay keys installed as secrets (rzp_test_… or rzp_live_…); switch keys to go live.' : 'Live: real payments are being taken.' }),
+      h('p', { class: 'muted', text: configured.mode === 'live' ? 'Live: real payments are being taken.' : 'Test mode follows the Razorpay key installed in Cloudflare (rzp_test_… or rzp_live_…): no real money moves until a live key is installed.' }),
       check('payments.enabled', 'Accept payments', pay.enabled !== false, 'When off, checkout shows “payments paused” and nobody is charged. Existing plans keep working.'));
     K.mount($('#as-signups'), legend('Sign-ups'),
-      check('signups.open', 'New sign-ups open', sig.open !== false, 'When closed, the sign-up page explains that new accounts are paused. Existing users can still sign in.'));
+      check('signups.open', 'New sign-ups open', sig.open !== false, 'When closed, nobody can create an account (the sign-up form says sign-ups are paused). Existing users can still sign in.'));
     if (!canWrite()) K.$$('input,textarea', form).forEach((i) => { i.disabled = true; });
     $('#as-save').disabled = !canWrite();
   }
@@ -52,7 +52,7 @@
     return {
       seller: { name: v('seller.name'), legalName: v('seller.legalName'), address: v('seller.address'), email: v('seller.email'), phone: v('seller.phone'), gstin: v('seller.gstin').toUpperCase() || null },
       support: { email: v('support.email'), hours: v('support.hours'), replyDays: Number(v('support.replyDays')) || 2 },
-      payments: { ...(loaded.payments || {}), enabled: form.elements['payments.enabled'].checked },
+      payments: { enabled: form.elements['payments.enabled'].checked },
       signups: { open: form.elements['signups.open'].checked },
     };
   }
@@ -90,7 +90,7 @@
     role = r;
     if (!res.ok) return K.error($('#as-alert'), res, load);
     loaded = res.data.settings;
-    configured = { payments: res.data.paymentsConfigured, webhook: res.data.webhookConfigured };
+    configured = { payments: res.data.paymentsConfigured, webhook: res.data.webhookConfigured, mode: res.data.paymentsMode || null };
     render(loaded);
   }
   load();
