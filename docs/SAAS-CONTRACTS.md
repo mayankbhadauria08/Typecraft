@@ -229,6 +229,25 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   kind, title, test, wpm, accuracy, seconds, at, code, checkedAt } }`; 404 for unknown, unshared or a
   disabled account (the same message for all three).
 
+## 6c. Institutes — `src/institutes.js`, `src/institute-access.js` (docs/INSTITUTES.md)
+
+- `GET /api/institutes/join?code=` (signed in; 20 an hour per account, 60 per address) → `{ code, institute: { name },
+  batch: { name }, plan: { name }, endsAt, joined, canJoin, problem: { code, message } | null }`; 404 `bad_code`.
+- `POST /api/institutes/join` (signed in) `{ code, adult: true }` → 201 `{ joined, already: false, institute, batch,
+  plan, endsAt }` or 200 `already: true`; 400 fields `code` / `adult`; 409 `not_open`, `ended`, `seats_full`,
+  `other_batch`.
+- `GET /api/me/institutes` (signed in) → `{ seats: [{ id, institute: { name }, batch: { name }, plan: { name },
+  joinedAt, endsAt, givesPlan }], staff: [{ institute: { id, name, status }, role }] }`.
+- `POST /api/me/institutes/:id/leave` (signed in, own seat) → `{ left: true }`.
+- `GET /api/institutes/:id` (active staff) → `{ role, institute: { id, name, city, status, seats, seatsUsed, startsAt,
+  endsAt }, batches: [{ id, name, students, archived }] }` (teachers: their batches only).
+- `GET /api/institutes/:id/batches/:bid` (admin, or a teacher of that batch) → `{ role, institute: { id, name },
+  batch: { id, name, archived, students, joinCode, teachers: [{ id, name }] } }`.
+- Not staff, not their batch, closed institute, unknown id: 404 (one answer for all). Before migration 0009: 503
+  `institutes_not_ready`.
+- Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
+  a seat in an active institute inside its term counts like a plan period of its package.
+
 ## 7. Roles and route protection (site + billing)
 
 - `src/roles.js`: `roleOf(env, user)` → `'owner'|'admin'|'support'|null`
@@ -267,7 +286,8 @@ Each exports `PAGES = [ { meta, body, scripts:['/site/js/x.js'] } ]`.
 | `/reset-password` `/verify-email` `/verify-otp` | public | token/code in `#hash` |
 | `/app` | user | the trainer (`index.html`), with plan locks |
 | `/dashboard` | user | |
-| `/account/profile` `/account/history` `/account/analytics` `/account/plans` `/account/payments` `/account/invoices` `/account/invoices/:number` `/account/settings` | user | |
+| `/account/profile` `/account/history` `/account/analytics` `/account/plans` `/account/payments` `/account/invoices` `/account/invoices/:number` `/account/settings` `/account/certificates` | user | |
+| `/join` `/join/:code` | user | join an institute's batch with its code (docs/INSTITUTES.md §4) |
 | `/checkout?plan=<id>` | user | |
 | `/payment/processing` `/payment/success` `/payment/failure` `/payment/pending` | user | `?order=<id>` |
 | `/admin` `/admin/users` `/admin/packages` `/admin/payments` `/admin/revenue` `/admin/emails` `/admin/settings` | admin | |

@@ -9,6 +9,7 @@ import * as payments from './account/payments.js';
 import * as invoices from './account/invoices.js';
 import * as invoice from './account/invoice.js';
 import * as settings from './account/settings.js';
+import * as join from './account/join.js';
 
 const KIT = '/site/js/pages-kit.js';
 // course-meta.js (static, shared with the app) gives lesson titles for "Continue lesson".
@@ -26,5 +27,8 @@ export const PAGES = [
   page(invoices, 'account-invoices'),
   page(invoice, 'account-invoice'),
   page(settings, 'account-settings'),
+  // a student joins their institute's batch with its code (docs/INSTITUTES.md §4)
+  page(join, 'account-join'),
+  { ...page(join, 'account-join'), meta: join.codeMeta },
 ];
 export default PAGES;

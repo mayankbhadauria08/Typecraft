@@ -49,7 +49,8 @@ export const USER_TABLES = ['sessions', 'password_reset_tokens', 'email_tokens',
   'xp_ledger', 'daily_quests', 'badges', 'certificates', 'placement', 'user_settings', 'workshop_unlocks', 'game_bests', 'ghost_replays',
   'daily_results', 'feedback', 'guest_imports', 'event_rejects', 'rebuild_diffs'];
 // tables from later migrations that may not exist yet on an older database are removed by the foreign key
-// (ON DELETE CASCADE): admin_users (0003), admin_sessions (0005), exam_results and certificate_codes (0008).
+// (ON DELETE CASCADE): admin_users (0003), admin_sessions (0005), exam_results and certificate_codes (0008),
+// institute_students and institute_staff (0009; an institute's own records stay).
 
 /** Deletes the account and everything stored for it. Requires the password. */
 export async function deleteAccount(request, env) {

@@ -11,6 +11,7 @@ import '../../shared/course-meta.js';
 import { HttpError, json } from '../http.js';
 import { loadCourse, lessonTitle, levelName } from '../course-store.js';
 import { entitlementsFor } from '../entitlements.js';
+import { keyStatsSql } from '../key-stats.js';
 import { requireAdmin } from './session.js';
 import { permissionsFor } from './permissions.js';
 import { Binder, pageOf, offsetOf, paged, like, oneOf, idParam, istDay, DAY_MS, PAGE_SIZE } from './lib.js';
@@ -100,7 +101,7 @@ export async function getProgressOne(request, env, ctx, params) {
   const [u, scores, keys, days, place, totals, all] = await DB.batch([
     DB.prepare('SELECT id, full_name, email, created_at, account_status FROM users WHERE id = ?1').bind(id),
     DB.prepare('SELECT lesson_id, status, stars, crown, best_wpm, best_accuracy, attempts, last_played, completed_at FROM lesson_scores WHERE user_id = ?1').bind(id),
-    DB.prepare(`SELECT k, attempts, errors FROM key_stats WHERE user_id = ?1 AND attempts >= ${KEY_MIN} ORDER BY CAST(errors AS REAL) / attempts DESC, attempts DESC LIMIT 10`).bind(id),
+    DB.prepare(`SELECT k, attempts, errors FROM (${keyStatsSql('?1')}) WHERE attempts >= ${KEY_MIN} ORDER BY CAST(errors AS REAL) / attempts DESC, attempts DESC LIMIT 10`).bind(id),
     DB.prepare('SELECT day, seconds, best_wpm, acc_sum, acc_count FROM daily_totals WHERE user_id = ?1 AND day >= ?2 ORDER BY day').bind(id, since),
     DB.prepare('SELECT level, wpm, accuracy, at FROM placement WHERE user_id = ?1').bind(id),
     DB.prepare('SELECT xp, streak_count, streak_best FROM user_totals WHERE user_id = ?1').bind(id),
