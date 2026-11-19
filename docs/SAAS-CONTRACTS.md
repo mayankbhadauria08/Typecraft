@@ -255,6 +255,9 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `POST /api/institutes/:id/students/:mid/remove`, `…/move { batchId }`; staff of the batch: `GET …/batches/:bid/students`.
   `GET /api/me/institutes` also lists `invites` and `emailVerified`. Pages `/institute`, `/institute/:id`,
   `/institute/:id/batches/:bid` (user, account layout).
+- Reports (`src/institute-reports.js`, docs/INSTITUTES.md §9), staff of the batch: `GET /api/institutes/:id/batches/:bid/report`,
+  `…/report.csv`, `…/certificates`; `GET /api/institutes/:id/students/:mid`. `GET /api/certificates/:code` adds `institute`
+  (name or null). Page `/institute/:id/students/:mid`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

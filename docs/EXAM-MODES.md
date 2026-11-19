@@ -85,3 +85,6 @@ verify page says checking isn't switched on yet, and the app prints certificates
 1. Bookmark, then apply `migrations/0008_exams.sql` (two new tables; no row changes). Never
    `wrangler d1 migrations apply`. **Done 19 Nov 2026** (bookmark in `docs/LAUNCH.md` §1f).
 2. Merge. Learners see "Update ready, reload" once (`sw.js` typecraft-next-8).
+
+
+Institutes (docs/INSTITUTES.md §9): the verify answer also carries `institute` (where the holder had a seat when they earned the certificate, or null), and the certificate picture prints "Trained at <institute>" when given one.

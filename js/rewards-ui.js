@@ -248,8 +248,11 @@
     const code = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(cert.code || '') ? cert.code : '';
     const where = code ? String(cert.verifyAt || ((root.location && root.location.host) || 'typecrafttyping.in') + '/verify').slice(0, 60) : '';
     const label = 'Certificate of typing speed: ' + wpm + ' words per minute at ' + acc + '% accuracy on a ' + len + ', awarded to ' + name + ' on ' + date +
-      (code ? '. Certificate number ' + code : '');
+      (cert.institute ? ', trained at ' + String(cert.institute).slice(0, 60) : '') + (code ? '. Certificate number ' + code : '');
     const nameSize = name.length > 26 ? 12 : name.length > 18 ? 13.5 : 15;
+    // where it was earned, for a student of an institute (docs/INSTITUTES.md §9)
+    const inst = String(cert.institute || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const instLine = inst ? '<text x="160" y="69" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="6.4" fill="#5f5848">Trained at ' + esc(inst) + '</text>' : '';
     const codeLine = code ? '<text x="24" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="5.6" fill="#5f5848">No. ' + esc(code) + '</text>' +
       '<text x="296" y="28" text-anchor="end" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="5.2" fill="#7b725e">Check at ' + esc(where) + '</text>' : '';
     return '<svg class="rw-cert" viewBox="0 0 320 210" role="img" aria-label="' + esc(label) + '" xmlns="http://www.w3.org/2000/svg">' +
@@ -260,6 +263,7 @@
       codeLine +
       '<text x="160" y="40" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-weight="500" font-size="8.5" letter-spacing="2.4" fill="#0b6e63">CERTIFICATE OF TYPING SPEED</text>' +
       '<text x="160" y="57" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-style="italic" font-size="10" fill="#6a6250">typecraft</text>' +
+      instLine +
       '<text x="160" y="92" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="560" font-size="24" fill="#26221b">' + wpm + ' words per minute</text>' +
       '<text x="160" y="113" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="10" fill="#5f5848">' + acc + '% accuracy · ' + esc(len) + '</text>' +
       '<text x="140" y="140" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="9.5" fill="#5f5848">awarded to</text>' +
@@ -268,12 +272,13 @@
       '<text x="140" y="184" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="8.5" fill="#5f5848">' + esc(date) + '</text>' +
       '<g transform="translate(262 156)">' + sealSvg(wpm) + '</g></svg>';
   }
-  /* Prints only the certificate: a temporary host + html.rw-printing (see print CSS). */
+  /* Prints only the certificate: a temporary host + html.rw-printing (see print CSS). Given a list,
+     prints one certificate a page (an institute printing a batch, docs/INSTITUTES.md §9). */
   function printCertificate(cert) {
     const doc = document, html = doc.documentElement;
     const host = doc.createElement('div');
     host.className = 'rw-print-host';
-    host.innerHTML = certificate(cert);
+    host.innerHTML = (Array.isArray(cert) ? cert : [cert]).map(certificate).join('');
     doc.body.appendChild(host);
     html.classList.add('rw-printing');
     let done = false;

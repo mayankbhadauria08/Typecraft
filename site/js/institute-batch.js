@@ -1,6 +1,8 @@
 /* /institute/:id/batches/:bid. GET /api/institutes/:id/batches/:bid → { role, institute: { id, name },
    batch: { id, name, archived, students, joinCode, teachers: [{ id, name }] } };
-   GET …/students → { role, since, students: [{ id, name, email, joinedAt, lastDay, activeThisWeek }] }.
+   GET …/report → { role, since, totalLessons, students: [{ id, name, email, joinedAt, lessonsDone, level, levelName, bestWpm, accuracy,
+     minutesThisWeek, lastDay, weakKeys: [{ key, rate }] }] }; …/report.csv (a download link);
+   GET …/certificates → { institute, batch, students: [{ id, name, certificate: { title, test, wpm, accuracy, seconds, at, code } | null }] }.
    Admins: PUT /api/institutes/:id/batches/:bid { name | teacherIds | joining | archived, removeStudents }, POST …/code,
    POST /api/institutes/:id/students/:mid/remove, …/move { batchId }; GET /api/institutes/:id (other batches), …/staff (teachers).
    docs/INSTITUTES.md §8. */
@@ -53,23 +55,55 @@
     load();
   }
 
+  const keyWord = (k) => (k === ' ' ? 'Space' : k.toUpperCase());
   async function students() {
-    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/students`);
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/report`);
     if (!res.ok) return K.error($('#ib-students'), res, students);
-    const admin = res.data.role === 'admin', list = res.data.students;
+    const r = res.data, admin = r.role === 'admin', list = r.students;
     if (!list.length) {
+      K.mount($('#ib-students-act'));
       return K.empty($('#ib-students'), { icon: 'users', title: 'No students yet', text: data.batch.joinCode ? 'Give them the code or the link above.' : 'Switch joining on to give students a code.' });
     }
-    const quiet = list.filter((s) => !s.activeThisWeek).length;
-    K.mount($('#ib-students-act'), h('span', { class: 'muted', text: `${list.length} student${list.length === 1 ? '' : 's'}${quiet ? ` · ${quiet} not practised this week` : ''}` }));
+    const quiet = list.filter((s) => !s.lastDay || s.lastDay < r.since).length;
+    K.mount($('#ib-students-act'), h('span', { class: 'muted', text: `${list.length} student${list.length === 1 ? '' : 's'}${quiet ? ` · ${quiet} not practised this week` : ''}` }), ' ',
+      h('a', { class: 'btn btn-ghost btn-sm', href: `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/report.csv`, download: '', text: 'Download CSV' }));
+    const page = (s) => `/institute/${encodeURIComponent(id)}/students/${encodeURIComponent(s.id)}`;
     K.mount($('#ib-students'), K.table([
-      { label: 'Student', value: (s) => [h('strong', { text: s.name || s.email }), s.name ? h('div', { class: 'muted', text: s.email }) : null] },
-      { label: 'Joined', value: (s) => K.date(s.joinedAt) },
-      { label: 'Last practised', value: (s) => (s.lastDay ? [K.date(s.lastDay + 'T12:00:00+05:30'), s.activeThisWeek ? null : [' ', K.badge('pending', 'Not this week')]] : 'Not yet') },
+      { label: 'Student', value: (s) => [h('a', { href: page(s), text: s.name || s.email }), s.name ? h('div', { class: 'muted', text: s.email }) : null] },
+      { label: 'Lessons', num: true, value: (s) => `${s.lessonsDone} of ${r.totalLessons}` },
+      { label: 'Working on', value: (s) => `Level ${s.level}` },
+      { label: 'Best speed', num: true, value: (s) => (s.bestWpm ? `${s.bestWpm} wpm` : '—') },
+      { label: 'Accuracy', num: true, value: (s) => (s.accuracy == null ? '—' : `${s.accuracy}%`) },
+      { label: 'This week', num: true, value: (s) => `${s.minutesThisWeek} min` },
+      { label: 'Last practised', value: (s) => (s.lastDay ? [K.date(s.lastDay + 'T12:00:00+05:30'), s.lastDay < r.since ? [' ', K.badge('pending', 'Not this week')] : null] : 'Not yet') },
+      { label: 'Weak keys', value: (s) => (s.weakKeys.length ? h('span', { class: 'ins-keys' }, s.weakKeys.map((k) => h('span', { class: 'kbd mono', title: `${k.rate}% mistakes`, text: keyWord(k.key) }))) : '—') },
       admin ? { label: '', value: (s) => h('div', { class: 'actions' },
         others.length ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Move', onclick: () => move(s) }) : null,
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Remove', onclick: () => remove(s) })) } : null,
-    ].filter(Boolean), list, { caption: 'Students' }));
+    ].filter(Boolean), list, { caption: 'Students and their progress' }));
+  }
+
+  async function certificates() {
+    const sec = $('#ib-certs-sec');
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/certificates`);
+    if (!res.ok) { sec.hidden = false; return K.error($('#ib-certs'), res, certificates); }
+    const list = res.data.students;
+    sec.hidden = !list.length;
+    if (!list.length) return;
+    const ready = list.filter((s) => s.certificate);
+    const pictures = ready.map((s) => ({ name: s.name, wpm: s.certificate.wpm, accuracy: s.certificate.accuracy, seconds: s.certificate.seconds,
+      date: s.certificate.at, code: s.certificate.code, verifyAt: location.host + '/verify', institute: res.data.institute.name }));
+    K.mount($('#ib-certs-act'), ready.length && window.TC_REWARDS_UI ? h('button', { type: 'button', class: 'btn btn-primary btn-sm',
+      text: `Print ${ready.length} certificate${ready.length === 1 ? '' : 's'}`, onclick: () => TC_REWARDS_UI.printCertificate(pictures) }) : null);
+    K.mount($('#ib-certs'),
+      h('p', { class: 'muted', text: 'Each student\u2019s best certificate: their highest speed certificate from the course, or else a passed exam practice test they made a certificate of. One a page, with your institute\u2019s name and a code anyone can check. In the print window choose your printer, or "Save as PDF".' }),
+      K.table([
+        { label: 'Student', value: (s) => s.name },
+        { label: 'Certificate', value: (s) => (s.certificate ? s.certificate.title : h('span', { class: 'muted', text: 'None yet' })) },
+        { label: 'Test', value: (s) => (s.certificate ? s.certificate.test : '—') },
+        { label: 'Date', value: (s) => (s.certificate ? K.date(s.certificate.at) : '—') },
+        { label: 'Code', value: (s) => (s.certificate ? (s.certificate.code ? h('span', { class: 'mono', text: s.certificate.code }) : 'Not shared') : '—') },
+      ], list, { caption: 'Certificates' }));
   }
   async function move(s) {
     const v = await K.confirm({ title: `Move ${s.name || s.email}`, text: 'They keep their seat and their progress.', confirmLabel: 'Move',
@@ -149,6 +183,7 @@
       others = all.ok ? all.data.batches.filter((x) => !x.archived && x.id !== bid) : [];
     }
     students();
+    certificates();
     if (data.role === 'admin') settings(data); else $('#ib-admin-sec').hidden = true;
   }
   load();

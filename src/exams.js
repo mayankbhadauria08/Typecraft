@@ -110,7 +110,7 @@ export async function getResults(request, env) {
 }
 
 /** The code for one certificate, made the first time it is asked for. */
-async function codeFor(env, userId, kind, ref) {
+export async function codeFor(env, userId, kind, ref) {
   const DB = env.DB;
   const have = await DB.prepare('SELECT code, shared FROM certificate_codes WHERE user_id = ?1 AND kind = ?2 AND ref = ?3').bind(userId, kind, ref).first();
   if (have) return have;
@@ -168,12 +168,12 @@ export async function getMyCertificates(request, env) {
   for (const e of exams) out.push(examView(e, byKey.get('exam:' + e.id)));
   return json({ ready: true, certificates: out });
 }
-function levelView(l, c) {
+export function levelView(l, c) {
   return { kind: 'level', level: l.level, title: `${Math.round(l.wpm)} words a minute`, test: `${testWords(l.seconds)} in the TypeCraft course (the ${l.level} wpm certificate)`,
     wpm: Math.round(l.wpm), accuracy: Math.round(l.accuracy), seconds: Math.round(l.seconds), at: l.at,
     code: c ? showCode(c.code) : null, shared: c ? !!c.shared : null };
 }
-function examView(e, c) {
+export function examView(e, c) {
   const M = X.MODES[e.mode] || { certificate: 'Typing test', minutes: 0 };
   // rounded down, so a certificate never shows more than was typed (41.6 wpm is 41, 0.29% mistakes is 99% right)
   const wpm = Math.floor(e.net_wpm);
@@ -202,6 +202,23 @@ export async function putMyCertificate(request, env, ctx, params) {
   }, NOT_READY_SAVE);
 }
 
+/**
+ * The institute a learner had a seat at when they earned a certificate (docs/INSTITUTES.md §9), or null.
+ * Before migration 0009 there is none.
+ */
+export async function instituteAt(env, userId, at) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT i.name FROM institute_students s JOIN institutes i ON i.id = s.institute_id
+        WHERE s.user_id = ?1 AND s.joined_at <= ?2 AND (s.ended_at IS NULL OR s.ended_at >= ?2) ORDER BY s.joined_at DESC LIMIT 1`
+    ).bind(userId, at).first();
+    return row ? row.name : null;
+  } catch (err) {
+    if (/no such table/i.test(String(err && err.message))) return null;
+    throw err;
+  }
+}
+
 /* ---------------- GET /api/certificates/:code (public) ---------------- */
 const NOT_FOUND = 'No certificate matches this code, or its holder has stopped sharing it. Check the code and try again.';
 export async function getCertificate(request, env, ctx, params) {
@@ -223,7 +240,8 @@ export async function getCertificate(request, env, ctx, params) {
     }
     if (!cert) throw new HttpError(404, 'not_found', NOT_FOUND);
     const { shared, id, ...view } = cert;
-    return json({ certificate: { ...view, holder: c.full_name || 'TypeCraft learner', checkedAt: nowIso() } },
+    const institute = await instituteAt(env, c.user_id, cert.at);
+    return json({ certificate: { ...view, holder: c.full_name || 'TypeCraft learner', institute, checkedAt: nowIso() } },
       200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
   }, NOT_READY_CHECK);
 }

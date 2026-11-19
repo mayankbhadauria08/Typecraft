@@ -34,6 +34,7 @@ const EXPECTED = [
   ['/institute', 'user', 'account'],
   ['/institute/:id', 'user', 'account'],
   ['/institute/:id/batches/:bid', 'user', 'account'],
+  ['/institute/:id/students/:mid', 'user', 'account'],
   ['/checkout', 'user', 'account'],
   ['/payment/processing', 'user', 'bare'],
   ['/payment/success', 'user', 'account'],
