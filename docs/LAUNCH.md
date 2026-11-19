@@ -138,6 +138,13 @@ institutes are only created in the console (part 2).
    Workers & Pages › Plans (Capacity today on console › Institutes shows why); read `/institute-terms`
    and the new privacy lines with a lawyer or CA. Full list: `docs/INSTITUTES.md` §11.
 
+## 1h. Institutes, Release 2 (targets, assignments, student invitations, reminders, invoices)
+
+1. **[Claude, after your OK] Database**: after 0009, take a restore bookmark, then apply
+   `migrations/0010_institutes_teaching.sql` one statement at a time (six new tables and indexes; adds
+   only). Before this, Release 1 works and the Release 2 parts stay hidden or say they aren't switched on.
+2. **[You] Merge** the Release 2 pull requests in order, after Release 1's.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

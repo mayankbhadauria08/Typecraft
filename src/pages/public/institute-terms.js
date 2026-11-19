@@ -44,6 +44,7 @@ export default `
     <h2>5. Data</h2>
     <ul>
       <li>While a student is in one of your batches, your admins see, and their batch's teachers see, the student's name, email, course progress, speeds, accuracy, practice time, weak keys, exam practice results and certificates.</li>
+      <li>If you turn on a batch's leaderboard, its students see each other's first names and best speeds of the last 7 days. It is off until you turn it on.</li>
       <li>When the student leaves, is removed, or your term ends, that access stops. The student's account and progress stay theirs: they keep them after your term.</li>
       <li>Use what you see only to teach your students. Don't sell it or give it to anyone else. If you download a report, keep it safe and delete it when you no longer need it.</li>
       <li>We handle personal data as our <a href="/privacy">privacy policy</a> describes.</li>

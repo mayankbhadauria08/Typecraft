@@ -83,6 +83,112 @@
     ].filter(Boolean), list, { caption: 'Students and their progress' }));
   }
 
+  /* Target, assignments, exam practice and the leaderboard: GET …/teaching → { target, targetStudents: [{ id, name, best, met }],
+     assignments: [{ id, kind, title, dueDay, note, done, late, overdue, todo, students: [{ id, name, state }] }],
+     exams: [{ id, name, modes: { mode: { tries, best, passed, latest } } }], examModes, leaderboard: { on, rows }, lessons, today };
+     PUT …/target, POST …/assignments, POST …/assignments/:aid/remove, PUT …/leaderboard. */
+  const STATE = { done: ['active', 'Done'], late: ['pending', 'Done late'], overdue: ['failed', 'Not done'], todo: ['created', 'To do'] };
+  const day = (d) => K.date(d + 'T12:00:00+05:30');
+  async function teaching() {
+    const sec = $('#ib-teach-sec');
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/teaching`);
+    if (!res.ok) {
+      if (res.error && res.error.code === 'teaching_not_ready') { sec.hidden = true; return; }
+      sec.hidden = false; return K.error($('#ib-asg'), res, teaching);
+    }
+    const t = res.data;
+    sec.hidden = !!data.batch.archived;
+    if (data.batch.archived) return;
+    // target
+    K.mount($('#ib-target-act'), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: t.target ? 'Change' : 'Set a target', onclick: () => setTarget(t.target) }));
+    if (!t.target) K.mount($('#ib-target'), h('p', { class: 'muted', text: 'Give the batch a goal, like 35 words a minute at 95% accuracy. Students see it on their dashboard.' }));
+    else {
+      const met = t.targetStudents.filter((x) => x.met).length;
+      K.mount($('#ib-target'),
+        h('p', null, h('strong', { text: `${t.target.wpm} wpm at ${t.target.accuracy}% accuracy` }), t.target.dueDay ? ` by ${day(t.target.dueDay)}` : ''),
+        t.target.note ? h('p', { class: 'muted', text: t.target.note }) : null,
+        h('p', { class: 'muted', text: `${met} of ${t.targetStudents.length} student${t.targetStudents.length === 1 ? '' : 's'} have reached it (best speed at that accuracy in lessons, typing tests or exam practice).` }),
+        t.targetStudents.length ? K.table([
+          { label: 'Student', value: (x) => x.name },
+          { label: 'Best', num: true, value: (x) => (x.best ? `${x.best} wpm` : '—') },
+          { label: '', value: (x) => (x.met ? K.badge('active', 'Reached') : null) },
+        ], t.targetStudents.slice().sort((a, b) => b.best - a.best), { caption: 'Progress to the target' }) : null);
+    }
+    // leaderboard
+    K.mount($('#ib-board-act'), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: t.leaderboard.on ? 'Turn off' : 'Turn on', onclick: () => board(!t.leaderboard.on) }));
+    K.mount($('#ib-board'),
+      h('p', { class: 'muted', text: t.leaderboard.on ? 'On: students in this batch see the top speeds of the last 7 days, with first names only.'
+        : 'Off: only you see it. Turn it on to show students the top speeds of the last 7 days, with first names only.' }),
+      t.leaderboard.rows.length ? h('ol', { class: 'ins-board' }, t.leaderboard.rows.map((r) => h('li', null, h('span', { text: r.name }), h('strong', { text: `${r.wpm} wpm` }))))
+        : h('p', { class: 'muted', text: 'Nobody has practised in the last 7 days.' }));
+    // assignments
+    K.mount($('#ib-asg-act'), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Give an assignment', onclick: () => assign(t) }));
+    if (!t.assignments.length) K.mount($('#ib-asg'), h('p', { class: 'muted', text: 'No assignments. Give the batch a lesson or an exam practice test to finish by a day; you see who has done it.' }));
+    else {
+      K.mount($('#ib-asg'), K.table([
+        { label: 'Assignment', value: (a) => [h('strong', { text: a.title }), a.note ? h('div', { class: 'muted', text: a.note }) : null] },
+        { label: 'Due', value: (a) => day(a.dueDay) },
+        { label: 'Done', num: true, value: (a) => `${a.done + a.late} of ${a.students.length}` },
+        { label: 'Not done', value: (a) => {
+          const missing = a.students.filter((x) => x.state === 'overdue' || x.state === 'todo');
+          return missing.length ? h('details', null, h('summary', { text: `${missing.length} student${missing.length === 1 ? '' : 's'}` }), h('ul', { class: 'ins-names' }, missing.map((x) => h('li', null, x.name, ' ', K.badge(STATE[x.state][0], STATE[x.state][1]))))) : '—';
+        } },
+        { label: '', value: (a) => h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Remove', onclick: () => unassign(a) }) },
+      ], t.assignments, { caption: 'Assignments' }));
+    }
+    // exam practice
+    const tried = t.exams.filter((x) => Object.keys(x.modes).length);
+    if (!tried.length) K.mount($('#ib-exams'), h('p', { class: 'muted', text: 'No exam practice tests saved by these students yet.' }));
+    else {
+      K.mount($('#ib-exams'), K.table([
+        { label: 'Student', value: (x) => x.name },
+        ...t.examModes.map((m) => ({ label: m.short, value: (x) => {
+          const r = x.modes[m.id];
+          return r ? [`${r.best} wpm`, ' ', r.passed ? K.badge('active', 'Passed') : K.badge('created', `${r.tries} tr${r.tries === 1 ? 'y' : 'ies'}`)] : '—';
+        } })),
+      ], t.exams, { caption: 'Best exam practice result of each student' }));
+    }
+  }
+  async function setTarget(cur) {
+    const v = await K.confirm({ title: 'Target for this batch', text: 'Students see it on their dashboard, and you see who has reached it.', confirmLabel: 'Save target',
+      fields: [
+        { name: 'wpm', label: 'Speed (words a minute)', type: 'number', min: 5, max: 150, required: true, value: cur ? cur.wpm : 35 },
+        { name: 'accuracy', label: 'Accuracy (%)', type: 'number', min: 50, max: 100, required: true, value: cur ? cur.accuracy : 95 },
+        { name: 'dueDay', label: 'By (optional)', type: 'date', value: cur && cur.dueDay ? cur.dueDay : '' },
+        { name: 'note', label: 'Note for students (optional)', maxlength: 200, value: cur ? cur.note : '', hint: 'For example "SSC CHSL typing test: 35 wpm".' }] });
+    if (!v) return;
+    const res = await K.api('PUT', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/target`, { wpm: Number(v.wpm), accuracy: Number(v.accuracy), dueDay: v.dueDay || null, note: v.note });
+    if (!res.ok) return fail(res);
+    K.toast('Target saved.'); teaching();
+  }
+  async function board(on) {
+    const res = await K.api('PUT', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/leaderboard`, { on });
+    if (!res.ok) return fail(res);
+    K.toast(on ? 'The leaderboard is on.' : 'The leaderboard is off.'); teaching();
+  }
+  async function assign(t) {
+    const kind = await K.confirm({ title: 'Give an assignment', text: 'What should the batch do?', confirmLabel: 'Next',
+      fields: [{ name: 'kind', label: 'Kind', type: 'select', value: 'lesson', options: [{ value: 'lesson', label: 'A lesson from the course' }, { value: 'exam', label: 'An exam practice test' }] }] });
+    if (!kind) return;
+    const options = kind.kind === 'lesson' ? t.lessons.map((l) => ({ value: l.id, label: l.label })) : t.examModes.map((m) => ({ value: m.id, label: m.name }));
+    const v = await K.confirm({ title: kind.kind === 'lesson' ? 'Give a lesson' : 'Give an exam practice test', confirmLabel: 'Give assignment',
+      fields: [
+        { name: 'ref', label: kind.kind === 'lesson' ? 'Lesson' : 'Test', type: 'select', value: options[0].value, options },
+        { name: 'dueDay', label: 'Finish by', type: 'date', required: true, value: K.addDays(K.today(), 7) },
+        { name: 'note', label: 'Note for students (optional)', maxlength: 200 }] });
+    if (!v) return;
+    const res = await K.api('POST', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/assignments`, { kind: kind.kind, ref: v.ref, dueDay: v.dueDay, note: v.note });
+    if (!res.ok) return fail(res);
+    K.toast('Assignment given.'); teaching();
+  }
+  async function unassign(a) {
+    const ok = await K.confirm({ title: `Remove "${a.title}"?`, text: 'Students stop seeing it. What they did stays in their progress.', confirmLabel: 'Remove', danger: true });
+    if (!ok) return;
+    const res = await K.api('POST', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/assignments/${encodeURIComponent(a.id)}/remove`, {});
+    if (!res.ok) return fail(res);
+    K.toast('Removed.'); teaching();
+  }
+
   async function certificates() {
     const sec = $('#ib-certs-sec');
     const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/batches/${encodeURIComponent(bid)}/certificates`);
@@ -183,6 +289,7 @@
       others = all.ok ? all.data.batches.filter((x) => !x.archived && x.id !== bid) : [];
     }
     students();
+    teaching();
     certificates();
     if (data.role === 'admin') settings(data); else $('#ib-admin-sec').hidden = true;
   }

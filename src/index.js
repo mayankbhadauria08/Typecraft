@@ -21,8 +21,9 @@ import * as exams from './exams.js';          // exam practice and certificate c
 import * as institutes from './institutes.js'; // institute seats, join codes, staff views (docs/INSTITUTES.md)
 import * as institutePortal from './institute-portal.js'; // the institute's own pages: batches, teachers, students
 import * as instituteReports from './institute-reports.js'; // batch report, a student's page, certificates to print
+import * as instituteTeaching from './institute-teaching.js'; // targets, assignments, exam results by batch, leaderboard
 import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
-const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, instituteReports, consoleApi];
+const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, instituteReports, instituteTeaching, consoleApi];
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,
