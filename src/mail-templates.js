@@ -27,6 +27,8 @@
 //   contact_received              { name, topic, message*, replyDays = 2 }
 //   contact_forward               { name*, email*, topic, message*, userId, priority (bool), plan, messageId }
 //   institute_invite              { name, instituteName*, role* ('admin' | 'teacher'), invitedBy, email*, link* }
+//   student_invite                { name, instituteName*, batchName*, batchCode*, joinPath* }  (not 'code'/'link': kept for retries)
+//   institute_reminder            { name, instituteName*, kind* ('seats' | 'ends'), seats, seatsUsed, lastDay, days, link }
 // URLs given in data may be absolute https URLs or site paths ('/pricing'); anything else is dropped.
 
 const ACCENT = '#0b6e63';
@@ -151,6 +153,8 @@ const HEADS = {
   contact_received: ['Support', 'We got your message'],
   contact_forward: ['Support', 'New contact message'],
   institute_invite: ['Institute', null],
+  student_invite: ['Institute', null],
+  institute_reminder: ['Institute', null],
 };
 const DARK = '#0f1b19';
 
@@ -417,6 +421,30 @@ export const TEMPLATES = {
       P(`Sign in, or create an account, with this email address${d.email ? ` (${d.email})` : ''}. Then accept the invitation.`),
       Button('Open the invitation', url(site, d.link) || `${site.siteUrl}/institute`),
       Small("If you weren't expecting this, you can ignore this email: nothing happens unless you accept."),
+    ] });
+  },
+
+  student_invite(d, site) {
+    const subject = `Join ${String(d.batchName || 'your batch').replace(/[\r\n]+/g, ' ')} at ${String(d.instituteName || 'your institute').replace(/[\r\n]+/g, ' ')} on TypeCraft`;
+    return layout(site, { subject, preheader: `Your batch code is ${d.batchCode}.`, blocks: [
+      P(hi(d)),
+      P(`${d.instituteName} uses TypeCraft for typing practice, and has added you to its batch ${d.batchName}. Joining gives you the institute's plan while you study there.`),
+      Code(d.batchCode, 'Batch code'),
+      Button('Join the batch', url(site, d.joinPath) || `${site.siteUrl}/join`),
+      P('Sign in, or create an account with any email address, then confirm that you are 18 or older. Your teachers will see your typing progress while you are in the batch.'),
+      Small("If you don't study at this institute, you can ignore this email."),
+    ] });
+  },
+
+  institute_reminder(d, site) {
+    const seats = d.kind === 'seats';
+    const subject = seats ? `${d.instituteName}: ${d.seatsUsed} of ${d.seats} TypeCraft seats are in use`
+      : `${d.instituteName}: your TypeCraft seats end on ${d.lastDay}`;
+    return layout(site, { subject: subject.replace(/[\r\n]+/g, ' '), preheader: seats ? 'Add seats before you run out.' : 'Renew to keep your students practising.', blocks: [
+      P(hi(d)),
+      P(seats ? `${d.seatsUsed} of your ${d.seats} seats are in use. When every seat is taken, new students can't join your batches. To add seats, reply to this email.`
+        : `Your institute's seats end on ${d.lastDay}${d.days != null ? `, in ${d.days} day${d.days === 1 ? '' : 's'}` : ''}. After that your students go back to the Free plan; their progress and your batches stay. To renew, reply to this email.`),
+      Button('Open your institute', url(site, d.link) || `${site.siteUrl}/institute`),
     ] });
   },
 

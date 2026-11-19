@@ -31,6 +31,10 @@ export const body = `
   <div class="ins-sec-head"><h2 id="ib-certs-h">Certificates</h2><div id="ib-certs-act"></div></div>
   <div id="ib-certs"></div>
 </section>
+<section class="section" id="ib-inv-sec" hidden aria-labelledby="ib-inv-h">
+  <h2 id="ib-inv-h">Invite students by email</h2>
+  <div id="ib-inv"></div>
+</section>
 <section class="section" id="ib-admin-sec" hidden aria-labelledby="ib-admin-h">
   <h2 id="ib-admin-h">Batch settings</h2>
   <div id="ib-admin"></div>

@@ -254,3 +254,18 @@ the institute terms say so.
 
 Every change is in the institute's history: `institute.target_set`, `target_clear`, `assignment_add`,
 `assignment_remove`, `leaderboard`.
+
+## 13. Release 2: students invited by email, reminders — `src/institute-mail.js`
+
+- **Invite students by email** (a batch's page, admins): choose a spreadsheet saved as CSV, or paste
+  names and emails, one student a line (an email anywhere on the line; the rest is the name). The page
+  sends them in parts of 25; each student gets the `student_invite` email with the batch's code and link.
+  Skipped, with the reason: not an email, twice in the list, already in the institute, already invited to
+  this batch, the daily limit (500 an institute). Needs joining on (the email carries the code). The list
+  shows who was invited and who has joined. The code and link are stored with the email as `batchCode` and
+  `joinPath` so a retry carries them (a batch code is not a password: anyone with it can join, as on the
+  batch's page).
+- **Reminders** (nightly, 2:47 am India time): when 90% of an institute's seats are in use (institutes of 5
+  seats or more), 30 days before its last day, and 7 days before. Each once a term (`institute_reminders`,
+  keyed by the term's end, so a renewal starts them again), to its active admins and its contact email,
+  `institute_reminder` template, "reply to this email" to add seats or renew.
