@@ -1,4 +1,4 @@
-// /institute/:id/batches/:bid — one batch: its join code, its students, and (admins) its settings
+// /institute/:id/batches/:bid — one batch: its join code, its students' progress (CSV), certificates to print, and (admins) its settings
 // (docs/INSTITUTES.md §8). Data: GET /api/institutes/:id/batches/:bid and …/students.
 export const meta = {
   path: '/institute/:id/batches/:bid', title: 'Batch', description: 'A batch: its code and its students.',
@@ -15,6 +15,10 @@ export const body = `
 <section class="section" aria-labelledby="ib-students-h">
   <div class="ins-sec-head"><h2 id="ib-students-h">Students</h2><div id="ib-students-act"></div></div>
   <div id="ib-students"><div class="skeleton" style="height:8rem"></div></div>
+</section>
+<section class="section" id="ib-certs-sec" hidden aria-labelledby="ib-certs-h">
+  <div class="ins-sec-head"><h2 id="ib-certs-h">Certificates</h2><div id="ib-certs-act"></div></div>
+  <div id="ib-certs"></div>
 </section>
 <section class="section" id="ib-admin-sec" hidden aria-labelledby="ib-admin-h">
   <h2 id="ib-admin-h">Batch settings</h2>

@@ -13,6 +13,7 @@ import * as join from './account/join.js';
 import * as instituteHome from './account/institute-home.js';
 import * as instituteOne from './account/institute-one.js';
 import * as instituteBatch from './account/institute-batch.js';
+import * as instituteStudent from './account/institute-student.js';
 
 const KIT = '/site/js/pages-kit.js';
 // course-meta.js (static, shared with the app) gives lesson titles for "Continue lesson".
@@ -36,6 +37,7 @@ export const PAGES = [
   // the institute's own pages, for its admin and teachers (docs/INSTITUTES.md §8)
   page(instituteHome, 'institute-home'),
   page(instituteOne, 'institute-one'),
-  page(instituteBatch, 'institute-batch'),
+  page(instituteBatch, 'institute-batch', ['/js/rewards-ui.js']),
+  page(instituteStudent, 'institute-student'),
 ];
 export default PAGES;

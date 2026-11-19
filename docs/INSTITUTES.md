@@ -11,8 +11,8 @@ Release 1 is built in five pull requests. This file grows with each one.
 |---|---|---|
 | 1. Foundations (A1–A6) | tables, seat → plan, join codes, seat count and end date, staff checks, weak keys | pull request #28 |
 | 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request #30 |
-| 3. Institute portal (C1–C4) | institute home, teachers, batches, students | pull request 3 |
-| 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | |
+| 3. Institute portal (C1–C4) | institute home, teachers, batches, students | pull request #31 |
+| 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | pull request 4 |
 | 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | |
 
 Nobody can join anything until part 2 is live: institutes are only created in the console.
@@ -167,3 +167,27 @@ sidebar for anyone who helps run an institute or is invited to (one small lookup
   `student_remove`, `student_move`.
 - A pending (not paid) institute can be prepared: batches made, teachers invited, codes handed out;
   students can join once it is switched on. A closed institute is out of reach for its staff.
+
+## 9. Reports and certificates — `src/institute-reports.js`
+
+Only numbers TypeCraft saved from the student's own practice; staff can't type any in.
+
+- **Batch report** (the Students table on a batch's page; `GET …/batches/:bid/report`): one row per
+  student: lessons done of 78, the level they are working on, best speed, average accuracy of finished
+  lessons, minutes practised in the last 7 days (India days), last practised, and their three weakest keys
+  (typed 20 times or more, with at least one mistake; worst first). A student's name opens their page.
+- **CSV** (`…/report.csv`, "Download CSV"): the same rows, with a byte-order mark so Excel shows names
+  correctly; a cell starting with = + - @ gets a leading apostrophe so it is never run as a formula.
+- **A student's page** (`/institute/:id/students/:mid`): summary, minutes by day for 30 days, lessons
+  finished in each level, weak keys, lessons they are stuck on (tried 5 times or more), recent exam
+  practice. The same numbers as the console's Student progress (`progressOf` in
+  `src/console/progress-api.js`, used by both).
+- **Certificates** (a batch's page, "Print N certificates"; `…/certificates`): for each student, their
+  highest course speed certificate, or else their best passed exam-practice test they made a
+  certificate of. A course certificate gets its verify code here if it has none yet (as when the
+  student opens Certificates). A code the student stopped sharing is left off the print. Printing uses
+  the browser: one certificate a page; "Save as PDF" gives one PDF for the batch.
+- **"Trained at <institute>"** is printed on the certificate, and the verify page says "Earned while at
+  <institute>" when the holder had a seat there on the day they earned it (`instituteAt` in
+  `src/exams.js`).
+- Admins see every batch; a teacher only theirs (§5). Everything else is 404.
