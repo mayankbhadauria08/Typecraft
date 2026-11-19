@@ -354,6 +354,13 @@ export async function getExport(request, env) {
     try { out[t] = strip((await DB.prepare(`SELECT * FROM ${t} WHERE user_id = ?1`).bind(user.id).all()).results); }
     catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
   }
+  // institute seats and staff roles (migration 0009): the institute and batch by name
+  try {
+    out.institute_seats = (await DB.prepare(`SELECT i.name AS institute, b.name AS batch, s.status, s.adult_confirmed_at, s.joined_at, s.ended_at
+      FROM institute_students s JOIN institutes i ON i.id = s.institute_id JOIN batches b ON b.id = s.batch_id WHERE s.user_id = ?1 ORDER BY s.joined_at`).bind(user.id).all()).results;
+    out.institute_roles = (await DB.prepare(`SELECT i.name AS institute, st.role, st.status, st.invited_at, st.joined_at, st.removed_at
+      FROM institute_staff st JOIN institutes i ON i.id = st.institute_id WHERE st.user_id = ?1 ORDER BY st.invited_at`).bind(user.id).all()).results;
+  } catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
   return json(out, 200, { 'Content-Disposition': `attachment; filename="typecraft-export-${nowIso().slice(0, 10)}.json"` });
 }
 

@@ -534,6 +534,22 @@ form{margin:0}
 .verify-card{gap:16px}
 .verify-pic{max-width:520px}
 .verify-small{font-size:13.5px;margin:24px 0 48px}
+/* /join: a student joins their institute's batch (docs/INSTITUTES.md) */
+.join-form{gap:16px;max-width:520px}
+.join-form input{font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase}
+#joinResult{margin-top:18px}
+.join-card{gap:14px;max-width:520px}
+.join-card h2{font-size:20px}
+.join-card p{margin:0}
+.join-facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:0}
+.join-facts dt{color:var(--muted)}
+.join-facts dd{margin:0;font-weight:600}
+.join-confirm{display:flex;flex-direction:column;gap:12px}
+.join-confirm .check input{width:18px;height:18px;min-height:0;padding:0;box-shadow:none}
+.join-small{font-size:13.5px;margin:24px 0 48px;max-width:640px}
+.seat-list{display:flex;flex-direction:column;gap:12px}
+.card.seat-item{flex-direction:row;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;text-align:left}
+.seat-item p{margin:0}
 /* the certificate picture (as css/rewards.css in the app) */
 .rw-cert{display:block;width:100%;height:auto;border-radius:6px;box-shadow:0 14px 26px -18px var(--shadow)}
 .rw-print-host{display:none}

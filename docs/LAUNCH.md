@@ -117,6 +117,20 @@ Full notes: `docs/EXAM-MODES.md`.
 2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
 
+## 1g. Institutes, part 1: foundations
+
+Full notes: `docs/INSTITUTES.md`. Nothing changes for learners until an institute exists, and
+institutes are only created in the console (part 2).
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0009_institutes.sql` one statement at a time (six new tables and
+   their indexes; adds only, no row changes). Never `wrangler d1 migrations apply`. Check with
+   `SELECT name FROM sqlite_master WHERE name LIKE 'institute%' OR name LIKE 'batch%'`, and that
+   `users`, `user_subscriptions` and `lesson_scores` have the same counts as before.
+   Before this, the site works as today and the institute pages say they aren't switched on.
+2. **[You] Merge the pull request.** The new `/join` page and the "Your institute" line on Plans
+   appear; weak keys start showing in the console and in Analytics (no new data is stored for that).
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

@@ -12,10 +12,13 @@
 // runs: docs/UNLOCK-RULES.md. A paid plan keeps the lessons it was bought with
 // (user_subscriptions.limits) and also gets any its package has gained since: removing lessons
 // from a package only changes what new buyers get.
+// A seat in an institute (migration 0009, docs/INSTITUTES.md §3) counts like a period of its package that
+// ends with the institute's term: ent.seats lists them.
 import '../shared/course-meta.js';
 import '../shared/lesson-access.js';
 import { nowIso } from './http.js';
 import { rulesStatement, fromRow, projection } from './learning-rules.js';
+import { seatsFor } from './institute-access.js';
 
 const META = globalThis.TC_META;
 const A = globalThis.TC_ACCESS;
@@ -72,7 +75,7 @@ export function overrideOf(ent, kind, id) {
 
 export async function entitlementsFor(env, userId, now = nowIso()) {
   const DB = env.DB;
-  const [freeRes, subsRes, rulesRes] = await DB.batch([
+  const [seats, [freeRes, subsRes, rulesRes]] = await Promise.all([seatsFor(env, userId, now), DB.batch([
     DB.prepare("SELECT id, name, features, limits FROM packages WHERE id = 'free'"),
     DB.prepare(`SELECT s.id, s.package_id, s.status, s.source, s.starts_at, s.expires_at, s.features, s.limits,
                        p.name AS package_name, p.display_order, p.limits AS package_limits
@@ -80,7 +83,7 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
                  WHERE s.user_id = ?1 AND s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > ?2)
                  ORDER BY s.starts_at`).bind(userId, now),
     rulesStatement(env),
-  ]);
+  ])]);
   const free = freeRes.results[0];
   const ent = {
     plan: 'free',
@@ -103,6 +106,17 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
     // what it was bought with, plus any lessons its package has gained since
     ent.limits = mergeLimits(ent.limits, { ...bought, lessons: A.union(bought.lessons, parse(s.package_limits, {}).lessons) });
     if (!best || s.display_order > best.display_order) best = s;
+  }
+  // a seat in an institute counts like a plan period that ends with the institute's term
+  // (docs/INSTITUTES.md §3): its package as it is today; whichever lasts longer wins, as for periods
+  ent.seats = [];
+  for (const m of seats) {
+    ent.seats.push({ id: m.id, instituteId: m.institute_id, instituteName: m.institute_name, batchName: m.batch_name,
+      packageId: m.package_id, packageName: m.package_name, joinedAt: m.joined_at, expiresAt: m.ends_at });
+    if (!latest || m.ends_at > latest) latest = m.ends_at;
+    for (const f of parse(m.features, [])) features.add(f);
+    ent.limits = mergeLimits(ent.limits, parse(m.limits, {}));
+    if (!best || m.display_order > best.display_order) best = m;
   }
   ent.features = [...features];
   if (best) { ent.plan = best.package_id; ent.planName = best.package_name; ent.expiresAt = lifetime ? null : latest; }

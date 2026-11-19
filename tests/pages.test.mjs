@@ -29,6 +29,8 @@ const EXPECTED = [
   ['/account/invoices', 'user', 'account'],
   ['/account/invoices/:number', 'user', 'bare'],
   ['/account/settings', 'user', 'account'],
+  ['/join', 'user', 'account'],
+  ['/join/:code', 'user', 'account'],
   ['/checkout', 'user', 'account'],
   ['/payment/processing', 'user', 'bare'],
   ['/payment/success', 'user', 'account'],
@@ -186,6 +188,7 @@ const SAMPLE = [
   [/\/api\/admin\/emails\/\$\{[^}]+\}/, '/api/admin/emails/em_none'],
   [/\/api\/admin\/contact\/\$\{[^}]+\}/, '/api/admin/contact/msg_none'],
   [/\/api\/me\/certificates\/\$\{[^}]+\}/, '/api/me/certificates/ABCD-EFGH-JKLM'],
+  [/\/api\/me\/institutes\/\$\{[^}]+\}/, '/api/me/institutes/mem_00000000000000000000'],
 ];
 function apiCalls() {
   const out = new Set();
