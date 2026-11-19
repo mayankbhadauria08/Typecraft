@@ -412,7 +412,7 @@ test('customer pages: frames by permission, the sidebar shows where you are, str
   // Home says what is ready here, with links only to what the role may open
   const home = (await owner('GET', '/console')).text;
   assert.match(home, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>/);
-  assert.match(home, /<a href="\/console\/roles">Roles and permissions<\/a>\./);
+  assert.match(home, /<a href="\/console\/roles">Roles and permissions<\/a>, [^.]*<a href="\/console\/settings">Settings<\/a>\./);
   assert.ok(!/ustomers[^.<]* still managed in the current admin/.test(home), 'what is built here is no longer listed as managed elsewhere');
   const supportHome = (await support('GET', '/console')).text;
   assert.match(supportHome, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>/);

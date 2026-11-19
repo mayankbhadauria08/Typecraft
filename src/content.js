@@ -90,4 +90,3 @@ export const ROUTES = {
 export const PATTERNS = [
   ['GET', /^\/api\/content\/packs\/([a-z0-9-]{1,40})$/, ['id'], getPack],
 ];
-export async function cron(env, ctx, kind) {}

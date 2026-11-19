@@ -20,6 +20,7 @@
 // browser's word. Amounts are worked out on the server. The seats switch on once: the one call that moves the
 // order to 'paid' writes its claim_id, and every change in the same transaction requires that claim_id.
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
+import { perRun } from './limits.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { audit, getSetting, paymentsAvailable } from './billing.js';
 import * as rzp from './razorpay.js';
@@ -506,7 +507,7 @@ export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
     const now = Date.now();
     rows = (await DB.prepare(
       `SELECT * FROM institute_orders WHERE status IN ('created', 'pending', 'failed') AND razorpay_order_id IS NOT NULL
-          AND created_at < ?1 AND created_at > ?2 ORDER BY created_at LIMIT 25`
+          AND created_at < ?1 AND created_at > ?2 ORDER BY created_at LIMIT ${perRun(env).instituteReconcile}`
     ).bind(new Date(now - olderThanMin * MIN_MS).toISOString(), new Date(now - 7 * DAY_MS).toISOString()).all()).results;
   } catch (err) { if (noTable(err)) return out; throw err; }
   if (rzp.configured(env)) {
@@ -522,7 +523,7 @@ export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
   }
   // repair: every paid order has its invoice, and its email
   const todo = (await DB.prepare(
-    "SELECT id FROM institute_orders WHERE status = 'paid' AND institute_payment_id IS NOT NULL AND invoice_emailed_at IS NULL ORDER BY paid_at LIMIT 25"
+    "SELECT id FROM institute_orders WHERE status = 'paid' AND institute_payment_id IS NOT NULL AND invoice_emailed_at IS NULL ORDER BY paid_at LIMIT " + perRun(env).instituteInvoices
   ).all()).results;
   for (const t of todo) {
     try { const r = await afterPaid(env, ctx, t.id); if (r.invoiceNumber) out.repaired++; } catch (err) { console.error('institute invoice repair failed:', err && err.name); }

@@ -846,3 +846,34 @@ progress.meter::-moz-progress-bar { background: var(--accent); border-radius: 99
 .match-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .match-row:first-child { border-top: 0; }
 @media (max-width: 640px) { .match-row { grid-template-columns: minmax(0, 1fr) auto; } .match-row > .muted { grid-column: 1 / -1; order: 3; } }
+
+/* ---------- Settings, Integrations, System health, Email templates (Phase 5a) ---------- */
+.sub-head { margin: 18px 0 8px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.block .notice { margin-bottom: 14px; }
+.int-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.int-grid > .panel { margin: 0; }
+.int-card .panel-head { align-items: center; }
+.int-card .notice { margin: 12px 0 0; }
+.int-card .btn-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; }
+.int-card .btn-link .ic { width: 14px; height: 14px; }
+.health-warnings { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; }
+.health-warnings .alert { margin: 0; }
+.health-clear { margin: 0 0 20px; }
+.tiles#jobTiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile-value-sm { font-size: 15px; line-height: 24px; }
+.tpl-layout { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.tpl-nav { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+.tpl-nav ul { list-style: none; margin: 0 0 14px; padding: 0; }
+.tpl-nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 14px; }
+.tpl-nav a:hover { background: var(--hover); }
+.tpl-nav a[aria-current="page"] { background: var(--accent-wash); color: var(--accent-ink); font-weight: 500; }
+.tpl-group { margin: 0 0 4px; padding: 0 10px; color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.tpl-view .block-head { align-items: center; }
+.tpl-frame-wrap { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #f4f1ea; }
+.tpl-frame { display: block; width: 100%; height: 760px; border: 0; }
+.tpl-text { margin: 14px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 'IBM Plex Mono', ui-monospace, monospace; }
+@media (max-width: 900px) {
+  .int-grid, .tiles#jobTiles { grid-template-columns: minmax(0, 1fr); }
+  .tpl-layout { grid-template-columns: minmax(0, 1fr); }
+  .tpl-nav { position: static; max-height: none; }
+}

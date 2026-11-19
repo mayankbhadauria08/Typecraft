@@ -4,10 +4,10 @@ The new admin dashboard, built in six phases beside the current `/admin` pages. 
 map for whoever works on it next: what exists, how sign-in and permissions work, how to add a
 module, and what has to happen before it replaces the current admin.
 
-Status: **Phases 1 to 4 of 6 are built** (foundation; core operations; learning operations; business
-growth). It lives at `/console`. The current `/admin` keeps working unchanged until
-the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
-`docs/ADMIN-PHASE-3.md`, `docs/ADMIN-PHASE-4.md`.
+Status: **Phases 1 to 4 of 6 are built, and Phase 5 is in progress** (foundation; core operations;
+learning operations; business growth; infrastructure). It lives at `/console`. The current `/admin`
+keeps working unchanged until the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
+`docs/ADMIN-PHASE-3.md`, `docs/ADMIN-PHASE-4.md`, `docs/ADMIN-PHASE-5.md`.
 
 | Phase | Contents | Status |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
 | 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access, the search box | built |
 | 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | built (docs/ADMIN-PHASE-3.md, docs/UNLOCK-RULES.md) |
 | 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | built in three parts: 4a Support and Business reports, 4b Email campaigns and Notifications, 4c Coupons and Promotions (docs/ADMIN-PHASE-4.md) |
-| 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | not started |
+| 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | in two parts: 5a Settings, Integrations, System health (built), 5b Administrators, Activity logs, Security (docs/ADMIN-PHASE-5.md) |
 | 6 | Optimisation, full test pass, cutover, delivery report | not started |
 
 ## 1. What the audit found (Phase 1)
@@ -51,7 +51,7 @@ a link.
 1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access, Institutes (docs/INSTITUTES.md §7)
 2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth** (docs/ADMIN-PHASE-4.md): Coupons, Promotions, Email campaigns, Support, Notifications, Business reports (all built)
-4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
+4. **Infrastructure** (docs/ADMIN-PHASE-5.md): Administrators, Roles and permissions (built), Activity logs, System health (built), Integrations (built), Security, Settings (built)
 
 ## 3. Sign-in and sessions
 
@@ -185,6 +185,9 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
+- `0017_job_runs.sql` (Phase 5a): `job_runs`, the background jobs' record. One new table, no row changes,
+  safe to run twice. Before it is applied, the jobs run exactly as before and System health says the
+  update is missing. Go-live steps: `docs/ADMIN-PHASE-5.md` §7 and `docs/LAUNCH.md` §1n.
 - `0016_coupons.sql` (Phase 4c): `coupons`, `promotions`, `order_discounts`. Three new tables, no row
   changes, safe to run twice. Before it is applied, prices are the plans' own, codes are refused politely
   at checkout, and the Coupons and Promotions pages answer "not switched on yet" (503).
@@ -247,6 +250,8 @@ All are secrets or variables on the `typecraft` Worker in Cloudflare; none are i
 | `SESSION_SECRET` (16+ characters; use 40+) | needed for emailed sign-in codes |
 | `RESEND_API_KEY`, or `SMTP_USER` + `SMTP_PASS` once `src/smtp.js` is merged | sending email |
 | `ADMIN_EMAIL_CODE=off` | emergency switch: admin sign-in without the emailed code |
+| `WORKERS_PLAN=paid` | larger background batches once on Workers Paid (docs/ADMIN-PHASE-5.md §3) |
+| `RESEND_PLAN=paid` | System health stops measuring against Resend's free plan |
 
 ## 11. Tests
 
@@ -261,3 +266,6 @@ Phase 3: `tests/console-course.test.mjs` (course edits, drafts, publishing, vers
 packs), `console-progress` (student progress), `console-analytics` (learning analytics).
 The other test files still pass unchanged apart from two expectations that follow the new
 defaults (an Admin cannot change settings or refund until allowed).
+Phase 4: `console-support`, `console-campaigns`, `console-coupons`, `console-institutes`.
+Phase 5a: `tests/console-system.test.mjs` (settings, integrations, system health, the job record and
+its alerts, email previews; docs/ADMIN-PHASE-5.md §8).

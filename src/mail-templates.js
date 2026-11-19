@@ -155,6 +155,7 @@ const HEADS = {
   test_completed: ['Typing test', 'Your typing test result'],
   contact_received: ['Support', 'We got your message'],
   contact_forward: ['Support', 'New contact message'],
+  system_alert: ['System health', 'Something needs a look'],
   support_reply: ['Support', 'A reply from TypeCraft'],
   institute_invite: ['Institute', null],
   student_invite: ['Institute', null],
@@ -329,7 +330,7 @@ export const TEMPLATES = {
     const invoice = url(site, d.invoiceUrl) || (d.invoiceNumber ? `${site.siteUrl}/account/invoices/${encodeURIComponent(d.invoiceNumber)}` : null);
     const blocks = [
       P(hi(d)),
-      P(`Thank you. Your payment was successful and ${d.packageName} is now active on your account.`),
+      P(`Thank you. Your payment was successful and your TypeCraft ${d.packageName} plan is now active on your account.`),
       Rows([
         ['Plan', d.packageName],
         ['Amount paid', money(d.amountPaise, d.currency)],
@@ -537,6 +538,19 @@ export const TEMPLATES = {
       ]),
       Quote(d.message),
       Small('Reply to this email to answer the sender directly.'),
+    ] });
+  },
+
+  // to the Super Admins, when a background job fails (src/jobs.js); at most one every 6 hours per job
+  system_alert(d, site) {
+    const title = d.title || 'A background job failed';
+    const list = Array.isArray(d.failures) ? d.failures.slice(0, 10) : [];
+    return layout(site, { subject: `TypeCraft: ${title}`, preheader: list.length ? `${list[0].part}: ${list[0].error}` : title, blocks: [
+      P(`${title}. The other parts of the job carried on, and the job runs again on its next turn.`),
+      Rows(list.map((f) => [String(f.part || 'part'), String(f.error || 'failed').slice(0, 160)])),
+      P('System health in the admin console shows the last runs and what failed. If the same part keeps failing, look at the Worker\'s logs in Cloudflare (Workers & Pages, typecraft, Logs).'),
+      Button('Open System health', url(site, d.link) || `${site.siteUrl}/console/system-health`),
+      Small('You get this because you are a Super Admin. At most one of these is sent every 6 hours for each job.'),
     ] });
   },
 };

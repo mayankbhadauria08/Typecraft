@@ -323,7 +323,7 @@ test('defaults: Support cannot refund, manage administrators, or touch settings;
   for (const k of ['customers.export', 'customers.manage', 'payments.export', 'institutes.manage', 'institutes.payments']) assert.ok(!support.includes(k), `support must not have ${k}`);
   for (const k of ['payments.refund', 'settings.manage', 'roles.manage', 'admins.manage', 'unlock.manage', 'course.publish', 'campaigns.limit', 'coupons.manage', 'promotions.manage']) assert.ok(!admin.includes(k), `admin must not have ${k} by default`);
   for (const k of ['campaigns.write', 'emails.announce', 'notices.manage']) assert.ok(!support.includes(k) && admin.includes(k), k);
-  assert.equal(admin.length, 38);
+  assert.equal(admin.length, 40);
   assert.deepEqual(await keys('learner'), []); assert.deepEqual(await keys(null), []);
   await assert.rejects(() => can(A.env, 'admin', 'no.such.permission'), /unknown permission/);
   // every permission belongs to one of the four layers
@@ -478,7 +478,7 @@ test('the setup checklist says what is switched on and never shows a value', asy
   const a = await ownerA('GET', '/api/admin/console/setup');
   assert.equal(a.status, 200);
   const flags = (r) => Object.fromEntries(r.body.items.map((i) => [i.key, i.ready]));
-  assert.deepEqual(flags(a), { owner: true, email: false, secret: false, adminCode: false, razorpay: true, webhook: true });
+  assert.deepEqual(flags(a), { owner: true, email: false, emailWebhook: false, secret: false, adminCode: false, razorpay: true, webhook: true });
   assert.equal(a.body.items.find((i) => i.key === 'razorpay').mode, 'test');
   // server B has email and the secret: sign in with the code
   const ownerB = client(B);
@@ -487,7 +487,7 @@ test('the setup checklist says what is switched on and never shows a value', asy
   await ownerB('POST', '/api/admin/auth/login', { email: OWNER, password: pw });
   await ownerB('POST', '/api/admin/auth/verify', { code: lastCode(OWNER) });
   const b = await ownerB('GET', '/api/admin/console/setup');
-  assert.deepEqual(flags(b), { owner: true, email: true, secret: true, adminCode: true, razorpay: false, webhook: false });
+  assert.deepEqual(flags(b), { owner: true, email: true, emailWebhook: false, secret: true, adminCode: true, razorpay: false, webhook: false });
   for (const secret of [...SECRET_VALUES, 'rzp_test_abc']) assert.ok(!a.text.includes(secret) && !b.text.includes(secret), 'no setting values in the answer');
   const support = await consoleLogin(A, await account(A, { role: 'support' }));
   assert.equal((await support('GET', '/api/admin/console/setup')).status, 403);

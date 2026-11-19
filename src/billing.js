@@ -6,6 +6,7 @@
 // confirmed by Razorpay itself (API fetch after a valid checkout signature, or a
 // signed webhook); fulfilment happens once (conditional UPDATE + unique indexes).
 import { packageView, catalogueView } from './package-view.js';
+import { perRun } from './limits.js'; // how many orders one run checks with Razorpay
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { uuid, sha256Hex } from './crypto.js';
@@ -770,7 +771,7 @@ export async function reconcile(env, ctx, { olderThanMin = 15 } = {}) {
     const now = Date.now();
     const rows = (await DB.prepare(
       `SELECT * FROM orders WHERE status IN ('created', 'attempted', 'pending') AND razorpay_order_id IS NOT NULL
-          AND created_at < ?1 AND created_at > ?2 ORDER BY created_at LIMIT 25`
+          AND created_at < ?1 AND created_at > ?2 ORDER BY created_at LIMIT ${perRun(env).reconcile}`
     ).bind(new Date(now - olderThanMin * MIN_MS).toISOString(), new Date(now - 7 * DAY_MS).toISOString()).all()).results;
     for (const o of rows) {
       out.checked++;

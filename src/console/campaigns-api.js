@@ -21,6 +21,7 @@
 // again just before their turn: closed accounts and people who turned off product news are skipped.
 // Each email is an email_logs row like any other, with retries and the unsubscribe link.
 import { HttpError, json, readJson, fieldError, clientIp, nowIso } from '../http.js';
+import { perRun } from '../limits.js';
 import { uuid } from '../crypto.js';
 import { hitLimit, emailEnabled, tooMany } from '../session.js';
 import { audit } from '../billing.js';
@@ -32,7 +33,7 @@ import { Binder, PAGE_SIZE, DAY_MS, pageOf, offsetOf, paged, like, oneOf, idPara
 export const STATUSES = ['draft', 'scheduled', 'sending', 'sent', 'cancelled'];
 export const DEFAULT_CAP = 80;
 const CAP_MAX = 5000;
-export const BATCH = 40;                 // campaign emails handed to Resend per cron run (every 10 minutes)
+export const BATCH = 40;                 // the most campaign emails handed to Resend per run on Workers Paid; Free: src/limits.js
 const STUCK_MS = 15 * 60000;             // a person claimed this long ago with no result: the run was cut off
 const INACTIVE_DAYS = [7, 14, 30];
 const NAME_MAX = 80, SUBJECT_MAX = 150, BODY_MAX = 20000;
@@ -312,7 +313,7 @@ export async function scheduleCampaign(request, env, ctx, params) {
     const run = runCampaigns(env).catch((err) => console.error('campaign run failed:', err && err.message));
     if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(run); else await run;
   }
-  return json({ id: r.id, status: 'scheduled', sendAt, message: later ? 'Scheduled.' : 'Sending has started. Up to ' + BATCH + ' emails go every 10 minutes, within the daily limit.' });
+  return json({ id: r.id, status: 'scheduled', sendAt, message: later ? 'Scheduled.' : 'Sending has started. Up to ' + perRun(env).campaigns + ' emails go every 10 minutes, within the daily limit.' });
 }
 
 export async function unscheduleCampaign(request, env, ctx, params) {
@@ -382,7 +383,7 @@ export async function runCampaigns(env, { now = nowIso() } = {}) {
     .bind(new Date(Date.parse(now) - STUCK_MS).toISOString()).run();
 
   if (emailEnabled(env)) {
-    const room = Math.min(BATCH, (await dailyCap(env)) - (await usedToday(env, now)));
+    const room = Math.min(perRun(env).campaigns, (await dailyCap(env)) - (await usedToday(env, now)));
     const rows = room > 0 ? (await DB.prepare(`SELECT s.campaign_id, s.user_id, c.subject, c.body, u.email, u.full_name, u.account_status, u.email_verified,
                                                       COALESCE(p.announcements, 1) AS news
                                                  FROM campaign_sends s JOIN email_campaigns c ON c.id = s.campaign_id JOIN users u ON u.id = s.user_id

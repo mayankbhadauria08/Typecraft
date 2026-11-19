@@ -8,7 +8,8 @@ import { roleOf, ROLES } from './roles.js';
 import { requirePermission, assertCan } from './console/session.js';
 import { isOwner, healthNumbers } from './admin.js';
 import { entitlementsFor } from './entitlements.js';
-import { audit, getSetting, refund } from './billing.js';
+import { audit, refund } from './billing.js';
+import { readSettings, checkBody, saveSettings, paymentsMode } from './settings.js';
 import { storedPackageView as packageView } from './package-view.js';
 import { packageFields, checkPackage, featureKeys, saveStatements, highlightTakenFrom } from './package-rules.js';
 
@@ -308,67 +309,20 @@ export async function getRevenue(request, env) {
 }
 
 /* ---------------- settings ---------------- */
-const SETTING_KEYS = ['seller', 'support', 'payments', 'signups'];
-const str = (v, max) => typeof v === 'string' && v.length <= max && !/[\u0000-\u0008\u000b-\u001f]/.test(v);
-const VALIDATE = {
-  seller(v) {
-    for (const k of ['name', 'legalName', 'address', 'email', 'phone']) if (v[k] !== undefined && !str(v[k], 300)) return `seller.${k} must be text (at most 300 characters).`;
-    if (v.gstin !== undefined && v.gstin !== null && !(typeof v.gstin === 'string' && /^[0-9A-Z]{15}$/.test(v.gstin))) return 'seller.gstin must be a 15-character GSTIN or empty.';
-    if (v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return 'seller.email must be an email address.';
-    return null;
-  },
-  support(v) {
-    if (v.email !== undefined && !(typeof v.email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email))) return 'support.email must be an email address.';
-    if (v.hours !== undefined && !str(v.hours, 200)) return 'support.hours must be text.';
-    if (v.replyDays !== undefined && !(Number.isInteger(v.replyDays) && v.replyDays >= 0 && v.replyDays <= 30)) return 'support.replyDays must be 0–30.';
-    return null;
-  },
-  payments(v) {
-    for (const k of ['enabled', 'testMode']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return `payments.${k} must be true or false.`;
-    return null;
-  },
-  signups(v) {
-    if (v.open !== undefined && typeof v.open !== 'boolean') return 'signups.open must be true or false.';
-    return null;
-  },
-};
-const ALLOWED_FIELDS = { seller: ['name', 'legalName', 'address', 'email', 'phone', 'gstin'], support: ['email', 'hours', 'replyDays'], payments: ['enabled', 'testMode'], signups: ['open'] };
-
-async function allSettings(env) {
-  const out = {};
-  for (const k of SETTING_KEYS) out[k] = await getSetting(env, k, {});
-  return out;
-}
-
+// Checked and saved by src/settings.js, shared with the admin console's Settings page. There is no test-mode
+// switch: test or live follows the Razorpay key (paymentsMode).
 export async function getSettings(request, env) {
   await requirePermission(env, request, 'settings.view');
-  return json({ settings: await allSettings(env), paymentsConfigured: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), webhookConfigured: !!env.RAZORPAY_WEBHOOK_SECRET });
+  return json({ settings: (await readSettings(env)).settings, paymentsConfigured: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET),
+    webhookConfigured: !!env.RAZORPAY_WEBHOOK_SECRET, paymentsMode: paymentsMode(env) });
 }
 
 export async function putSettings(request, env) {
   const { user: actor } = await requirePermission(env, request, 'settings.manage');
-  const body = await readJson(request);
-  const fields = {}, changes = {};
-  for (const [k, v] of Object.entries(body)) {
-    if (!SETTING_KEYS.includes(k)) { fields[k] = `Unknown setting: ${k}.`; continue; }
-    if (!v || typeof v !== 'object' || Array.isArray(v)) { fields[k] = `${k} must be an object.`; continue; }
-    const unknown = Object.keys(v).filter((f) => !ALLOWED_FIELDS[k].includes(f));
-    if (unknown.length) { fields[k] = `Unknown field: ${k}.${unknown[0]}.`; continue; }
-    const err = VALIDATE[k](v);
-    if (err) { fields[k] = err; continue; }
-    changes[k] = v;
-  }
-  if (Object.keys(fields).length) throw fieldError(fields);
+  const changes = checkBody(await readJson(request));
   if (!Object.keys(changes).length) throw new HttpError(400, 'nothing_to_save', 'Nothing to save.');
-  const now = nowIso();
-  const before = await allSettings(env);
-  await env.DB.batch(Object.entries(changes).map(([k, v]) => env.DB.prepare(
-    `INSERT INTO platform_settings (key, value, updated_by, updated_at) VALUES (?1, ?2, ?3, ?4)
-     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
-  ).bind(k, JSON.stringify({ ...before[k], ...v }), actor.id, now)));
-  await audit(env, { actorId: actor.id, action: 'settings.update', target: `settings:${Object.keys(changes).join(',')}`,
-    detail: Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, { from: Object.fromEntries(Object.keys(v).map((f) => [f, before[k][f] ?? null])), to: v }])), ip: clientIp(request) });
-  return json({ settings: await allSettings(env) });
+  await saveSettings(env, changes, { actorId: actor.id, ip: clientIp(request) });
+  return json({ settings: (await readSettings(env)).settings });
 }
 
 /* ---------------- audit log ---------------- */
@@ -405,4 +359,3 @@ export const PATTERNS = [
   ['PUT', /^\/api\/admin\/packages\/([\w-]{1,40})$/, ['id'], putPackage],
   ['POST', /^\/api\/admin\/payments\/([\w-]{1,80})\/refund$/, ['id'], postRefund],
 ];
-export async function cron() {}

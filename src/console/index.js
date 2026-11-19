@@ -21,14 +21,17 @@ import * as institutes from './institutes-api.js';
 import * as campaigns from './campaigns-api.js';
 import * as notices from './notices-api.js';
 import * as coupons from './coupons-api.js';
+import * as settings from './settings-api.js';
+import * as system from './system-api.js';
+import * as emailPreview from './email-preview.js';
 
-const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics, institutes, support, reports, campaigns, notices, coupons];
+const PARTS = [auth, access, customers, payments, refunds, subscriptions, learning, packages, dashboard, search, unlock, course, progress, analytics, institutes, support, reports, campaigns, notices, coupons, settings, system, emailPreview];
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006',
   course_drafts: '0007', course_releases: '0007', support_replies: '0014', support_assignments: '0014',
   email_campaigns: '0015', campaign_sends: '0015', site_notices: '0015',
-  coupons: '0016', promotions: '0016', order_discounts: '0016' };
+  coupons: '0016', promotions: '0016', order_discounts: '0016', job_runs: '0017' };
 const whenReady = (handler) => async (request, env, ctx, params) => {
   try { return await handler(request, env, ctx, params); } catch (err) {
     const m = String(err && err.message).match(/no such table: (\w+)/i);

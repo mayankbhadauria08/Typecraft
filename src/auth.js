@@ -13,6 +13,7 @@ import {
 import { sendTemplate, sendLater, siteUrl, getPreferences } from './mail.js';
 import { createOtp, verifyOtp, otpEnabled } from './otp.js';
 import { endAdminSessionsFor } from './console/session.js';
+import { signupsOpen } from './settings.js';
 
 const HOUR = 60 * 60 * 1000;
 const WRONG_LOGIN = 'Email or password is incorrect.';
@@ -107,6 +108,8 @@ export async function signup(request, env, ctx) {
   const pw = checkPassword(body.password, { email: email.value }); if (pw) fields.password = pw;
   requireMatch(body.password, body.confirmPassword, fields);
   if (Object.keys(fields).length) throw fieldError(fields);
+  // Settings → Sign-ups in the admin console (src/settings.js); existing accounts sign in as usual
+  if (!(await signupsOpen(env))) throw new HttpError(403, 'signups_closed', "New accounts can't be created right now. If you already have an account, sign in.");
 
   if (!(await hitLimit(env, `signup-ip:${clientIp(request)}`, 10, 3600))) throw tooMany(60);
 

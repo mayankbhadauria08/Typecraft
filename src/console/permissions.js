@@ -75,7 +75,9 @@ export const PERMISSIONS = [
 
   // ----- Layer 4: infrastructure -----
   P('settings.view', 'infra', 'Settings', 'See platform settings', 'Business details, support contact and which services are set up.', 1, 0),
-  P('settings.manage', 'infra', 'Settings', 'Change platform settings', 'Edit business details, support contact, payments and sign-up switches.', 0, 0),
+  P('settings.manage', 'infra', 'Settings', 'Change platform settings', 'Edit business details, support contact, and the payments and sign-up switches. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('integrations.view', 'infra', 'Integrations', 'See integrations', 'Which outside services are connected (Razorpay, email, Cloudflare) and whether each works. Secret values are never shown.', 1, 0),
+  P('health.view', 'infra', 'System health', 'See system health', 'Background jobs, email sending, payments waiting, database size and database updates.', 1, 0),
   P('audit.view', 'infra', 'Activity logs', 'See the activity log', 'Who changed what in the admin, and when.', 1, 0),
   P('roles.view', 'infra', 'Roles and permissions', 'See roles and permissions', 'This table, and who has admin access.', 1, 0),
   P('roles.manage', 'infra', 'Roles and permissions', 'Change role permissions', 'Switch permissions on or off for Admin and Support.', 0, 0, { ownerOnly: true, sensitive: true }),

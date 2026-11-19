@@ -206,6 +206,22 @@ Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1i, §1j) first: thi
 4. Before the first real sale, try it once: make a sale that ends in an hour on one plan, check the
    pricing page and checkout, then turn it off.
 
+## 1n. The admin console, Phase 5a (Settings, Integrations, System health)
+
+Full notes: `docs/ADMIN-PHASE-5.md`. Phase 5 comes as two pull requests (5a, then 5b); merge 5a first.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0017_job_runs.sql` (one new table, `job_runs`; adds only, no row
+   changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('job_runs', 'job_runs_recent')`.
+2. **[You] Merge the 5a pull request.** Nothing changes for learners.
+3. After 10 minutes, open Console › System health: the "Every 10 minutes" job should say Finished.
+   If a job fails, every Super Admin gets one email about it (at most one every 6 hours).
+4. The sign-ups switch in Settings now really closes sign-ups (it did nothing before). The
+   test-mode switch is gone: test or live follows the Razorpay key.
+5. Recommended: set up `RESEND_WEBHOOK_SECRET` (§2) so the email log knows delivered from bounced.
+6. When you move to Workers Paid: add the variable `WORKERS_PLAN` = `paid` (§2).
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |
@@ -216,8 +232,10 @@ Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1i, §1j) first: thi
 | `RESEND_API_KEY` | Cloudflare secret | for email | Resend → API Keys |
 | `SESSION_SECRET` | Cloudflare secret | for codes | random 40+ characters |
 | `OWNER_EMAILS` | Cloudflare secret | set ✓ | mayankbhadauria08@gmail.com |
-| `RESEND_WEBHOOK_SECRET` | Cloudflare secret | optional | Resend webhook (delivered/bounced) |
+| `RESEND_WEBHOOK_SECRET` | Cloudflare secret | recommended | Resend webhook to `/api/webhooks/resend` (delivered, bounced, complained) |
 | `ADMIN_EMAIL_CODE` | Cloudflare variable | optional | `off` = admin sign-in without the emailed code (only if email is down) |
+| `WORKERS_PLAN` | Cloudflare variable | after upgrading | `paid` = larger background batches (docs/ADMIN-PHASE-5.md §3); leave unset on Workers Free |
+| `RESEND_PLAN` | Cloudflare variable | after upgrading Resend | `paid` = System health stops warning about the free plan's 100 emails a day |
 | `SITE_URL` | wrangler.jsonc var | set ✓ | https://typecrafttyping.in |
 | `EMAIL_FROM` / `EMAIL_REPLY_TO` | wrangler.jsonc vars | set ✓ | TypeCraft <hello@typecrafttyping.com> |
 

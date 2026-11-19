@@ -95,6 +95,7 @@ ${block('renewals', 'Plans ending soon', lines(4), '<span class="panel-meta" id=
 /* ---------- Email campaigns ---------- */
 function campaignsBody(me) {
   const actions = [
+    `<a class="btn btn-quiet" href="${esc(CONSOLE_BASE)}/email-templates">${icon('eye')}<span>Email templates</span></a>`,
     `<a class="btn btn-quiet" href="${esc(CONSOLE_BASE)}/email-log">${icon('mail')}<span>Email log</span></a>`,
     has(me, 'campaigns.write') ? `<button type="button" class="btn btn-primary" id="newCampaign">${icon('plus')}<span>New campaign</span></button>` : '',
   ].join('');
