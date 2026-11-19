@@ -1,6 +1,6 @@
 -- Admin console Phase 4c: coupons and promotions (docs/ADMIN-PHASE-4.md §7).
 -- Adds tables only: nothing existing changes, and it is safe to run twice.
--- Apply by hand after a restore bookmark (docs/LAUNCH.md §1i). Never `wrangler d1 migrations apply`.
+-- Apply by hand after a restore bookmark (docs/LAUNCH.md §1k). Never `wrangler d1 migrations apply`.
 -- Money is in paise. An order's amount_paise stays what the customer paid; order_discounts says
 -- what the price was before, and why it was lower.
 

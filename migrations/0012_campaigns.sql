@@ -1,6 +1,6 @@
 -- Admin console Phase 4b: email campaigns and notifications for learners (docs/ADMIN-PHASE-4.md §4–5).
 -- Adds tables only: nothing existing changes, and it is safe to run twice.
--- Apply by hand after a restore bookmark (docs/LAUNCH.md §1h). Never `wrangler d1 migrations apply`.
+-- Apply by hand after a restore bookmark (docs/LAUNCH.md §1j). Never `wrangler d1 migrations apply`.
 
 -- An email to many people. audience is JSON: {"kind":"all"} | {"kind":"free"} | {"kind":"paid"}
 -- | {"kind":"plan","plan":"<package id>"} | {"kind":"inactive","days":7|14|30}.

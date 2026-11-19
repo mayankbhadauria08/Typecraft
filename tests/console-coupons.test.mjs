@@ -250,7 +250,7 @@ test('pages: frames without inline code; Support sees coupons and sales but not 
 });
 
 /* ---------------- before the migration ---------------- */
-test('before migration 0011: prices as they are, codes refused politely, checkout works, the console says so', async () => {
+test('before migration 0013: prices as they are, codes refused politely, checkout works, the console says so', async () => {
   for (const t of ['order_discounts', 'coupons', 'promotions']) await K.run(`DROP TABLE ${t}`);
   forgetAll(S.env);
   const b = await learner();
@@ -263,5 +263,5 @@ test('before migration 0011: prices as they are, codes refused politely, checkou
   assert.equal((await support('GET', `/api/console/payments/${paid.orderId}`)).body.discount, null);
   const r = await owner('GET', '/api/console/coupons');
   assert.equal(r.status, 503);
-  assert.match(r.body.error.message, /0011/);
+  assert.match(r.body.error.message, /0013/);
 });

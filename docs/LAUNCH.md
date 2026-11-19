@@ -117,37 +117,38 @@ Full notes: `docs/EXAM-MODES.md`.
 2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
 
-## 1g. The admin console, Phase 4a (Support and Business reports)
+## 1i. The admin console, Phase 4a (Support and Business reports)
 
 Full notes: `docs/ADMIN-PHASE-4.md`. Phase 4 comes as three pull requests (4a, 4b, 4c); merge them
-in that order.
+in that order. Its migrations are numbered 0011 to 0013 because the Institutes work (§1g, §1h) uses
+0009 and 0010; the two sets don't depend on each other.
 
 1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
-   here), then apply `migrations/0009_support.sql` (two new tables, `support_replies` and
+   here), then apply `migrations/0011_support.sql` (two new tables, `support_replies` and
    `support_assignments`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('support_replies', 'support_assignments')`.
 2. **[You] Merge the 4a pull request.** Nothing changes for learners.
 3. Replies from the console are emailed from the normal sending address with "reply to" set to
    the support address in Settings, so the customer's answer comes back to that inbox.
 
-## 1h. The admin console, Phase 4b (Email campaigns and Notifications)
+## 1j. The admin console, Phase 4b (Email campaigns and Notifications)
 
-Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1g) first: this builds on it.
+Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1i) first: this builds on it.
 
 1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
-   here), then apply `migrations/0010_campaigns.sql` (three new tables, `email_campaigns`,
+   here), then apply `migrations/0012_campaigns.sql` (three new tables, `email_campaigns`,
    `campaign_sends` and `site_notices`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('email_campaigns', 'campaign_sends', 'site_notices')`.
 2. **[You] Merge the 4b pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Campaigns send at most 80 emails a day (Resend's free plan allows 100 a day for everything). After
    upgrading Resend, raise the limit in Console › Email campaigns › Change the limit.
 
-## 1i. The admin console, Phase 4c (Coupons and Promotions)
+## 1k. The admin console, Phase 4c (Coupons and Promotions)
 
-Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1g, §1h) first: this builds on them.
+Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1i, §1j) first: this builds on them.
 
 1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
-   here), then apply `migrations/0011_coupons.sql` (three new tables, `coupons`, `promotions` and
+   here), then apply `migrations/0013_coupons.sql` (three new tables, `coupons`, `promotions` and
    `order_discounts`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('coupons', 'promotions', 'order_discounts')`.
 2. **[You] Merge the 4c pull request.**

@@ -172,7 +172,7 @@ export async function getPayment(request, env, ctx, params) {
     refundedPaise: y.refunded, refundablePaise: ['captured', 'partially_refunded'].includes(y.status) ? Math.max(0, y.amount_paise - y.refunded - y.refunding) : 0,
   }));
   const refundable = attempts.some((y) => y.refundablePaise > 0);
-  // a coupon or a sale on this order (migration 0011; none before it)
+  // a coupon or a sale on this order (migration 0013; none before it)
   const d = await orderDiscount(env, o.id);
   return json({
     discount: d ? { source: d.source, label: d.label, code: d.code || null, listPaise: d.list_price_paise, discountPaise: d.discount_paise, couponId: d.coupon_id || null } : null,

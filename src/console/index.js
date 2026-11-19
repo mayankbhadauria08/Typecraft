@@ -25,9 +25,9 @@ const PARTS = [auth, access, customers, payments, refunds, subscriptions, learni
 
 // A console table that doesn't exist yet means its database update hasn't been applied: say so plainly.
 const TABLE_UPDATE = { admin_sessions: '0005', role_permissions: '0005', customer_notes: '0006', access_overrides: '0006', refund_choices: '0006',
-  course_drafts: '0007', course_releases: '0007', support_replies: '0009', support_assignments: '0009',
-  email_campaigns: '0010', campaign_sends: '0010', site_notices: '0010',
-  coupons: '0011', promotions: '0011', order_discounts: '0011' };
+  course_drafts: '0007', course_releases: '0007', support_replies: '0011', support_assignments: '0011',
+  email_campaigns: '0012', campaign_sends: '0012', site_notices: '0012',
+  coupons: '0013', promotions: '0013', order_discounts: '0013' };
 const whenReady = (handler) => async (request, env, ctx, params) => {
   try { return await handler(request, env, ctx, params); } catch (err) {
     const m = String(err && err.message).match(/no such table: (\w+)/i);
