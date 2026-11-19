@@ -19,8 +19,9 @@ import * as learningRules from './learning-rules.js';
 import * as courseStore from './course-store.js';   // published course edits (docs/ADMIN-PHASE-3.md) // rules for everyone about lessons (docs/UNLOCK-RULES.md)
 import * as exams from './exams.js';          // exam practice and certificate codes (docs/EXAM-MODES.md)
 import * as institutes from './institutes.js'; // institute seats, join codes, staff views (docs/INSTITUTES.md)
+import * as institutePortal from './institute-portal.js'; // the institute's own pages: batches, teachers, students
 import * as consoleApi from './console/index.js'; // admin console: sign-in, roles and permissions (docs/ADMIN-CONSOLE.md)
-const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, consoleApi];
+const MODULES = [billing, adminApi, mail, content, learningRules, courseStore, exams, institutes, institutePortal, consoleApi];
 
 const CORE_ROUTES = {
   'GET /api/auth/me': auth.me,

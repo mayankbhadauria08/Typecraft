@@ -12,7 +12,9 @@
   var LABELS = {
     'institute.create': 'Institute created', 'institute.update': 'Details changed', 'institute.term': 'Seats or term changed', 'institute.status': 'Status changed',
     'institute.payment': 'Payment recorded', 'institute.payment_remove': 'Payment removed', 'institute.staff_invite': 'Invitation sent',
-    'institute.staff_resend': 'Invitation sent again', 'institute.staff_remove': 'Removed from the institute'
+    'institute.staff_resend': 'Invitation sent again', 'institute.staff_remove': 'Removed from the institute',
+    'institute.staff_accept': 'Invitation accepted', 'institute.staff_decline': 'Invitation declined', 'institute.batch_create': 'Batch created',
+    'institute.batch_update': 'Batch changed', 'institute.batch_code': 'New join code', 'institute.student_remove': 'Student removed', 'institute.student_move': 'Student moved'
   };
   var page = null;
   var after = function (changed) { if (changed) page.load(); };

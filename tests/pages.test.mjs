@@ -31,6 +31,9 @@ const EXPECTED = [
   ['/account/settings', 'user', 'account'],
   ['/join', 'user', 'account'],
   ['/join/:code', 'user', 'account'],
+  ['/institute', 'user', 'account'],
+  ['/institute/:id', 'user', 'account'],
+  ['/institute/:id/batches/:bid', 'user', 'account'],
   ['/checkout', 'user', 'account'],
   ['/payment/processing', 'user', 'bare'],
   ['/payment/success', 'user', 'account'],
@@ -189,6 +192,11 @@ const SAMPLE = [
   [/\/api\/admin\/contact\/\$\{[^}]+\}/, '/api/admin/contact/msg_none'],
   [/\/api\/me\/certificates\/\$\{[^}]+\}/, '/api/me/certificates/ABCD-EFGH-JKLM'],
   [/\/api\/me\/institutes\/\$\{[^}]+\}/, '/api/me/institutes/mem_00000000000000000000'],
+  [/\/api\/me\/institute-invites\/\$\{[^}]+\}\/\$\{[^}]+\}/, '/api/me/institute-invites/stf_00000000000000000000/accept'],
+  [/\/api\/institutes\/\$\{[^}]+\}/, '/api/institutes/ins_00000000000000000000'],
+  [/\/batches\/\$\{[^}]+\}/, '/batches/bat_00000000000000000000'],
+  [/\/staff\/\$\{[^}]+\}/, '/staff/stf_00000000000000000000'],
+  [/\/students\/\$\{[^}]+\}/, '/students/mem_00000000000000000000'],
 ];
 function apiCalls() {
   const out = new Set();

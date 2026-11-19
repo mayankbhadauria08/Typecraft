@@ -123,7 +123,7 @@ export async function getMine(request, env) {
   return ready(async () => {
     const DB = env.DB;
     const now = nowIso();
-    const [seats, staff] = await DB.batch([
+    const [seats, staff, invites] = await DB.batch([
       DB.prepare(`SELECT s.id, s.joined_at, i.id AS institute_id, i.name AS institute_name, i.status, i.starts_at, i.ends_at,
                          b.name AS batch_name, p.name AS package_name
                     FROM institute_students s JOIN institutes i ON i.id = s.institute_id JOIN batches b ON b.id = s.batch_id
@@ -131,6 +131,8 @@ export async function getMine(request, env) {
                    WHERE s.user_id = ?1 AND s.status = 'active' ORDER BY s.joined_at`).bind(user.id),
       DB.prepare(`SELECT st.role, i.id, i.name, i.status FROM institute_staff st JOIN institutes i ON i.id = st.institute_id
                    WHERE st.user_id = ?1 AND st.status = 'active' AND i.status <> 'closed' ORDER BY i.name`).bind(user.id),
+      DB.prepare(`SELECT st.id, st.role, st.invited_at, i.name FROM institute_staff st JOIN institutes i ON i.id = st.institute_id
+                   WHERE st.email = ?1 AND st.status = 'invited' AND i.status <> 'closed' ORDER BY st.invited_at`).bind(user.email),
     ]);
     return json({
       seats: seats.results.map((s) => ({
@@ -138,6 +140,9 @@ export async function getMine(request, env) {
         joinedAt: s.joined_at, endsAt: s.ends_at, givesPlan: instituteOpen(s, now),
       })),
       staff: staff.results.map((s) => ({ institute: { id: s.id, name: s.name, status: s.status }, role: s.role })),
+      // invitations to help run an institute, sent to this account's email (accepting needs it verified)
+      invites: invites.results.map((x) => ({ id: x.id, institute: { name: x.name }, role: x.role, invitedAt: x.invited_at })),
+      emailVerified: !!user.emailVerified,
     });
   });
 }
@@ -156,6 +161,8 @@ export async function postLeave(request, env, ctx, params) {
 }
 
 /* ---------------- staff views ---------------- */
+/** The first India day of the last seven (practice on or after it counts as "this week"). */
+const weekAgo = () => new Date(Date.now() + 330 * 60000 - 6 * 86400000).toISOString().slice(0, 10);
 function instituteView(i, used) {
   return { id: i.id, name: i.name, city: i.city, status: i.status, seats: i.seats, seatsUsed: used, startsAt: i.starts_at, endsAt: i.ends_at };
 }
@@ -166,15 +173,20 @@ export async function getInstitute(request, env, ctx, params) {
   const DB = env.DB;
   const [used, batches] = await DB.batch([
     DB.prepare("SELECT COUNT(*) AS n FROM institute_students WHERE institute_id = ?1 AND status = 'active'").bind(institute.id),
-    DB.prepare(`SELECT b.id, b.name, b.archived_at,
-                       (SELECT COUNT(*) FROM institute_students s WHERE s.batch_id = b.id AND s.status = 'active') AS students
+    DB.prepare(`SELECT b.id, b.name, b.archived_at, b.join_code,
+                       (SELECT COUNT(*) FROM institute_students s WHERE s.batch_id = b.id AND s.status = 'active') AS students,
+                       (SELECT COUNT(*) FROM institute_students s WHERE s.batch_id = b.id AND s.status = 'active'
+                           AND NOT EXISTS (SELECT 1 FROM daily_totals d WHERE d.user_id = s.user_id AND d.day >= ?3 AND d.seconds > 0)) AS quiet,
+                       (SELECT GROUP_CONCAT(COALESCE(u.full_name, st.email), ', ') FROM batch_teachers t JOIN institute_staff st ON st.id = t.staff_id
+                          LEFT JOIN users u ON u.id = st.user_id WHERE t.batch_id = b.id AND st.status = 'active') AS teachers
                   FROM batches b WHERE b.institute_id = ?1 AND ${visibleBatchSql(staff.role, '?2')}
-                 ORDER BY b.archived_at IS NOT NULL, b.name`).bind(institute.id, staff.id),
+                 ORDER BY b.archived_at IS NOT NULL, b.name`).bind(institute.id, staff.id, weekAgo()),
   ]);
   return json({
     role: staff.role,
     institute: instituteView(institute, used.results[0].n),
-    batches: batches.results.map((b) => ({ id: b.id, name: b.name, students: b.students, archived: !!b.archived_at })),
+    batches: batches.results.map((b) => ({ id: b.id, name: b.name, students: b.students, quietThisWeek: b.quiet, teachers: b.teachers || '',
+      joinCode: b.archived_at ? null : showJoinCode(b.join_code), archived: !!b.archived_at })),
   });
 }
 
