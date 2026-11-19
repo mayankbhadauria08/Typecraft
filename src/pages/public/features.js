@@ -17,13 +17,13 @@ const F = [
   ['chart', 'Progress analytics', 'Daily and weekly speed and accuracy trends from your lessons, games and tests.', paid('Starter and up')],
   ['grid', 'Advanced analytics', 'A per-key accuracy heatmap, your slowest letter pairs and the kinds of mistakes you make most.', paid('Pro and up')],
   ['code', 'Custom practice', 'Paste your own text, or practise only your weakest keys, inside the same lesson engine.', paid('Pro and up')],
-  ['layers', 'Premium exercise packs', 'Numbers and data entry, code snippets, business writing and exam-style passages, all written by us.', paid('Pro and up')],
+  ['layers', 'Premium exercise packs', 'Numbers and data entry, code snippets, business writing and long 300-word passages, all written by us.', paid('Pro and up')],
   ['gamepad', 'Arcade', 'Eight games that each train one skill, plus a shared Daily Challenge.', `${free} Daily Challenge · ${paid('All plans')} all 8 games`],
   ['sparkle', 'Personal insights', 'A weekly plan built from your mistakes and speed: what to practise next and for how long.', paid('Premium')],
   ['certificate', 'Certificates', 'Printable level certificates showing the speed and accuracy you reached.', paid('Premium')],
   ['devices', 'Saved to your account', 'Progress saves as you type and follows you to any computer. Lessons keep working offline and sync later.', free],
   ['sun', 'Calm themes', 'Dark ink and light paper themes, sound on or off, and reduced motion for those who prefer it.', free],
-  ['shield', 'Private by design', 'No ads and no third-party trackers. Sign in with a password or a one-time code sent to your email.', free],
+  ['shield', 'Private by design', 'No ads and no advertising trackers; visits are counted without cookies. Sign in with a password or a one-time code sent to your email.', free],
 ];
 
 export default `
