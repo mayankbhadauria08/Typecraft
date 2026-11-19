@@ -14,7 +14,7 @@
     'institute.payment': 'Payment recorded', 'institute.payment_remove': 'Payment removed', 'institute.staff_invite': 'Invitation sent',
     'institute.staff_resend': 'Invitation sent again', 'institute.staff_remove': 'Removed from the institute',
     'institute.staff_accept': 'Invitation accepted', 'institute.staff_decline': 'Invitation declined', 'institute.batch_create': 'Batch created',
-    'institute.batch_update': 'Batch changed', 'institute.batch_code': 'New join code', 'institute.student_remove': 'Student removed', 'institute.student_move': 'Student moved'
+    'institute.batch_update': 'Batch changed', 'institute.invoice': 'Invoice made', 'institute.batch_code': 'New join code', 'institute.student_remove': 'Student removed', 'institute.student_move': 'Student moved'
   };
   var page = null;
   var after = function (changed) { if (changed) page.load(); };
@@ -107,14 +107,28 @@
     if (!d.payments) return;
     var i = d.institute, can = d.can.payments;
     if (!d.payments.length) return AC.fill('paymentsBody', AC.quiet('No payments recorded yet.'));
-    AC.fill('paymentsBody', AC.table([['Day'], ['Amount', 'num'], ['How', 'col-wide'], ['Reference', 'col-wide'], ['Recorded by', 'col-wide'], ['', 'col-act']], d.payments.map(function (p) {
+    var invoiceCell = function (p) {
+      if (p.invoice) return el('a', { href: '/institute/' + encodeURIComponent(i.id) + '/invoices/' + encodeURIComponent(p.invoice), target: '_blank', rel: 'noopener', class: 'mono', text: p.invoice });
+      if (!can) return '\u2013';
+      return el('button', { type: 'button', class: 'btn-link', text: 'Make invoice', on: { click: function () {
+        AC.confirm({ title: 'Make an invoice for ' + AC.money(p.amountPaise) + '?', text: 'It gets the next invoice number and the institute\u2019s details as they are now. An invoice can\u2019t be deleted, and its payment can then no longer be removed.', confirmLabel: 'Make invoice' })
+          .then(function (ok) {
+            if (!ok) return;
+            AC.api('POST', '/api/console/institutes/' + encodeURIComponent(i.id) + '/payments/' + encodeURIComponent(p.id) + '/invoice', {}).then(function (r) {
+              AC.toast('Invoice ' + r.invoice.number + ' made.'); page.load();
+            }, function (err) { if (err.code !== 'cancelled') AC.toast(err.message, 'bad'); });
+          });
+      } } });
+    };
+    AC.fill('paymentsBody', AC.table([['Day'], ['Amount', 'num'], ['How', 'col-wide'], ['Reference', 'col-wide'], ['Invoice', 'col-wide'], ['Recorded by', 'col-wide'], ['', 'col-act']], d.payments.map(function (p) {
       return el('tr', null, [
         el('td', null, [el('span', { class: 'cell-main', text: day(p.paidOn) }), p.note ? el('div', { class: 'cell-sub', text: p.note }) : null]),
         el('td', { class: 'num', text: AC.money(p.amountPaise) }),
         el('td', { class: 'col-wide', text: AC.method(p.method) }),
         el('td', { class: 'col-wide mono', text: p.reference || '–' }),
+        el('td', { class: 'col-wide' }, invoiceCell(p)),
         el('td', { class: 'col-wide', text: p.recordedBy }),
-        el('td', { class: 'col-act' }, can ? el('button', { type: 'button', class: 'btn-link btn-link-danger', text: 'Remove', on: { click: function () { AC.institutes.removePayment(i, p).then(after); } } }) : null)
+        el('td', { class: 'col-act' }, can && !p.invoice ? el('button', { type: 'button', class: 'btn-link btn-link-danger', text: 'Remove', on: { click: function () { AC.institutes.removePayment(i, p).then(after); } } }) : null)
       ]);
     })));
   }

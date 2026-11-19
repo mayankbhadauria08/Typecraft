@@ -267,6 +267,9 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `{ students: [{ name, email }] }` (≤ 25) → `{ sent, skipped: [{ email, why }] }`; `GET …/invites`. Nightly reminders.
 - Email templates `student_invite` `{ name, instituteName*, batchName*, batchCode*, joinPath* }`, `institute_reminder`
   `{ name, instituteName*, kind*, seats, seatsUsed, lastDay, days, link }`.
+- Institute invoices (`src/institute-invoices.js`, docs/INSTITUTES.md §14): `POST /api/console/institutes/:id/payments/:pid/invoice`
+  (institutes.payments), `GET /api/console/institutes/:id/invoices/:number`; admins: `GET /api/institutes/:id/invoices`,
+  `GET /api/institutes/:id/invoices/:number`. Page `/institute/:id/invoices/:number` (public, bare, noindex; data via the APIs).
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

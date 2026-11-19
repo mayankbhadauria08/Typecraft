@@ -269,3 +269,18 @@ Every change is in the institute's history: `institute.target_set`, `target_clea
   seats or more), 30 days before its last day, and 7 days before. Each once a term (`institute_reminders`,
   keyed by the term's end, so a renewal starts them again), to its active admins and its contact email,
   `institute_reminder` template, "reply to this email" to add seats or renew.
+
+## 14. Release 2: invoices for institute payments — `src/institute-invoices.js`
+
+- Console › an institute › Payments: **Make invoice** on a recorded payment (`institutes.payments`, asks for
+  the password again). It takes the next number of the one TypeCraft series (`TC-YYYY-NNNNNN`, shared
+  with customers' invoices), and copies the institute's details (name, contact, city, email, phone,
+  GSTIN) and the seller's (console Settings) as they are then. Made once per payment; an invoice can't
+  be deleted, and its payment can no longer be removed (ask your CA about a credit note).
+- The line says the plan, seats and term, and "(part payment)" when the payment is less than seats ×
+  price. Like every TypeCraft invoice for now, **no GST is added**: "GST not applicable" while the seller
+  has no GSTIN; with one, the invoice says GST is not added. Charging GST (rate, CGST/SGST or IGST by
+  state) is for your CA to decide before it is built.
+- The printable page `/institute/:id/invoices/:number` ("Print or save as PDF") holds no data: it asks the
+  institute's API (its admins) or the console's (TypeCraft staff with a money permission). The institute's
+  admins see **Invoices** on their institute page.

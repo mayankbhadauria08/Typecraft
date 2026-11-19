@@ -103,6 +103,19 @@
     load();
   }
 
+  /* Invoices (admins): GET /api/institutes/:id/invoices → { invoices: [{ number, amountPaise, issuedAt }] }. */
+  async function invoices() {
+    const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}/invoices`);
+    const sec = $('#io-inv-sec');
+    sec.hidden = !(res.ok && res.data.invoices.length);
+    if (sec.hidden) return;
+    K.mount($('#io-inv'), K.table([
+      { label: 'Invoice', value: (v) => h('a', { href: `/institute/${encodeURIComponent(id)}/invoices/${encodeURIComponent(v.number)}`, class: 'mono', text: v.number }) },
+      { label: 'Date', value: (v) => K.date(v.issuedAt) },
+      { label: 'Amount', num: true, value: (v) => K.money(v.amountPaise) },
+    ], res.data.invoices, { caption: 'Invoices' }));
+  }
+
   async function load() {
     const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}`);
     if (!res.ok) {
@@ -117,7 +130,7 @@
     K.mount($('#io-note'), note(i));
     stats(i);
     batches(data);
-    if (data.role === 'admin') staff();
+    if (data.role === 'admin') { staff(); invoices(); }
   }
   load();
 })();

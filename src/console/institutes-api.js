@@ -220,6 +220,12 @@ export async function getInstitute(request, env, ctx, params) {
         : DB.prepare('SELECT 1 WHERE 0'),
     ]);
     const paid = payments.results.reduce((s, p) => s + p.amount_paise, 0);
+    // invoices made for payments (migration 0010; none before it)
+    let invoiced = new Map();
+    if (money) {
+      try { invoiced = new Map((await DB.prepare('SELECT payment_id, number FROM institute_invoices WHERE institute_id = ?1').bind(i.id).all()).results.map((r) => [r.payment_id, r.number])); }
+      catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
+    }
     return json({
       institute: fullView(i, money, used.results[0].n),
       money: money ? { pricePaise: i.price_paise, duePaise: i.seats * i.price_paise, paidPaise: paid } : null,
@@ -228,7 +234,7 @@ export async function getInstitute(request, env, ctx, params) {
       staff: staff.results.map((s) => ({ id: s.id, email: s.email, name: s.full_name || null, role: s.role, status: s.status,
         invitedAt: s.invited_at, joinedAt: s.joined_at, removedAt: s.removed_at })),
       payments: money ? payments.results.map((p) => ({ id: p.id, amountPaise: p.amount_paise, method: p.method, reference: p.reference, paidOn: p.paid_on,
-        note: p.note, recordedBy: p.recorder || 'Unknown', createdAt: p.created_at })) : null,
+        note: p.note, recordedBy: p.recorder || 'Unknown', createdAt: p.created_at, invoice: invoiced.get(p.id) || null })) : null,
       history: perms.includes('audit.view') ? history.results.map((a) => {
         const d = parseJson(a.detail, {});
         return { action: a.action, reason: d.reason || null, note: historyNote(a.action, d, money), actor: a.actor || 'System', createdAt: a.created_at };
@@ -259,6 +265,7 @@ function historyNote(action, d, money) {
   if (action === 'institute.student_remove') return [d.student, d.batch].filter(Boolean).join(' · ') || null;
   if (action === 'institute.student_move') return d.student ? `${d.student}: ${d.from} → ${d.to}` : null;
   if (action === 'institute.create') return d.seats ? `${d.seats} seats` : null;
+  if (action === 'institute.invoice' && money) return d.number ? `${d.number} · ${rupees(d.amountPaise || 0)}` : null;
   return null;
 }
 
@@ -375,6 +382,10 @@ export async function postPaymentRemove(request, env, ctx, params) {
     const reason = reasonOf(body);
     const p = await env.DB.prepare('SELECT * FROM institute_payments WHERE id = ?1 AND institute_id = ?2').bind(params.pid, i.id).first();
     if (!p) throw new HttpError(404, 'not_found', 'There is no payment with this ID.');
+    let inv = null;
+    try { inv = await env.DB.prepare('SELECT number FROM institute_invoices WHERE payment_id = ?1').bind(p.id).first(); }
+    catch (err) { if (!/no such table/i.test(String(err && err.message))) throw err; }
+    if (inv) throw new HttpError(409, 'invoiced', `Invoice ${inv.number} was made for this payment, so it can't be removed. Ask your CA about a credit note.`);
     await env.DB.prepare('DELETE FROM institute_payments WHERE id = ?1').bind(p.id).run();
     // the activity log keeps everything the row said
     await audit(env, { actorId: who.user.id, action: 'institute.payment_remove', target: target(i.id),
