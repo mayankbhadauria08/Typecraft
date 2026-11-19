@@ -1,7 +1,7 @@
 /* TypeCraft service worker: caches the app's own files so lessons and games work
    offline. Never caches anything under /api. A new version waits until the page
    asks it to take over ("Update ready, reload"). Bump VERSION with each release. */
-const VERSION = 'typecraft-next-13';
+const VERSION = 'typecraft-next-15';
 const FILES = ['manifest.webmanifest', 'icons/icon.svg', 'icons/favicon.svg', 'icons/icon-192.png', 'favicon.ico',
   'css/app.css', 'css/next.css', 'css/games.css', 'css/rewards.css', 'css/typewriter.css', 'css/plan.css',
   'shared/course-meta.js', 'shared/lesson-access.js', 'shared/rewards-rules.js', 'js/course.js', 'shared/course-edits.js', 'js/rewards-ui.js', 'js/typewriter.js', 'js/app.js',

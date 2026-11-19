@@ -3,21 +3,8 @@ export const meta = {
   path: '/account/invoices/:number', title: 'Invoice', description: 'A printable invoice.',
   access: 'user', layout: 'bare', nav: 'invoices', noindex: true,
 };
-export const body = `
-<div class="container narrow inv-page">
-  <div class="inv-tools field-row">
-    <a class="btn btn-ghost btn-sm" href="/account/invoices">&larr; All invoices</a>
-    <button class="btn btn-primary btn-sm" type="button" id="inv-print" disabled>Print or save as PDF</button>
-  </div>
-  <article class="card inv-sheet" id="inv-sheet" aria-labelledby="inv-h">
-    <header class="inv-top">
-      <div><p class="inv-brand">TypeCraft</p><div id="inv-seller" class="inv-block"><div class="skeleton" style="height:4rem;width:14rem"></div></div></div>
-      <div class="inv-meta"><h1 id="inv-h">Invoice <span id="inv-number" class="mono"></span></h1><dl id="inv-dates"></dl></div>
-    </header>
-    <div id="inv-body"><div class="skeleton" style="height:10rem"></div></div>
-  </article>
-</div>
-<style>
+/** The invoice sheet's styles, shared with an institute's invoice (./institute-invoice.js). */
+export const INVOICE_STYLE = `<style>
 .inv-page{padding-top:1.5rem;padding-bottom:3rem}
 .inv-tools{justify-content:space-between;margin-bottom:1rem}
 .inv-sheet{padding:clamp(1.25rem,4vw,2.5rem)}
@@ -45,6 +32,21 @@ export const body = `
   .badge{border:1px solid #888 !important}
   a{text-decoration:none}
 }
-</style>
+</style>`;
+export const body = `
+<div class="container narrow inv-page">
+  <div class="inv-tools field-row">
+    <a class="btn btn-ghost btn-sm" href="/account/invoices">&larr; All invoices</a>
+    <button class="btn btn-primary btn-sm" type="button" id="inv-print" disabled>Print or save as PDF</button>
+  </div>
+  <article class="card inv-sheet" id="inv-sheet" aria-labelledby="inv-h">
+    <header class="inv-top">
+      <div><p class="inv-brand">TypeCraft</p><div id="inv-seller" class="inv-block"><div class="skeleton" style="height:4rem;width:14rem"></div></div></div>
+      <div class="inv-meta"><h1 id="inv-h">Invoice <span id="inv-number" class="mono"></span></h1><dl id="inv-dates"></dl></div>
+    </header>
+    <div id="inv-body"><div class="skeleton" style="height:10rem"></div></div>
+  </article>
+</div>
+${INVOICE_STYLE}
 `;
 export default body;

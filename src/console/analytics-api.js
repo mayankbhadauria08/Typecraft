@@ -10,6 +10,7 @@ import '../../shared/course-meta.js';
 import { json, nowIso } from '../http.js';
 import { loadCourse, lessonTitle, levelName } from '../course-store.js';
 import { requireAdmin } from './session.js';
+import { keyStatsManySql } from '../key-stats.js';
 import { Binder, oneOf, istDay, istDayStart, istDayEnd, DAY_MS } from './lib.js';
 import { STUCK_TRIES, workingOn } from './progress-api.js';
 
@@ -69,8 +70,9 @@ export async function getLearningAnalytics(request, env) {
     stmt((b) => `SELECT level, COUNT(*) AS n, AVG(wpm) AS wpm FROM placement WHERE ${learnersOnly(b, 'user_id', owners)} GROUP BY level ORDER BY level`),
     stmt((b) => `SELECT ${SPEED_BANDS.map(([lo, hi], i) => `SUM(best >= ${lo}${hi == null ? '' : ` AND best < ${hi}`}) AS b${i}`).join(', ')} FROM (
                    SELECT user_id, MAX(best_wpm) AS best FROM lesson_scores WHERE best_wpm > 0 AND ${learnersOnly(b, 'user_id', owners)} GROUP BY user_id)`),
-    stmt((b) => `SELECT k, SUM(attempts) AS attempts, SUM(errors) AS errors, COUNT(*) AS learners FROM key_stats
-                  WHERE ${learnersOnly(b, 'user_id', owners)} GROUP BY k HAVING SUM(attempts) >= ${KEY_MIN}
+    stmt((b) => `SELECT k, SUM(attempts) AS attempts, SUM(errors) AS errors, COUNT(*) AS learners
+                   FROM (${keyStatsManySql((col) => learnersOnly(b, col, owners))})
+                  GROUP BY k HAVING SUM(attempts) >= ${KEY_MIN}
                   ORDER BY CAST(SUM(errors) AS REAL) / SUM(attempts) DESC, SUM(attempts) DESC LIMIT 10`),
   ]);
   const { edits } = await loadCourse(env);

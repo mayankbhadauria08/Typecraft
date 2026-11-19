@@ -69,11 +69,19 @@
     refund: { pending: ['On its way', 'warn'], processed: ['Sent', 'ok'], failed: ['Failed', 'bad'] },
     plan: { active: ['Active', 'ok'], upcoming: ['Starts later', ''], expired: ['Ended', ''], revoked: ['Ended early', 'bad'] },
     access: { allow: ['Opened', 'ok'], deny: ['Closed', 'bad'] },
-    email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] }
+    email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] },
+    support: { new: ['New', 'warn'], answered: ['Answered', 'ok'], closed: ['Closed', ''] },
+    campaign: { draft: ['Draft', ''], scheduled: ['Scheduled', 'warn'], sending: ['Sending', 'warn'], sent: ['Sent', 'ok'], cancelled: ['Stopped', 'bad'] },
+    notice: { live: ['Showing', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] },
+    coupon: { live: ['Works now', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Expired', ''], used_up: ['Used up', ''], off: ['Off', ''] },
+    promotion: { live: ['On now', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] },
+    institute: { pending: ['Not paid yet', 'warn'], active: ['On', 'ok'], suspended: ['Paused', 'bad'], closed: ['Closed', ''] },
+    staff: { invited: ['Invited', 'warn'], active: ['Joined', 'ok'], removed: ['Removed', ''] }
   };
   /** A badge for a state: AC.status('order', 'paid'). */
   function status(kind, key) { var p = (STATUS[kind] || {})[key] || [key, '']; return badge(p[0], p[1]); }
-  var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer' };
+  var METHOD = { card: 'Card', upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later', bank_transfer: 'Bank transfer',
+    cheque: 'Cheque', cash: 'Cash', other: 'Other', razorpay: 'Online (Razorpay)' };
   function method(key) { return key ? (METHOD[key] || key) : '\u2013'; }
   var SOURCE = { purchase: 'Bought', admin: 'Given by staff', promo: 'Promotion' };
   function source(key) { return SOURCE[key] || key; }
@@ -88,6 +96,13 @@
     options.timeZone = ZONE;
     return new Intl.DateTimeFormat(LOCALE, options).format(d);
   }
+  /** ISO time → the value of a datetime-local field in this browser's time ('' for none), and back. */
+  function localInput(iso) {
+    var d = new Date(iso); if (!iso || isNaN(d)) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fromLocalInput(value) { if (!value) return null; var d = new Date(value); return isNaN(d) ? null : d.toISOString(); }
   var fmt = {
     date: function (iso) { return shown(iso, { day: 'numeric', month: 'short', year: 'numeric' }); },
     /** '2026-11-18' (an India day, as the server sends it) → '18 Nov'. */
@@ -111,7 +126,9 @@
       if (isNaN(left)) return '';
       if (left < 1) return 'in under a minute';
       if (left < 60) return 'in ' + left + ' min';
-      return 'in ' + Math.floor(left / 60) + ' h ' + (left % 60) + ' min';
+      if (left < 48 * 60) return 'in ' + Math.floor(left / 60) + ' h ' + (left % 60) + ' min';
+      var days = Math.round(left / 1440);
+      return 'in ' + days + ' days';
     }
   };
 
@@ -201,7 +218,8 @@
    * A dialog with fields. It stays open until opts.submit(values) succeeds, and shows what the server
    * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
    * opts: { title, text, submitLabel, danger, submit(values) → Promise,
-   *         fields: [{ name, label, type: 'text' | 'textarea' | 'number' | 'select' | 'radio', value, required,
+   *         fields: [{ name, label, type: 'text' | 'email' | 'date' | 'textarea' | 'number' | 'select' | 'radio' | 'checks' (an array) | 'checkbox' (true/false)
+   *                    | 'datetime' (local 'YYYY-MM-DDTHH:MM'), value, required,
    *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint } | { group, options }] }] }
    */
   function formDialog(opts) {
@@ -222,12 +240,29 @@
           Array.prototype.forEach.call(row.querySelectorAll('input'), function (input) { clearOnChange(f.name, input); });
           return row;
         }
+        if (f.type === 'checks' || f.type === 'checkbox') {
+          // checks: several boxes, read as an array of the ticked values; checkbox: one box, read as true or false
+          var boxes = f.type === 'checkbox' ? [{ value: 'on', label: f.label, hint: f.hint }] : f.options;
+          var ticked = f.type === 'checkbox' ? (f.value ? ['on'] : []) : (f.value || []).map(String);
+          var inputs = boxes.map(function (o, i) {
+            var input = el('input', { type: 'checkbox', id: id + '-' + i, value: o.value, checked: ticked.indexOf(String(o.value)) !== -1 });
+            return el('label', { class: 'choice', for: id + '-' + i }, [input, el('span', null, [el('span', { class: 'choice-label', text: o.label }), o.hint ? el('span', { class: 'choice-hint', text: o.hint }) : null])]);
+          });
+          controls[f.name] = { read: function () {
+            var on = Array.prototype.filter.call(row.querySelectorAll('input'), function (x) { return x.checked; }).map(function (x) { return x.value; });
+            return f.type === 'checkbox' ? on.length > 0 : on;
+          }, node: null, first: function () { return row.querySelector('input'); } };
+          row = el('fieldset', { class: 'field choices' + (f.type === 'checkbox' ? ' choices-one' : '') }, [f.type === 'checkbox' ? null : el('legend', { text: f.label }), inputs,
+            f.type !== 'checkbox' && f.hint ? el('p', { class: 'field-hint', text: f.hint }) : null, err]);
+          Array.prototype.forEach.call(row.querySelectorAll('input'), function (input) { input.addEventListener('change', function () { if (!errors[f.name].hidden) showError(f.name, ''); }); });
+          return row;
+        }
         if (f.type === 'textarea') control = el('textarea', { id: id, rows: f.rows || 3, maxlength: f.maxlength, placeholder: f.placeholder });
         else if (f.type === 'select') control = el('select', { id: id }, (f.options || []).map(function (o) {
           if (o.group) return el('optgroup', { label: o.group }, o.options.map(function (x) { return el('option', { value: x.value, text: x.label }); }));
           return el('option', { value: o.value, text: o.label });
         }));
-        else control = el('input', { id: id, type: f.type === 'number' ? 'number' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
+        else control = el('input', { id: id, type: f.type === 'number' || f.type === 'date' || f.type === 'email' ? f.type : f.type === 'datetime' ? 'datetime-local' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
           inputmode: f.inputmode || (f.type === 'number' ? 'numeric' : null), autocomplete: 'off' });
         if (f.value !== undefined && f.value !== null) control.value = String(f.value);
         controls[f.name] = { read: function () { return control.value; }, node: control, first: function () { return control; } };
@@ -258,7 +293,7 @@
         fields.forEach(function (f) {
           var v = controls[f.name].read();
           values[f.name] = typeof v === 'string' ? v.trim() : v;
-          var missing = f.required && !values[f.name];
+          var missing = f.required && (Array.isArray(values[f.name]) ? !values[f.name].length : !values[f.name]);
           showError(f.name, missing ? (f.requiredText || 'Fill this in.') : '');
           if (missing && !firstBad) firstBad = controls[f.name].first();
         });
@@ -731,7 +766,7 @@
   window.AC = {
     base: base, boot: boot, me: me,
     can: function (permission) { return !!(me && me.permissions.indexOf(permission) !== -1); },
-    el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, badge: badge, toast: toast, busy: busy,
+    el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, localInput: localInput, fromLocalInput: fromLocalInput, badge: badge, toast: toast, busy: busy,
     status: status, method: method, source: source,
     confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, listPage: listPage, options: options,
     record: record, head: head, notice: notice, fill: fill, quiet: quiet, table: table, fact: fact, facts: facts, idFact: idFact, copyButton: copyButton, timeline: timeline,

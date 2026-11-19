@@ -19,6 +19,7 @@ export default `
   </header>
 
   <div id="planNotice" aria-live="polite"></div>
+  <div id="saleNote"></div>
   <div class="plan-grid" id="plans" aria-live="polite" aria-busy="true">
     <div class="plan-card skeleton" style="min-height:420px"></div><div class="plan-card skeleton" style="min-height:420px"></div><div class="plan-card skeleton" style="min-height:420px"></div><div class="plan-card skeleton" style="min-height:420px"></div>
   </div>

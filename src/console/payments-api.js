@@ -10,6 +10,7 @@
 // Nothing here marks an order paid by itself: only a payment Razorpay reports as captured
 // for that order and amount does (reconcileOrder() in src/billing.js).
 import { HttpError, json, nowIso, clientIp } from '../http.js';
+import { orderDiscount } from '../pricing.js';
 import { hitLimit, emailEnabled } from '../session.js';
 import * as rzp from '../razorpay.js';
 import { audit, reconcileOrder } from '../billing.js';
@@ -171,7 +172,10 @@ export async function getPayment(request, env, ctx, params) {
     refundedPaise: y.refunded, refundablePaise: ['captured', 'partially_refunded'].includes(y.status) ? Math.max(0, y.amount_paise - y.refunded - y.refunding) : 0,
   }));
   const refundable = attempts.some((y) => y.refundablePaise > 0);
+  // a coupon or a sale on this order (migration 0016; none before it)
+  const d = await orderDiscount(env, o.id);
   return json({
+    discount: d ? { source: d.source, label: d.label, code: d.code || null, listPaise: d.list_price_paise, discountPaise: d.discount_paise, couponId: d.coupon_id || null } : null,
     order: {
       id: o.id, status: o.status, amountPaise: o.amount_paise, currency: o.currency, packageId: o.package_id, packageName: o.package_name,
       razorpayOrderId: o.razorpay_order_id || null, failureReason: o.status === 'paid' ? null : (o.failure_reason || null),

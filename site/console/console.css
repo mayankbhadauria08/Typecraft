@@ -795,6 +795,50 @@ td .none { color: var(--ink-3); }
 .level-block .table-panel { margin-bottom: 12px; }
 tr.row-quiet td { color: var(--ink-3); }
 
+/* ---------- Phase 4: support ---------- */
+.seg-counts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: -4px 0 14px; }
+.seg-count { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.seg-count b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.msg-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 15px; margin: 0; }
+.thread { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.thread > li { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.thread > li.is-note { background: color-mix(in srgb, var(--warn, #b7791f) 7%, var(--surface)); border-style: dashed; }
+.thread-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--ink-2); }
+.thread-head b { color: var(--ink); font-weight: 600; }
+.thread-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; margin: 0; }
+.handling .field { margin-bottom: 12px; }
+.handling select { width: 100%; }
+
+/* ---------- Email campaigns, the email log, Notifications (Phase 4b) ---------- */
+.limit-bar { margin: -4px 0 14px; }
+.limit-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: 14px; }
+.limit-inner > .ic { color: var(--accent); }
+.mail-preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mail-preview-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.mail-preview-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; max-width: 72ch; white-space: pre-line; overflow-wrap: anywhere; }
+.mail-preview-foot { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 13px; }
+progress.meter { display: block; width: 100%; height: 10px; margin: 2px 0 14px; border: 0; border-radius: 999px; overflow: hidden; background: var(--hover); appearance: none; }
+progress.meter::-webkit-progress-bar { background: var(--hover); border-radius: 999px; }
+progress.meter::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
+progress.meter::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+.row-tools { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.notice-line { display: flex; align-items: flex-start; gap: 8px; }
+.notice-line > .ic { flex: none; margin-top: 2px; color: var(--accent); }
+.notice-line.tone-offer > .ic { color: var(--warn); }
+.notice-line.tone-warning > .ic { color: var(--bad); }
+
+/* Institutes (docs/INSTITUTES.md §7) */
+.pre-wrap { white-space: pre-wrap; }
+
+.cap-panel { margin-bottom: 16px; }
+.cap-panel p { margin-top: 6px; }
+.cap-panel .panel-head .btn { margin-top: 0; }
+.cap-meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 10px; }
+.cap-fill { display: block; height: 100%; background: var(--teal-deep); }
+.cap-warn .cap-fill { background: var(--bad); }
+.cap-w0 { width: 1%; } .cap-w1 { width: 10%; } .cap-w2 { width: 20%; } .cap-w3 { width: 30%; } .cap-w4 { width: 40%; } .cap-w5 { width: 50%; }
+.cap-w6 { width: 60%; } .cap-w7 { width: 70%; } .cap-w8 { width: 80%; } .cap-w9 { width: 90%; } .cap-w10 { width: 100%; }
+
 /* ---------- Learning access: customers matching a search (problem log #7) ---------- */
 .match-box { margin: -4px 0 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
 .match-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }

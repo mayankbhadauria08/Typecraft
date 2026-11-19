@@ -12,9 +12,12 @@ import { uuid, sha256Hex } from './crypto.js';
 import * as rzp from './razorpay.js';
 import { ensureInvoice, invoiceView } from './invoices.js';
 import { entitlementsFor, has } from './entitlements.js';
+import { keyStatsSql } from './key-stats.js';
 import { sendTemplate } from './mail.js';
 import { todayOf } from './api.js';
 import { remember, PUBLIC_DATA_TTL } from './memo.js';
+import { priceFor, livePromotions, withSales, orderDiscount, cleanCode } from './pricing.js';
+import { instituteWebhook } from './institute-checkout.js';
 
 const DAY_MS = 86400000;
 const MIN_MS = 60000;
@@ -66,7 +69,9 @@ export async function getPackages(request, env) {
     const labels = Object.fromEntries(ft.results.map((f) => [f.key, f.label]));
     return { packages: pk.results.map((p) => packageView(p, labels)), features: catalogueView(ft.results) };
   });
-  return json(body, 200, { 'Cache-Control': 'public, max-age=60' });
+  // a sale lowers pricePaise and adds listPricePaise and sale (src/pricing.js)
+  const sales = await livePromotions(env);
+  return json(sales.length ? { ...body, packages: withSales(body.packages, sales) } : body, 200, { 'Cache-Control': 'public, max-age=60' });
 }
 
 /* ---------------- GET /api/me/entitlements ---------------- */
@@ -75,48 +80,81 @@ export async function getEntitlements(request, env) {
   return json(await entitlementsFor(env, user.id));
 }
 
-/* ---------------- POST /api/checkout/order ---------------- */
+/* ---------------- POST /api/checkout/quote and /api/checkout/order ---------------- */
+async function checkoutPlan(env, body) {
+  const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
+  if (!packageId) throw fieldError({ packageId: 'Choose a plan.' });
+  const pkg = await env.DB.prepare('SELECT * FROM packages WHERE id = ?1 AND active = 1').bind(packageId).first();
+  if (!pkg) throw fieldError({ packageId: 'That plan is not available.' });
+  if (!(pkg.price_paise > 0)) throw new HttpError(400, 'free_package', 'The Free plan needs no payment.');
+  return pkg;
+}
+const quoteView = (q) => ({
+  listPaise: q.listPaise, pricePaise: q.pricePaise, note: q.note,
+  discount: q.discount ? { source: q.discount.source, label: q.discount.label, name: q.discount.name, paise: q.discount.paise, code: q.discount.code } : null,
+});
+
+/** What the customer would pay, with an optional coupon code: { listPaise, pricePaise, discount, note }. */
+export async function postQuote(request, env) {
+  const { user } = await requireSession(env, request);
+  const body = await readJson(request);
+  const pkg = await checkoutPlan(env, body);
+  // trying codes one after another is limited (guessing)
+  if (cleanCode(body.code) && !(await hitLimit(env, `coupon:${user.id}`, 20, 3600))) throw tooMany(60);
+  const q = await priceFor(env, pkg, { userId: user.id, code: body.code });
+  return json({ packageId: pkg.id, currency: pkg.currency, ...quoteView(q) });
+}
+
 export async function postOrder(request, env) {
   const { user } = await requireSession(env, request);
   const body = await readJson(request);
-  const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
-  if (!packageId) throw fieldError({ packageId: 'Choose a plan.' });
   const DB = env.DB;
-  const pkg = await DB.prepare('SELECT * FROM packages WHERE id = ?1 AND active = 1').bind(packageId).first();
-  if (!pkg) throw fieldError({ packageId: 'That plan is not available.' });
-  if (!(pkg.price_paise > 0)) throw new HttpError(400, 'free_package', 'The Free plan needs no payment.');
+  const pkg = await checkoutPlan(env, body);
   await assertPayments(env);
   if (!(await hitLimit(env, `checkout:${user.id}`, 20, 3600))) throw tooMany(60);
+  const q = await priceFor(env, pkg, { userId: user.id, code: body.code });
+  const d = q.discount;
 
   const out = (o) => json({
     orderId: o.id, razorpayOrderId: o.razorpay_order_id, amountPaise: o.amount_paise, currency: o.currency,
     keyId: env.RAZORPAY_KEY_ID, packageId: pkg.id, packageName: pkg.name,
     prefill: { name: user.fullName, email: user.email, contact: user.phoneNumber || '' },
+    ...quoteView(q),
   });
+  // the same unpaid order from the last 30 minutes is used again (a second press of Pay), if its discount is the same too
   const cutoff = new Date(Date.now() - 30 * MIN_MS).toISOString();
   const reuse = await DB.prepare(
     `SELECT * FROM orders WHERE user_id = ?1 AND package_id = ?2 AND status = 'created' AND razorpay_order_id IS NOT NULL
         AND amount_paise = ?3 AND currency = ?4 AND created_at > ?5 ORDER BY created_at DESC LIMIT 1`
-  ).bind(user.id, pkg.id, pkg.price_paise, pkg.currency, cutoff).first();
-  if (reuse) return out(reuse);
+  ).bind(user.id, pkg.id, q.pricePaise, pkg.currency, cutoff).first();
+  if (reuse) {
+    const had = await orderDiscount(env, reuse.id);
+    const key = (x) => (x ? (x.coupon_id || x.couponId || x.promotion_id || x.promotionId || 'x') : null);
+    if (key(had) === key(d)) return out(reuse);
+  }
 
   const id = 'ord_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
   const now = nowIso();
-  await DB.prepare(`INSERT INTO orders (id, user_id, package_id, amount_paise, currency, status, created_at, updated_at)
-                    VALUES (?1, ?2, ?3, ?4, ?5, 'created', ?6, ?6)`).bind(id, user.id, pkg.id, pkg.price_paise, pkg.currency, now).run();
+  const stmts = [DB.prepare(`INSERT INTO orders (id, user_id, package_id, amount_paise, currency, status, created_at, updated_at)
+                    VALUES (?1, ?2, ?3, ?4, ?5, 'created', ?6, ?6)`).bind(id, user.id, pkg.id, q.pricePaise, pkg.currency, now)];
+  if (d) stmts.push(DB.prepare(`INSERT INTO order_discounts (order_id, user_id, list_price_paise, discount_paise, source, coupon_id, promotion_id, code, label, created_at)
+                                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`)
+    .bind(id, user.id, q.listPaise, d.paise, d.source, d.couponId, d.promotionId, d.code, d.label, now));
+  await DB.batch(stmts);
   let r;
   try {
-    r = await rzp.createOrder(env, { amount: pkg.price_paise, currency: pkg.currency, receipt: id, notes: { orderId: id, userId: user.id, packageId: pkg.id } });
+    r = await rzp.createOrder(env, { amount: q.pricePaise, currency: pkg.currency, receipt: id, notes: { orderId: id, userId: user.id, packageId: pkg.id, ...(d && d.code ? { coupon: d.code } : {}) } });
   } catch (err) {
     await DB.prepare("UPDATE orders SET status = 'failed', failure_reason = 'Could not start the payment.', updated_at = ?2 WHERE id = ?1").bind(id, nowIso()).run();
     throw err;
   }
-  if (!r || typeof r.id !== 'string' || r.amount !== pkg.price_paise) {
+  if (!r || typeof r.id !== 'string' || r.amount !== q.pricePaise) {
     await DB.prepare("UPDATE orders SET status = 'failed', failure_reason = 'Could not start the payment.', updated_at = ?2 WHERE id = ?1").bind(id, nowIso()).run();
     throw new HttpError(502, 'payment_provider_error', 'The payment provider gave an unexpected answer. Please try again.');
   }
   await DB.prepare('UPDATE orders SET razorpay_order_id = ?2, updated_at = ?3 WHERE id = ?1').bind(id, r.id, nowIso()).run();
-  return out({ id, razorpay_order_id: r.id, amount_paise: pkg.price_paise, currency: pkg.currency });
+  if (d) await audit(env, { actorId: user.id, action: 'checkout.discount', target: `order:${id}`, detail: { source: d.source, code: d.code, promotionId: d.promotionId, paise: d.paise } });
+  return out({ id, razorpay_order_id: r.id, amount_paise: q.pricePaise, currency: pkg.currency });
 }
 
 /* ---------------- payments, fulfilment, failures ---------------- */
@@ -455,14 +493,14 @@ async function processWebhook(env, ctx, type, payload) {
     case 'order.paid': {
       if (!pay) return { status: 'ignored', note: 'no payment' };
       const order = await orderForRazorpay(env, pay.order_id || (ord && ord.id));
-      if (!order) return { status: 'ignored', note: 'unknown order' };
+      if (!order) return instituteWebhook(env, ctx, type, pay, ord); // seats for an institute (src/institute-checkout.js), or unknown
       const r = await handlePayment(env, ctx, order, pay, 'webhook');
       return r.status === 'mismatch' ? { status: 'ignored', note: 'payment does not match order' } : { status: 'processed' };
     }
     case 'payment.failed': {
       if (!pay) return { status: 'ignored', note: 'no payment' };
       const order = await orderForRazorpay(env, pay.order_id);
-      if (!order) return { status: 'ignored', note: 'unknown order' };
+      if (!order) return instituteWebhook(env, ctx, type, pay, ord);
       if (pay.amount !== order.amount_paise) return { status: 'ignored', note: 'payment does not match order' };
       await recordPayment(env, order, { ...pay, status: 'failed' }, 'webhook');
       await markFailed(env, ctx, order, pay.error_description || 'The payment did not go through.');
@@ -661,7 +699,7 @@ export async function getAnalytics(request, env) {
   const [daily, tests, ks, bg, ec] = (await DB.batch([
     DB.prepare('SELECT day, seconds, runs, best_wpm, acc_sum, acc_count, xp FROM daily_totals WHERE user_id = ?1 AND day >= ?2 AND day <= ?3 ORDER BY day').bind(user.id, from, today),
     DB.prepare('SELECT day, COUNT(*) AS n, AVG(wpm) AS wpm, MAX(wpm) AS best, AVG(accuracy) AS acc FROM typing_tests WHERE user_id = ?1 AND day >= ?2 GROUP BY day ORDER BY day').bind(user.id, from),
-    DB.prepare('SELECT k, attempts, errors FROM key_stats WHERE user_id = ?1').bind(user.id),
+    DB.prepare(keyStatsSql('?1')).bind(user.id),
     DB.prepare('SELECT pair, count, total_ms FROM bigram_stats WHERE user_id = ?1 AND count >= 3').bind(user.id),
     DB.prepare('SELECT cls, n FROM error_classes WHERE user_id = ?1').bind(user.id),
   ])).map((r) => r.results);
@@ -803,6 +841,7 @@ export async function cron(env, ctx, kind) {
 export const ROUTES = {
   'GET /api/packages': getPackages,
   'GET /api/me/entitlements': getEntitlements,
+  'POST /api/checkout/quote': postQuote,
   'POST /api/checkout/order': postOrder,
   'POST /api/checkout/verify': postVerify,
   'POST /api/checkout/failed': postFailed,

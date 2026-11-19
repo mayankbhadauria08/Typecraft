@@ -29,6 +29,14 @@ const EXPECTED = [
   ['/account/invoices', 'user', 'account'],
   ['/account/invoices/:number', 'user', 'bare'],
   ['/account/settings', 'user', 'account'],
+  ['/join', 'user', 'account'],
+  ['/join/:code', 'user', 'account'],
+  ['/institute', 'user', 'account'],
+  ['/institute/buy', 'user', 'account'],
+  ['/institute/:id', 'user', 'account'],
+  ['/institute/:id/batches/:bid', 'user', 'account'],
+  ['/institute/:id/students/:mid', 'user', 'account'],
+  ['/institute/:id/invoices/:number', 'public', 'bare'],
   ['/checkout', 'user', 'account'],
   ['/payment/processing', 'user', 'bare'],
   ['/payment/success', 'user', 'account'],
@@ -186,6 +194,18 @@ const SAMPLE = [
   [/\/api\/admin\/emails\/\$\{[^}]+\}/, '/api/admin/emails/em_none'],
   [/\/api\/admin\/contact\/\$\{[^}]+\}/, '/api/admin/contact/msg_none'],
   [/\/api\/me\/certificates\/\$\{[^}]+\}/, '/api/me/certificates/ABCD-EFGH-JKLM'],
+  [/\/api\/me\/institutes\/\$\{[^}]+\}/, '/api/me/institutes/mem_00000000000000000000'],
+  [/\/api\/me\/institute-invites\/\$\{[^}]+\}\/\$\{[^}]+\}/, '/api/me/institute-invites/stf_00000000000000000000/accept'],
+  [/\/api\/institutes\/checkout\/orders\/\$\{[^}]+\}/, '/api/institutes/checkout/orders/iord_00000000000000000000'],
+  [/\/api\/institutes\/\$\{[^}]+\}/, '/api/institutes/ins_00000000000000000000'],
+  [/\/batches\/\$\{[^}]+\}/, '/batches/bat_00000000000000000000'],
+  [/\/staff\/\$\{[^}]+\}/, '/staff/stf_00000000000000000000'],
+  [/\/students\/\$\{[^}]+\}/, '/students/mem_00000000000000000000'],
+  [/\/assignments\/\$\{[^}]+\}/, '/assignments/asg_00000000000000000000'],
+  [/\/api\/me\/batch-tests\/\$\{[^}]+\}/, '/api/me/batch-tests/btst_00000000000000000000'],
+  [/\/tests\/\$\{[^}]+\}/, '/tests/btst_00000000000000000000'],
+  [/\/api\/console\/institutes\/\$\{[^}]+\}/, '/api/console/institutes/ins_00000000000000000000'],
+  [/\/invoices\/\$\{[^}]+\}/, '/invoices/TC-2026-999999'],
 ];
 function apiCalls() {
   const out = new Set();
@@ -224,6 +244,7 @@ test('every API call made by a page script reaches a real endpoint', async () =>
     const r = await call(method, path);
     const generic = r.status === 404 && r.body && r.body.error && r.body.error.message === 'Not found.';
     assert.ok(!generic && r.status !== 405, `${c} → ${r.status} ${JSON.stringify(r.body)}`);
-    assert.notEqual(r.status, 401, `${c} needs a session the test has`);
+    // a console API needs a console session (a different sign-in): reached, but 401 here
+    if (!path.startsWith('/api/console/')) assert.notEqual(r.status, 401, `${c} needs a session the test has`);
   }
 });

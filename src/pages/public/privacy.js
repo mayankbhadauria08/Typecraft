@@ -24,6 +24,7 @@ export default `
       <li><b>Learning data</b>: which lessons and games you completed, your speed, accuracy and errors, and per-key and letter-pair counts used by the coach. We store results and counts, not a recording of everything you type.</li>
       <li><b>Typing tests</b>: the length, speed, accuracy and error count of tests you take while signed in.</li>
       <li><b>Exam practice</b>: for tests you save, the test, the time used, and the counts of key depressions and mistakes. What you typed is marked and then discarded, not stored.</li>
+      <li><b>Institutes</b>: if you join an institute's batch with its code, which institute and batch, when you joined and left, and that you confirmed you are 18 or older. If you help run an institute, your role there and the invitations you sent or received.</li>
       <li><b>Payments</b>: the plan, amount, status, dates and the payment reference from Razorpay. Card numbers, UPI PINs and bank logins go directly to Razorpay and never reach us.</li>
       <li><b>Messages</b>: what you send through the contact form or by email, and a record of the emails we send you (type, time, delivery status).</li>
       <li><b>Security data</b>: your IP address and browser type, used to limit repeated sign-in attempts and to tell you about sign-ins from a new device.</li>
@@ -34,6 +35,7 @@ export default `
       <li>To run your account and save your progress across devices.</li>
       <li>To build your review drills, analytics and certificates.</li>
       <li>To let anyone you give a certificate code check that certificate: the check shows your name, the result and the date, and nothing else. You can stop sharing a certificate at any time on your Certificates page.</li>
+      <li>If you are in an institute's batch: to show that institute's admins, and your batch's teachers, your name, email, course progress, speeds, accuracy, practice time, weak keys, exam practice results and certificates, so they can teach you. This stops when you leave the batch (you can, any time, from Plans), when the institute removes you, or when its term ends. Your progress stays in your own account. The institute is a separate organisation and uses what it sees under our <a href="/institute-terms">terms for institutes</a>. If your institute turns on its batch leaderboard, the other students in your batch see your first name and your best speed of the last 7 days.</li>
       <li>To take payments, activate plans and issue invoices, as required by law.</li>
       <li>To send account emails: verification codes, password resets, receipts, plan reminders and security alerts. Announcements are optional and you can turn them off in your account settings.</li>
       <li>To keep the service secure and to fix problems.</li>

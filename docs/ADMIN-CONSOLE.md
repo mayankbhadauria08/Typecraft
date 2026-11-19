@@ -4,16 +4,17 @@ The new admin dashboard, built in six phases beside the current `/admin` pages. 
 map for whoever works on it next: what exists, how sign-in and permissions work, how to add a
 module, and what has to happen before it replaces the current admin.
 
-Status: **Phases 1 and 2 of 6 are built** (foundation; core operations). It lives at
-`/console`. The current `/admin` keeps working unchanged until the cutover in §9. Phase 2's
-work order, endpoints and rules: `docs/ADMIN-PHASE-2.md`.
+Status: **Phases 1 to 4 of 6 are built** (foundation; core operations; learning operations; business
+growth). It lives at `/console`. The current `/admin` keeps working unchanged until
+the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
+`docs/ADMIN-PHASE-3.md`, `docs/ADMIN-PHASE-4.md`.
 
 | Phase | Contents | Status |
 | --- | --- | --- |
 | 1 | Audit, admin sign-in, roles and permissions, migrations, the four-layer frame | built |
 | 2 | Core operations: dashboard, customers, payments, refunds, packages, subscriptions, learning access, the search box | built |
-| 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | Unlock conditions built (docs/UNLOCK-RULES.md); the rest not started |
-| 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | not started |
+| 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | built (docs/ADMIN-PHASE-3.md, docs/UNLOCK-RULES.md) |
+| 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | built in three parts: 4a Support and Business reports, 4b Email campaigns and Notifications, 4c Coupons and Promotions (docs/ADMIN-PHASE-4.md) |
 | 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | not started |
 | 6 | Optimisation, full test pass, cutover, delivery report | not started |
 
@@ -47,9 +48,9 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 `src/console/modules.js`; a module without a `path` is shown as a label with its phase, never as
 a link.
 
-1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
+1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access, Institutes (docs/INSTITUTES.md §7)
 2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
-3. **Business growth**: Coupons, Promotions, Email campaigns, Support, Notifications, Business reports
+3. **Business growth** (docs/ADMIN-PHASE-4.md): Coupons, Promotions, Email campaigns, Support, Notifications, Business reports (all built)
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
 
 ## 3. Sign-in and sessions
@@ -184,6 +185,18 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
+- `0016_coupons.sql` (Phase 4c): `coupons`, `promotions`, `order_discounts`. Three new tables, no row
+  changes, safe to run twice. Before it is applied, prices are the plans' own, codes are refused politely
+  at checkout, and the Coupons and Promotions pages answer "not switched on yet" (503).
+  Go-live steps: `docs/ADMIN-PHASE-4.md` §6 and `docs/LAUNCH.md` §1m.
+- `0015_campaigns.sql` (Phase 4b): `email_campaigns`, `campaign_sends`, `site_notices`. Three new tables,
+  no row changes, safe to run twice. Before it is applied, the campaign and notification pages answer
+  "not switched on yet" (503), learners see no notices, and the old Announcement works the old way.
+  Go-live steps: `docs/ADMIN-PHASE-4.md` §6 and `docs/LAUNCH.md` §1l.
+- `0014_support.sql` (Phase 4a; 0009 to 0013 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
+  changes, safe to run twice. Before it is applied, the Support pages answer "not switched on yet"
+  (503); Business reports need no new table. Go-live steps: `docs/ADMIN-PHASE-4.md` §4 and
+  `docs/LAUNCH.md` §1k.
 - `0007_course.sql` (Phase 3): `course_drafts`, `course_releases`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the course pages answer "not switched on yet"
   (503) and learners get the course exactly as it is in the code. Go-live steps:

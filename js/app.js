@@ -2773,3 +2773,40 @@ document.querySelectorAll('[data-share-link]').forEach(b => b.addEventListener('
   try { await navigator.clipboard.writeText(url); toast('Link copied. Paste it into WhatsApp or an email to yourself.'); }
   catch(e) { window.prompt('Copy this link and send it to yourself:', url); }
 }));
+
+/* ---------- messages from the TypeCraft team (written in the admin console: Notifications) ----------
+   GET /api/notices?place=trainer gives the ones for this learner, minus any this browser closed: a closed
+   message is kept in the tc_nd cookie, which the website shares, so it stays closed there too. */
+function closeNotice(id){
+  const m = document.cookie.match(/(?:^|;\s*)tc_nd=([^;]*)/);
+  const ids = (m ? decodeURIComponent(m[1]).split('.') : []).filter(x => x && x !== id).concat(id).slice(-10);
+  document.cookie = 'tc_nd=' + ids.join('.') + '; Path=/; Max-Age=' + 60 * 86400 + '; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+}
+async function loadNotices(){
+  const slot = document.getElementById('noticeSlot');
+  if(!slot || !navigator.onLine) return;
+  let data = null;
+  try { const r = await fetch('/api/notices?place=trainer', { credentials:'same-origin', cache:'no-store' }); if(r.ok) data = await r.json(); } catch(e) { data = null; }
+  if(!data || !Array.isArray(data.notices)) return;
+  slot.textContent = '';
+  data.notices.forEach(n => {
+    if(!/^ntc_[a-z0-9]{6,24}$/.test(n.id || '')) return;
+    const box = document.createElement('div');
+    box.className = 'tc-notice tone-' + (['info','offer','warning'].includes(n.tone) ? n.tone : 'info');
+    const p = document.createElement('p');
+    p.textContent = n.message;
+    if(n.linkUrl && (/^\/(?!\/)/.test(n.linkUrl) || /^https:\/\//.test(n.linkUrl))){
+      const a = document.createElement('a');
+      a.href = n.linkUrl; a.textContent = (n.linkLabel || 'Find out more') + ' \u2192';
+      if(/^https:/.test(n.linkUrl)){ a.target = '_blank'; a.rel = 'noopener'; }
+      p.appendChild(a);
+    }
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'tc-notice-x'; x.setAttribute('aria-label', 'Close this message'); x.textContent = '\u00d7';
+    x.addEventListener('click', () => { closeNotice(n.id); box.remove(); slot.hidden = !slot.children.length; });
+    box.append(p, x);
+    slot.appendChild(box);
+  });
+  slot.hidden = !slot.children.length;
+}
+setTimeout(loadNotices, 600);

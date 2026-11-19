@@ -9,6 +9,13 @@ import * as payments from './account/payments.js';
 import * as invoices from './account/invoices.js';
 import * as invoice from './account/invoice.js';
 import * as settings from './account/settings.js';
+import * as join from './account/join.js';
+import * as instituteHome from './account/institute-home.js';
+import * as instituteOne from './account/institute-one.js';
+import * as instituteBatch from './account/institute-batch.js';
+import * as instituteStudent from './account/institute-student.js';
+import * as instituteInvoice from './account/institute-invoice.js';
+import * as instituteBuy from './account/institute-buy.js';
 
 const KIT = '/site/js/pages-kit.js';
 // course-meta.js (static, shared with the app) gives lesson titles for "Continue lesson".
@@ -16,7 +23,8 @@ const COURSE = '/shared/course-meta.js';
 const page = (mod, script, extra = []) => ({ meta: mod.meta, body: mod.body, scripts: [...extra, KIT, `/site/js/${script}.js`] });
 
 export const PAGES = [
-  page(dashboard, 'account-dashboard', [COURSE]),
+  // the student's batch: target, assignments, leaderboard (docs/INSTITUTES.md §12)
+  { ...page(dashboard, 'account-dashboard', [COURSE]), scripts: [...page(dashboard, 'account-dashboard', [COURSE]).scripts, '/site/js/my-batch.js'] },
   page(profile, 'account-profile'),
   page(history, 'account-history'),
   page(certificates, 'account-certificates', ['/js/rewards-ui.js']),
@@ -26,5 +34,16 @@ export const PAGES = [
   page(invoices, 'account-invoices'),
   page(invoice, 'account-invoice'),
   page(settings, 'account-settings'),
+  // a student joins their institute's batch with its code (docs/INSTITUTES.md §4)
+  page(join, 'account-join'),
+  { ...page(join, 'account-join'), meta: join.codeMeta },
+  // the institute's own pages, for its admin and teachers (docs/INSTITUTES.md §8)
+  page(instituteHome, 'institute-home'),
+  // seats bought online with Razorpay (docs/INSTITUTES.md §15): institute-pay.js needs the kit first
+  { meta: instituteBuy.meta, body: instituteBuy.body, scripts: [KIT, '/site/js/institute-pay.js', '/site/js/institute-buy.js'] },
+  { meta: instituteOne.meta, body: instituteOne.body, scripts: [KIT, '/site/js/institute-pay.js', '/site/js/institute-one.js'] },
+  page(instituteBatch, 'institute-batch', ['/js/rewards-ui.js']),
+  page(instituteStudent, 'institute-student'),
+  page(instituteInvoice, 'institute-invoice'),
 ];
 export default PAGES;

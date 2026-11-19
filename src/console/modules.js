@@ -18,6 +18,7 @@ export const LAYERS = [
       { key: 'packages', label: 'Packages', icon: 'package', path: '/packages', permission: 'packages.view' },
       { key: 'subscriptions', label: 'Subscriptions', icon: 'calendar', path: '/subscriptions', permission: 'subscriptions.view' },
       { key: 'access', label: 'Learning access', icon: 'unlock', path: '/access', permission: 'access.view' },
+      { key: 'institutes', label: 'Institutes', icon: 'users', path: '/institutes', permission: 'institutes.view' },
     ],
   },
   {
@@ -36,12 +37,12 @@ export const LAYERS = [
   {
     key: 'growth', label: 'Business growth', hint: 'Sales and retention',
     modules: [
-      { key: 'coupons', label: 'Coupons', icon: 'hash', phase: 4 },
-      { key: 'promotions', label: 'Promotions', icon: 'sparkle', phase: 4 },
-      { key: 'emails', label: 'Email campaigns', icon: 'mail', phase: 4 },
-      { key: 'support', label: 'Support', icon: 'inbox', phase: 4 },
-      { key: 'notifications', label: 'Notifications', icon: 'send', phase: 4 },
-      { key: 'reports', label: 'Business reports', icon: 'receipt', phase: 4 },
+      { key: 'coupons', label: 'Coupons', icon: 'hash', path: '/coupons', permission: 'coupons.view' },
+      { key: 'promotions', label: 'Promotions', icon: 'sparkle', path: '/promotions', permission: 'promotions.view' },
+      { key: 'emails', label: 'Email campaigns', icon: 'mail', path: '/campaigns', permission: 'emails.view' },
+      { key: 'support', label: 'Support', icon: 'inbox', path: '/support', permission: 'support.view' },
+      { key: 'notifications', label: 'Notifications', icon: 'send', path: '/notifications', permission: 'notices.view' },
+      { key: 'reports', label: 'Business reports', icon: 'receipt', path: '/reports', permission: 'revenue.view' },
     ],
   },
   {

@@ -43,6 +43,9 @@ export const PERMISSIONS = [
   P('payments.export', 'core', 'Payments', 'Download the payments list', 'A spreadsheet of orders with customer names and emails. Asks for your password again.', 1, 0, { sensitive: true }),
   P('payments.refund', 'core', 'Payments', 'Issue refunds', 'Send money back through Razorpay. Asks for your password again.', 0, 0, { sensitive: true }),
   P('refunds.view', 'core', 'Refunds', 'See refunds', 'Every refund, whether it has reached the customer, and who sent it.', 1, 1),
+  P('institutes.view', 'core', 'Institutes', 'See institutes', 'Institutes with their seats, term, batches and staff.', 1, 1),
+  P('institutes.manage', 'core', 'Institutes', 'Set up and change institutes', 'Create an institute, invite its admin, change its seats and term, pause or close it.', 1, 0),
+  P('institutes.payments', 'core', 'Institutes', 'Record institute payments', 'Record money an institute paid by bank transfer, UPI or cheque. The first payment switches its seats on. Asks for your password again.', 1, 0, { sensitive: true }),
 
   // ----- Layer 2: learning operations -----
   P('course.view', 'learning', 'Course', 'See the course', 'Levels, modules, lessons and practice packs, with drafts and published versions.', 1, 1),
@@ -54,12 +57,21 @@ export const PERMISSIONS = [
   P('unlock.manage', 'learning', 'Unlock conditions', 'Change unlock conditions', 'Close or open a lesson or level for everyone, and set when each level opens. Asks for your password again.', 0, 0, { sensitive: true }),
 
   // ----- Layer 3: business growth -----
+  P('coupons.view', 'growth', 'Coupons', 'See coupons', 'Coupon codes, what they take off, and who used them.', 1, 1),
+  P('coupons.manage', 'growth', 'Coupons', 'Make and change coupons', 'Create, change, turn off and delete coupon codes. They change what customers pay. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('promotions.view', 'growth', 'Promotions', 'See sales', 'Sales: lower prices for everyone for a while, shown on the pricing page.', 1, 1),
+  P('promotions.manage', 'growth', 'Promotions', 'Run sales', 'Start, change, end and delete sales. They change what customers pay. Asks for your password again.', 0, 0, { sensitive: true }),
   P('revenue.view', 'growth', 'Business reports', 'See revenue reports', 'Revenue by day and by package, refunds and net totals.', 1, 0),
-  P('emails.view', 'growth', 'Email', 'See the email log', 'Emails sent to customers and whether they were delivered.', 1, 1),
-  P('emails.retry', 'growth', 'Email', 'Retry failed emails', 'Send a failed email again.', 1, 0),
-  P('emails.announce', 'growth', 'Email', 'Send announcements', 'Email an announcement to all, paid or free customers.', 1, 0),
-  P('support.view', 'growth', 'Support', 'See customer messages', 'Messages sent through the contact form.', 1, 1),
-  P('support.manage', 'growth', 'Support', 'Update customer messages', 'Mark a message answered or closed.', 1, 1),
+  P('emails.view', 'growth', 'Email campaigns', 'See campaigns and the email log', 'Email campaigns, and every email sent to customers with whether it was delivered.', 1, 1),
+  P('emails.retry', 'growth', 'Email campaigns', 'Retry failed emails', 'Send a failed email again.', 1, 0),
+  P('campaigns.write', 'growth', 'Email campaigns', 'Write campaigns', 'Write and change campaign drafts, and send a test to yourself.', 1, 0),
+  P('emails.announce', 'growth', 'Email campaigns', 'Send campaigns', 'Schedule a campaign, send it now, or stop it. It goes to everyone in its audience who gets product news.', 1, 0),
+  P('campaigns.limit', 'growth', 'Email campaigns', 'Change the daily email limit', 'How many campaign emails may go out in a day. Asks for your password again.', 0, 0, { ownerOnly: true, sensitive: true }),
+  P('support.view', 'growth', 'Support', 'See customer messages', 'Messages sent through the contact form, with replies and notes.', 1, 1),
+  P('support.reply', 'growth', 'Support', 'Reply to customers', 'Email a reply to a customer message from the console.', 1, 1),
+  P('support.manage', 'growth', 'Support', 'Update customer messages', 'Mark a message answered or closed, give it to someone on the team, and write notes.', 1, 1),
+  P('notices.view', 'growth', 'Notifications', 'See notifications', 'The short messages learners see on the website and in the trainer.', 1, 1),
+  P('notices.manage', 'growth', 'Notifications', 'Change notifications', 'Write, schedule, turn off and delete the messages learners see.', 1, 0),
 
   // ----- Layer 4: infrastructure -----
   P('settings.view', 'infra', 'Settings', 'See platform settings', 'Business details, support contact and which services are set up.', 1, 0),

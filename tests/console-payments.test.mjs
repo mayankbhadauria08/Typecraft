@@ -301,7 +301,9 @@ test('payment pages: frames by permission, the sidebar shows where you are, stri
   // Home lists it as ready, and the old "Phase 2" tag is gone from its row
   const home = (await owner('GET', '/console')).text;
   assert.match(home, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>, <a href="\/console\/payments">Payments<\/a>/);
-  assert.match(home, /Emails are still managed in the current admin until they are rebuilt in this console\./);
+  // Email campaigns (Phase 4b) took over the last part of the current admin: nothing is listed as managed there any more
+  assert.match(home, /<a href="\/console\/campaigns">Email campaigns<\/a>/);
+  assert.ok(!/still managed in the current admin/.test(home));
   await K.setPermission('support', 'payments.view', false);
   try {
     assert.equal((await support('GET', '/console/payments')).status, 403);

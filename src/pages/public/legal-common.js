@@ -5,9 +5,11 @@
 //  2. terms.js: the city whose courts have jurisdiction ("[Your city]").
 //  3. refund-policy.js: the lesson count for the 7-day refund (REFUND_LESSON_LIMIT below).
 //  4. terms.js / refund-policy.js: the notice period before a shutdown (SHUTDOWN_NOTICE_DAYS).
-//  5. Read all three pages once with a lawyer or CA: they are a sensible starting point,
+//  5. institute-terms.js (for institutes that buy seats) uses the same city and seller details.
+//  6. Read all four pages once with a lawyer or CA: they are a sensible starting point,
 //     not legal advice.
 export const UPDATED = '15 November 2026';
+export const UPDATED_INSTITUTES = '19 November 2026'; // institute-terms.js (docs/INSTITUTES.md §10)
 export const REFUND_DAYS = 7;
 export const REFUND_LESSON_LIMIT = 10;      // lessons completed beyond the ones the Free plan includes
 export const SHUTDOWN_NOTICE_DAYS = 30;

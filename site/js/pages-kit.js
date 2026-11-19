@@ -153,7 +153,7 @@
 
   /* ---------- in-page confirmation (never window.confirm) ---------- */
   /**
-   * K.confirm({title, text, confirmLabel, danger, typeToConfirm, fields:[{name,label,type,value,hint,required,min,max,step}]})
+   * K.confirm({title, text, confirmLabel, danger, typeToConfirm, fields:[{name,label,type ('select': options [{value,label}]),value,hint,required,min,max,step,maxlength}]})
    * → Promise<null | {…field values}> (null = cancelled). Uses a <dialog> on the page.
    */
   K.confirm = function ({ title, text, confirmLabel = 'Confirm', danger = false, typeToConfirm = null, fields = [] }) {
@@ -164,7 +164,9 @@
         const id = 'tckf-' + f.name;
         const input = f.type === 'textarea'
           ? h('textarea', { id, name: f.name, rows: 3, required: f.required, value: f.value ?? '' })
-          : h('input', { id, name: f.name, type: f.type || 'text', required: f.required, min: f.min, max: f.max, step: f.step, value: f.value ?? '', autocomplete: f.autocomplete || 'off' });
+          : f.type === 'select'
+            ? h('select', { id, name: f.name }, (f.options || []).map((o) => h('option', { value: o.value, text: o.label, selected: String(o.value) === String(f.value ?? '') })))
+            : h('input', { id, name: f.name, type: f.type || 'text', required: f.required, min: f.min, max: f.max, step: f.step, maxlength: f.maxlength, value: f.value ?? '', autocomplete: f.autocomplete || 'off' });
         return h('div', { class: 'field' }, h('label', { for: id, text: f.label }), input, f.hint ? h('p', { class: 'hint', text: f.hint }) : null);
       });
       let typed = null;
@@ -196,7 +198,7 @@
       });
       document.body.appendChild(dlg);
       if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
-      (inputs.length ? K.$('input,textarea', form) : cancel).focus();
+      (inputs.length ? K.$('input,textarea,select', form) : cancel).focus();
     });
   };
 

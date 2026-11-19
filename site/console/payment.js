@@ -178,6 +178,8 @@
     var o = d.order, c = d.customer, p = d.plan, inv = d.invoice;
     AC.fill('orderBody', AC.facts([
       AC.fact('Amount', AC.money(o.amountPaise, o.currency)),
+      d.discount ? AC.fact('Discount', AC.el('span', null, [AC.money(d.discount.discountPaise, o.currency) + ' off ' + AC.money(d.discount.listPaise, o.currency) + ' (',
+        d.discount.couponId && AC.can('coupons.view') ? AC.el('a', { href: AC.base + '/coupons/' + encodeURIComponent(d.discount.couponId), text: d.discount.label }) : d.discount.label, ')'])) : null,
       AC.fact('Started', AC.fmt.dateTime(o.createdAt)),
       o.paidAt ? AC.fact('Paid', AC.fmt.dateTime(o.paidAt)) : null,
       AC.idFact('Order ID', o.id, 'order ID'),
