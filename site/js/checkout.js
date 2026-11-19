@@ -1,5 +1,6 @@
-/* /checkout?plan=<id>. Data: GET /api/packages, TC.me() (entitlements for stacking), POST /api/checkout/order {packageId}
-   → {orderId, razorpayOrderId, amountPaise, currency, keyId, packageName, prefill:{name,email,contact}},
+/* /checkout?plan=<id>. Data: GET /api/packages (pricePaise is what you pay now; listPricePaise and sale while a sale is on),
+   TC.me() (entitlements for stacking), POST /api/checkout/quote {packageId, code} → {listPaise, pricePaise, discount:{source, label, name, paise, code}|null, note},
+   POST /api/checkout/order {packageId, code} → {orderId, razorpayOrderId, amountPaise, currency, keyId, packageName, prefill:{name,email,contact}, …the quote},
    POST /api/checkout/failed {orderId, code, description}. Razorpay Checkout is loaded only when the learner presses Pay. */
 (function () {
   'use strict';
@@ -7,7 +8,7 @@
   const RZP_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
   const planId = K.qs('plan');
   const payBtn = $('#co-pay');
-  let pkg = null, rzpLoading = null;
+  let pkg = null, rzpLoading = null, quote = null, code = '';
 
   function msg(kind, text, ...more) { K.mount($('#co-msg'), kind ? K.alert(kind, text, ...more) : null); }
   function stop(text, action) {
@@ -27,6 +28,48 @@
       document.head.appendChild(s);
     });
     return rzpLoading;
+  }
+
+  /** The total: what is paid now, the price before it crossed out, and why it is lower. */
+  function totalNodes() {
+    const pay = quote ? quote.pricePaise : pkg.pricePaise;
+    const list = quote ? quote.listPaise : (pkg.listPricePaise || pkg.pricePaise);
+    const why = quote ? quote.discount : (pkg.sale ? { label: pkg.sale.name, name: pkg.sale.off } : null);
+    return [
+      h('div', { class: 'co-total-row' },
+        list > pay ? h('s', { class: 'co-was' }, h('span', { class: 'sr-only', text: 'Was ' }), K.money(list, pkg.currency)) : null,
+        h('b', { class: 'co-now', id: 'co-total' }, list > pay ? h('span', { class: 'sr-only', text: 'now ' }) : null, K.money(pay, pkg.currency)),
+        h('span', { class: 'muted', text: 'incl. all charges' })),
+      why ? h('div', { class: 'co-why', id: 'co-why', text: `${why.label}: ${why.name}` + (list > pay ? `, you save ${K.money(list - pay, pkg.currency)}` : '') }) : null,
+    ];
+  }
+  function paintTotal() {
+    const dd = $('#co-total-dd');
+    if (dd) { dd.textContent = ''; totalNodes().forEach((n) => { if (n != null) dd.append(n); }); }
+    if (!payBtn.disabled || payBtn.textContent.startsWith('Pay')) payBtn.textContent = `Pay ${K.money(quote ? quote.pricePaise : pkg.pricePaise, pkg.currency)}`;
+  }
+  async function applyCode(e) {
+    e.preventDefault();
+    const input = $('#co-code'), out = $('#co-code-msg'), btn = $('#co-code-btn');
+    const typed = input.value.trim().toUpperCase();
+    out.className = 'muted'; out.textContent = '';
+    input.removeAttribute('aria-invalid');
+    K.busy(btn, true);
+    const r = await K.api('POST', '/api/checkout/quote', { packageId: pkg.id, code: typed });
+    K.busy(btn, false);
+    if (!r.ok) {
+      if (r.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
+      const why = (r.error && r.error.fields && r.error.fields.code) || K.errMsg(r, 'That code could not be checked. Try again.');
+      out.className = 'err'; out.textContent = why;
+      input.setAttribute('aria-invalid', 'true');
+      return;
+    }
+    quote = r.data;
+    code = quote.discount && quote.discount.source === 'coupon' ? typed : '';
+    if (!typed) { out.textContent = ''; }
+    else if (code) { out.className = 'ok-text'; out.textContent = `${typed} applied: ${quote.discount.name}.`; }
+    else { out.textContent = quote.note || 'That code takes nothing more off.'; }
+    paintTotal();
   }
 
   function render(ent) {
@@ -49,7 +92,12 @@
         h('dt', { class: 'muted', text: 'Validity' }), h('dd', { style: 'margin:0', text: ends }),
         h('dt', { class: 'muted', text: 'Starts' }), h('dd', { style: 'margin:0', text: starts }),
         h('dt', { class: 'muted', text: 'Renewal' }), h('dd', { style: 'margin:0', text: 'No automatic renewal. You choose whether to buy again.' }),
-        h('dt', { class: 'muted', text: 'Total' }), h('dd', { style: 'margin:0' }, h('span', { class: 'price mono', text: price }), h('span', { class: 'muted', text: ' incl. all charges' }))));
+        h('dt', { class: 'muted', text: 'Total' }), h('dd', { style: 'margin:0', id: 'co-total-dd' }, totalNodes())),
+      h('form', { class: 'co-coupon', id: 'co-coupon-form', novalidate: true, onsubmit: applyCode },
+        h('label', { class: 'sr-only', for: 'co-code', text: 'Coupon code' }),
+        h('input', { id: 'co-code', name: 'code', type: 'text', placeholder: 'Coupon code (optional)', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', maxlength: '24', 'aria-describedby': 'co-code-msg' }),
+        h('button', { type: 'submit', class: 'btn btn-ghost', id: 'co-code-btn', text: 'Apply' })),
+      h('p', { id: 'co-code-msg', class: 'muted', role: 'status' }));
     const feats = pkg.features;
     const have = new Set((ent && ent.features) || []);
     // the lessons line counts as had when the plan already gives the same lessons, or every lesson
@@ -72,11 +120,17 @@
   async function pay() {
     msg(null);
     K.busy(payBtn, true);
-    const [res] = await Promise.all([K.api('POST', '/api/checkout/order', { packageId: pkg.id }), loadRazorpay().catch(() => null)]);
+    const [res] = await Promise.all([K.api('POST', '/api/checkout/order', { packageId: pkg.id, code }), loadRazorpay().catch(() => null)]);
     if (!res.ok) {
       K.busy(payBtn, false);
       if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
       if (res.error && res.error.code === 'payments_unavailable') return msg('bad', 'Payments are paused for a short while. Nothing has been charged. Please try again later.');
+      // the code stopped working since it was applied (used up, expired): back to the price without it
+      if (res.error && res.error.fields && res.error.fields.code) {
+        code = ''; quote = null; paintTotal();
+        const out = $('#co-code-msg'); out.className = 'err'; out.textContent = res.error.fields.code;
+        return msg('bad', 'Your coupon can\'t be used any more, so it was removed. Check the new total, then press Pay again.');
+      }
       return msg('bad', K.errMsg(res, 'We could not start the payment. Nothing has been charged.'));
     }
     try { await loadRazorpay(); } catch {
@@ -84,6 +138,7 @@
       return msg('bad', 'The Razorpay payment window could not load. Check your connection, turn off any blocker for checkout.razorpay.com, and try again. Nothing has been charged.');
     }
     const o = res.data;
+    if (o.pricePaise != null && o.pricePaise !== (quote ? quote.pricePaise : pkg.pricePaise)) { quote = o; paintTotal(); }
     let finished = false;
     const rzp = new window.Razorpay({
       key: o.keyId,

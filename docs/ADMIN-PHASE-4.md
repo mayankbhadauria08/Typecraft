@@ -21,7 +21,7 @@ live database, without the owner's yes.
 | 4a | Business reports: sales, refunds, sign-ups, buyers, plans ending, CSV | built |
 | 4b | Email campaigns: audiences, test send, schedule, daily limit, stop; the email log | built |
 | 4b | Notifications: messages for learners on the site and in the trainer | built |
-| 4c | Coupons and promotions, applied at checkout | see the 4c PR |
+| 4c | Coupons and promotions (sales), applied at checkout; shown on pricing, checkout, invoices | built |
 
 ## 1. Decisions
 
@@ -125,10 +125,40 @@ Data: `site_notices` (`migrations/0015_campaigns.sql`).
 - At most two show at a time, newest first. A learner can close one: it is remembered for 60 days in
   the `tc_nd` cookie, shared by the site and the trainer, so it stays closed in both.
 
+## 7. Coupons and promotions (4c)
+
+Pages: `/console/coupons`, `/console/coupons/cpn_…`, `/console/promotions`. API: `src/console/coupons-api.js`.
+What customers pay: `src/pricing.js`. Data: `coupons`, `promotions`, `order_discounts` (`migrations/0016_coupons.sql`).
+
+- **Who**: `coupons.view` and `promotions.view` for Admin and Support; `coupons.manage` and
+  `promotions.manage` are Super Admin only until a Super Admin switches them on for Admin in Roles and
+  permissions. Both ask for the password again, because they change what customers pay.
+- **A coupon** is a code (letters, numbers, dashes; customers can type it in any case) that takes a
+  percentage (1 to 90, rounded to whole rupees) or a fixed amount off, on every paid plan or on chosen
+  ones, optionally from and until a time, with an optional limit on uses in all and "once per customer"
+  (on by default). A use is a paid order; a fully refunded order gives its use back. A used code can't be
+  renamed or deleted (turn it off instead). The limit on uses is checked when checkout starts, so two
+  people paying at the same moment could both get the last use.
+- **A promotion (sale)** lowers prices for everyone between two times, on every paid plan or chosen
+  ones. The pricing page shows the old price crossed out, the sale's name and a line saying when it ends;
+  checkout shows the same; the trainer and the account pages show the sale price. To tell people about a
+  sale, add a notification (§5) as well.
+- **Coupon and sale together**: the customer gets whichever takes more off, never both. If the sale is
+  better, checkout says so and the code is not used up.
+- **Never below ₹1**: a paid plan always costs at least ₹1 (Razorpay's smallest payment).
+- **At checkout**: `POST /api/checkout/quote { packageId, code }` gives the price before paying (and is
+  limited to 20 tries an hour per customer, against guessing codes); `POST /api/checkout/order` takes
+  the same `code`, works the price out again, and asks Razorpay for exactly that amount. If the code has
+  stopped working in between, the order is refused with the reason and the page goes back to the full
+  price; nobody is charged a price they didn't see.
+- **Records**: `orders.amount_paise` stays what was paid (so payments, refunds and Business reports need no
+  change); `order_discounts` keeps the plan's own price, the discount and why. The invoice lists the plan at
+  its own price and the discount as a second line. The console's payment page shows the discount.
+
 ## 6. Going live
 
 Same pattern as before: a restore bookmark first, then the migration by hand (never
-`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1k and §1l.
+`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1k, §1l and §1m.
 
 1. Bookmark, then apply `migrations/0014_support.sql` (two new tables; changes no rows).
 2. Merge 4a. Until the migration is applied, the Support pages answer "not switched on yet" (503)
@@ -137,3 +167,6 @@ Same pattern as before: a restore bookmark first, then the migration by hand (ne
 4. Merge 4b. Learners see "Update ready, reload" once (`sw.js` changed). Until 0015 is applied, the
    campaign and notification pages answer "not switched on yet", learners see no notices, and the old
    `/admin` Announcement works as before.
+5. Bookmark, then apply `migrations/0016_coupons.sql` (three new tables; changes no rows).
+6. Merge 4c. Until 0016 is applied, prices are the plans' own, a code typed at checkout is politely
+   refused, checkout works as today, and the Coupons and Promotions pages answer "not switched on yet".

@@ -192,6 +192,20 @@ Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1i) first: this builds 
 3. Campaigns send at most 80 emails a day (Resend's free plan allows 100 a day for everything). After
    upgrading Resend, raise the limit in Console › Email campaigns › Change the limit.
 
+## 1m. The admin console, Phase 4c (Coupons and Promotions)
+
+Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1i, §1j) first: this builds on them.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0016_coupons.sql` (three new tables, `coupons`, `promotions` and
+   `order_discounts`; adds only, no row changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('coupons', 'promotions', 'order_discounts')`.
+2. **[You] Merge the 4c pull request.**
+3. Making coupons and running sales is for Super Admins. To let Admins do it too, switch on
+   "Make and change coupons" and "Run sales" for Admin in Console › Roles and permissions.
+4. Before the first real sale, try it once: make a sale that ends in an hour on one plan, check the
+   pricing page and checkout, then turn it off.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '11';
+export const ASSET_VERSION = '12';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

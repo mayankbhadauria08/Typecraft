@@ -56,7 +56,9 @@
     return '<article class="plan-card' + (p.highlight ? ' recommended' : '') + '" id="plan-' + TC.esc(p.id) + '" aria-labelledby="pn-' + TC.esc(p.id) + '">' +
       (p.highlight ? '<span class="ribbon">Recommended</span>' : '') +
       '<div class="row-between"><h3 id="pn-' + TC.esc(p.id) + '">' + TC.esc(p.name) + '</h3>' + (mine ? '<span class="badge badge-ok">Your plan</span>' : '') + '</div>' +
-      '<div class="price"><b>' + TC.esc(TC.money(p.pricePaise, p.currency)) + '</b><span>' + TC.esc(v.per) + '</span></div>' +
+      (p.sale ? '<div class="sale-tag">' + TC.icon('sparkle') + '<span>' + TC.esc(p.sale.name) + ': ' + TC.esc(p.sale.off) + '</span></div>' : '') +
+      '<div class="price">' + (p.sale ? '<s class="was"><span class="sr-only">Was </span>' + TC.esc(TC.money(p.listPricePaise, p.currency)) + '</s>' : '') +
+        '<b>' + (p.sale ? '<span class="sr-only">now </span>' : '') + TC.esc(TC.money(p.pricePaise, p.currency)) + '</b><span>' + TC.esc(v.per) + '</span></div>' +
       '<span class="validity">' + TC.esc(v.line) + '</span>' +
       '<p class="plan-desc">' + TC.esc(p.description) + '</p>' +
       '<ul>' + items + '</ul>' +
@@ -69,7 +71,7 @@
     const list = data.packages;
     const head = '<thead><tr><th scope="col">Feature</th>' + list.map((p) => '<th scope="col"' + (p.highlight ? ' class="rec"' : '') + '>' + TC.esc(p.name) + '</th>').join('') + '</tr></thead>';
     const txt = (s) => '<td>' + TC.esc(s) + '</td>';
-    let rows = '<tr><th scope="row">Price</th>' + list.map((p) => '<td class="mono">' + TC.esc(TC.money(p.pricePaise, p.currency)) + '</td>').join('') + '</tr>';
+    let rows = '<tr><th scope="row">Price</th>' + list.map((p) => '<td class="mono">' + (p.sale ? '<s class="was">' + TC.esc(TC.money(p.listPricePaise, p.currency)) + '</s> ' : '') + TC.esc(TC.money(p.pricePaise, p.currency)) + '</td>').join('') + '</tr>';
     rows += '<tr><th scope="row">Access</th>' + list.map((p) => txt(!p.pricePaise ? 'Forever' : p.validityDays ? p.validityDays + ' days' : 'Lifetime')).join('') + '</tr>';
     rows += '<tr><th scope="row">Lessons</th>' + list.map((p) => txt(lessonsOf(p).short || '')).join('') + '</tr>';
     rows += '<tr><th scope="row">Typing tests</th>' + list.map((p) => txt(p.limits && p.limits.dailyTests != null ? p.limits.dailyTests + ' a day' : 'Unlimited')).join('') + '</tr>';
@@ -81,9 +83,20 @@
     table.style.minWidth = (220 + list.length * 110) + 'px';
   }
 
+  /** A line above the plans while a sale is on: its name, and when it ends. */
+  function saleNote(list) {
+    const slot = $('saleNote');
+    if (!slot) return;
+    const sales = [];
+    list.forEach((p) => { if (p.sale && !sales.some((x) => x.id === p.sale.id)) sales.push(p.sale); });
+    slot.innerHTML = sales.map((x) => '<div class="sale-note">' + TC.icon('sparkle') + '<div><b>' + TC.esc(x.name) + '</b> is on: ' + TC.esc(x.off) +
+      (list.filter((p) => p.sale && p.sale.id === x.id).length < list.filter((p) => p.pricePaise > 0).length ? ' on some plans' : '') +
+      ', until ' + TC.esc(TC.dateTime ? TC.dateTime(x.endsAt) : TC.date(x.endsAt)) + '. The price you see is the price you pay.</div></div>').join('');
+  }
   function draw(data) {
     if (!data || !data.packages || !data.packages.length) return false;
     const list = data.packages;
+    saleNote(list);
     grid.innerHTML = list.map((p, i) => card(p, i > 0 ? list[i - 1] : null)).join('');
     grid.removeAttribute('aria-busy');
     compare(data);

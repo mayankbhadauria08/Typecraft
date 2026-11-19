@@ -57,6 +57,10 @@ export const PERMISSIONS = [
   P('unlock.manage', 'learning', 'Unlock conditions', 'Change unlock conditions', 'Close or open a lesson or level for everyone, and set when each level opens. Asks for your password again.', 0, 0, { sensitive: true }),
 
   // ----- Layer 3: business growth -----
+  P('coupons.view', 'growth', 'Coupons', 'See coupons', 'Coupon codes, what they take off, and who used them.', 1, 1),
+  P('coupons.manage', 'growth', 'Coupons', 'Make and change coupons', 'Create, change, turn off and delete coupon codes. They change what customers pay. Asks for your password again.', 0, 0, { sensitive: true }),
+  P('promotions.view', 'growth', 'Promotions', 'See sales', 'Sales: lower prices for everyone for a while, shown on the pricing page.', 1, 1),
+  P('promotions.manage', 'growth', 'Promotions', 'Run sales', 'Start, change, end and delete sales. They change what customers pay. Asks for your password again.', 0, 0, { sensitive: true }),
   P('revenue.view', 'growth', 'Business reports', 'See revenue reports', 'Revenue by day and by package, refunds and net totals.', 1, 0),
   P('emails.view', 'growth', 'Email campaigns', 'See campaigns and the email log', 'Email campaigns, and every email sent to customers with whether it was delivered.', 1, 1),
   P('emails.retry', 'growth', 'Email campaigns', 'Retry failed emails', 'Send a failed email again.', 1, 0),
