@@ -155,6 +155,7 @@ const HEADS = {
   test_completed: ['Typing test', 'Your typing test result'],
   contact_received: ['Support', 'We got your message'],
   contact_forward: ['Support', 'New contact message'],
+  support_reply: ['Support', 'A reply from TypeCraft'],
   institute_invite: ['Institute', null],
   student_invite: ['Institute', null],
   institute_reminder: ['Institute', null],
@@ -511,6 +512,18 @@ export const TEMPLATES = {
       Small('Your message:'),
       Quote(d.message),
       Small('To add anything, just reply to this email.'),
+    ] });
+  },
+
+  support_reply(d, site) {
+    const subject = String(d.subject || 'Re: your message to TypeCraft');
+    return layout(site, { subject, preheader: String(d.body || '').slice(0, 90), blocks: [
+      P(hi(d)),
+      Paragraphs(d.body),
+      P(d.staffName ? `${d.staffName}, TypeCraft support` : 'TypeCraft support'),
+      d.original ? Small('Your message:') : Raw('', ''),
+      d.original ? Quote(d.original) : Raw('', ''),
+      Small('To answer, just reply to this email.'),
     ] });
   },
 

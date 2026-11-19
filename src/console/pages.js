@@ -12,6 +12,7 @@ import { LAYERS as MODULE_LAYERS } from './modules.js';
 import { skeletonRows, lines, select, section, listFrame, downloadButton } from './page-kit.js';
 import { CORE_PAGES } from './pages-core.js';
 import { LEARNING_PAGES } from './pages-learning.js';
+import { GROWTH_PAGES } from './pages-growth.js';
 import { INSTITUTE_PAGES } from './pages-institutes.js';
 
 /* ---------- Home ---------- */
@@ -199,6 +200,7 @@ export const PAGES = [
   ...CORE_PAGES,
   ...INSTITUTE_PAGES,
   ...LEARNING_PAGES,
+  ...GROWTH_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],
     permission: 'roles.view', body: rolesBody, scripts: ['roles.js'] },
 ];

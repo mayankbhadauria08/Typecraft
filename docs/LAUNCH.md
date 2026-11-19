@@ -166,6 +166,20 @@ institutes are only created in the console (part 2).
 3. **[Claude, after your OK] Database**: the Monday email needs `migrations/0013_institute_weekly.sql` (two
    tables; adds only), applied the same way. It needs `RESEND_API_KEY` to actually send.
 
+## 1k. The admin console, Phase 4a (Support and Business reports)
+
+Full notes: `docs/ADMIN-PHASE-4.md`. Phase 4 comes as three pull requests (4a, 4b, 4c); merge them
+in that order. Its migrations are numbered 0014 to 0016 because the Institutes work (§1g to §1j) uses
+0009 to 0013; the two sets don't depend on each other.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0014_support.sql` (two new tables, `support_replies` and
+   `support_assignments`; adds only, no row changes). Never `wrangler d1 migrations apply`.
+   Check with `SELECT name FROM sqlite_master WHERE name IN ('support_replies', 'support_assignments')`.
+2. **[You] Merge the 4a pull request.** Nothing changes for learners.
+3. Replies from the console are emailed from the normal sending address with "reply to" set to
+   the support address in Settings, so the customer's answer comes back to that inbox.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |

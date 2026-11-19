@@ -37,6 +37,7 @@ const CATEGORY = {
   payment_success: 'billing', payment_failed: 'billing', invoice: 'billing', subscription_renewal_reminder: 'billing',
   subscription_expired: 'billing', refund_processed: 'billing',
   announcement: 'platform', account_update: 'transactional', test_completed: 'transactional',
+  contact_received: 'support', contact_forward: 'support', support_reply: 'support',
   contact_received: 'support', contact_forward: 'support', institute_invite: 'transactional',
   student_invite: 'transactional', institute_reminder: 'transactional', institute_payment: 'billing', institute_weekly: 'transactional',
 };
