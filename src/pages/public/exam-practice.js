@@ -7,6 +7,7 @@ import '../../../shared/exam-rules.js';
 const X = globalThis.TC_EXAMS;
 
 export const meta = {
+  needsKeyboard: true,   // phones see a note offering to send the link to a computer
   path: '/exam-practice',
   title: 'Typing exam practice: SSC typing test, SSC data entry (DEST) and CPCT',
   ogTitle: 'Typing exam practice · TypeCraft',
