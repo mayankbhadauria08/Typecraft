@@ -293,13 +293,17 @@
         document.documentElement.classList.toggle('nav-open', open);
       });
     }
-    // close the user menu on outside click / Escape
+    // the user menu and the header's dropdowns: one open at a time; outside click or Escape closes them
+    const MENUS = 'details.user-menu[open], details.nav-group[open]';
+    document.querySelectorAll('details.user-menu, details.nav-group').forEach((d) => d.addEventListener('toggle', () => {
+      if (d.open) document.querySelectorAll(MENUS).forEach((o) => { if (o !== d) o.removeAttribute('open'); });
+    }));
     document.addEventListener('click', (e) => {
-      document.querySelectorAll('details.user-menu[open]').forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open'); });
+      document.querySelectorAll(MENUS).forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open'); });
     });
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
-      document.querySelectorAll('details.user-menu[open]').forEach((d) => { d.removeAttribute('open'); const s = d.querySelector('summary'); if (s) s.focus(); });
+      document.querySelectorAll(MENUS).forEach((d) => { d.removeAttribute('open'); const s = d.querySelector('summary'); if (s) s.focus(); });
     });
     document.querySelectorAll('[data-signout]').forEach((b) => b.addEventListener('click', async () => {
       busy(b, true);
@@ -308,7 +312,7 @@
       location.replace('/login?signedout=1');
     }));
     document.querySelectorAll('[data-theme-toggle]').forEach((b) => {
-      const sync = () => { const light = document.documentElement.getAttribute('data-theme') === 'light'; b.setAttribute('aria-pressed', String(light)); b.innerHTML = icon(light ? 'moon' : 'sun') + '<span class="sr-only">' + (light ? 'Switch to dark theme' : 'Switch to light theme') + '</span>'; };
+      const sync = () => { const light = document.documentElement.getAttribute('data-theme') === 'light'; b.setAttribute('aria-pressed', String(light)); b.innerHTML = icon(light ? 'moon' : 'sun') + '<span' + (b.getAttribute('data-theme-toggle') === 'menu' ? '' : ' class="sr-only"') + '>' + (light ? 'Switch to dark theme' : 'Switch to light theme') + '</span>'; };
       sync();
       b.addEventListener('click', () => { setTheme(document.documentElement.getAttribute('data-theme') !== 'light'); sync(); });
     });

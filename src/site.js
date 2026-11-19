@@ -143,12 +143,22 @@ async function sessionFor(env, request) {
   try { return await getSession(env, request); } catch { return null; } // tables missing: signed out
 }
 async function whoFor(env, session) {
-  if (!session) return { user: null, entitlements: null, role: null };
-  let entitlements = null, role = null;
+  if (!session) return { user: null, entitlements: null, role: null, totals: null };
+  let entitlements = null, role = null, totals = null;
   try { const e = await entitlementsFor(env, session.user.id); entitlements = { plan: e.plan, planName: e.planName, expiresAt: e.expiresAt, features: e.features, limits: e.limits }; } catch { entitlements = null; }
   try { role = await roleOf(env, session.user); } catch { role = null; }
+  try { totals = headerTotals(await env.DB.prepare('SELECT xp, streak_count, streak_last FROM user_totals WHERE user_id = ?1').bind(session.user.id).first()); } catch { totals = null; }
   const u = session.user;
-  return { user: { id: u.id, fullName: u.fullName, email: u.email, emailVerified: u.emailVerified }, entitlements, role };
+  return { user: { id: u.id, fullName: u.fullName, email: u.email, emailVerified: u.emailVerified }, entitlements, role, totals };
+}
+
+/** The header's streak and XP chip. A streak counts only while its last day is today or yesterday
+    (India time, where nearly all learners are), so a lapsed streak shows 0 days rather than an old number. */
+export function headerTotals(row, now = Date.now()) {
+  if (!row) return { streak: 0, xp: 0 };
+  const day = (ms) => new Date(ms + 330 * 60000).toISOString().slice(0, 10);
+  const alive = row.streak_last && (row.streak_last >= day(now - 86400000));
+  return { streak: alive ? Number(row.streak_count) || 0 : 0, xp: Number(row.xp) || 0 };
 }
 
 /** {{seller.legalName}}-style tokens in a page body, filled from platform_settings (escaped). */
@@ -201,6 +211,7 @@ export async function servePage(request, env, ctx) {
   if (path === '/robots.txt') return textResponse(url, robotsTxt(env), 'text/plain; charset=utf-8');
   if (path === '/sitemap.xml') return textResponse(url, sitemapXml(env), 'application/xml; charset=utf-8');
   if (path === '/app') return readOnly ? serveApp(request, env, url) : new Response('Method not allowed', { status: 405 });
+  if (path === '/arcade') return readOnly ? serveArcade(request, env, url) : new Response('Method not allowed', { status: 405 });
 
   // the owner page from before the multi-page site, until the admin registry provides /admin
   const hasAdminHome = !!findPage('/admin');
@@ -251,7 +262,7 @@ async function render(env, url, page, params, who, status) {
   const ctx = {
     env, url, params, siteUrl: base, path: url.pathname, nonce,
     canonicalPath: page.meta.canonical || (page.re ? url.pathname : page.meta.path),
-    user: who.user, entitlements: who.entitlements, role: who.role,
+    user: who.user, entitlements: who.entitlements, role: who.role, totals: who.totals || null,
     noindex: !!page.meta.noindex || page.meta.access === 'user' || page.meta.access === 'admin' || isWorkersDev(url) || !!status,
     jsonld: [],
   };
@@ -286,6 +297,12 @@ async function serveApp(request, env, url) {
   const headers = pageHeaders(url, { nonce: null, cache: NO_STORE, extra });
   headers.set('X-Robots-Tag', 'noindex');
   return new Response(request.method === 'HEAD' ? null : res.body, { status: 200, headers });
+}
+
+/* ---------- /arcade: straight to the trainer's arcade (signed-out visitors sign in first, then land there) ---------- */
+async function serveArcade(request, env, url) {
+  if (env.DB && !(await sessionFor(env, request))) return redirect(url, '/login?next=' + encodeURIComponent('/arcade'));
+  return redirect(url, '/app#arcade');
 }
 
 /* ---------- robots.txt and sitemap.xml ---------- */

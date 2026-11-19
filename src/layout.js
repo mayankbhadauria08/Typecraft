@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '2';
+export const ASSET_VERSION = '3';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -23,13 +23,30 @@ const FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@
 // same theme as the app: typingMasterSettings.bg 'paper' (or the old 'light' theme) = light, before anything is drawn
 const THEME_SCRIPT = "try{var s=JSON.parse(localStorage.getItem('typingMasterSettings')||'{}');if(s.bg==='paper'||(!s.bg&&localStorage.getItem('typingMasterTheme')==='light'))document.documentElement.setAttribute('data-theme','light')}catch(e){}";
 
+/* The site header (docs/SAAS-CONTRACTS.md §8): two dropdown groups, Exam practice, a direct Arcade
+   button, Pricing and For institutes. SITE_NAV stays the flat list of every link in it. */
+export const NAV_LEARN = [
+  ['/app', 'Course and trainer', 'Lessons from the home row to full speed', 'keyboard'],
+  ['/practice', 'Typing practice', 'Free drills by level, key and word', 'target'],
+  ['/typing-test', 'Typing test', 'Check your speed in 1, 3 or 5 minutes', 'clock'],
+];
+export const NAV_RESOURCES = [
+  ['/features', 'Features', 'Everything TypeCraft does', 'sparkle'],
+  ['/verify', 'Verify a certificate', 'Check a TypeCraft certificate is genuine', 'certificate'],
+  ['/faq', 'FAQ', 'Answers to common questions', 'help'],
+  ['/contact', 'Contact', 'Write to us', 'mail'],
+];
+const NAV_MORE = [
+  ['/pricing', 'Pricing', 'Plans are one payment, nothing renews', 'rupee'],
+  ['/contact?topic=institutes', 'For institutes', 'Labs, batches and certificates', 'users'],
+];
 export const SITE_NAV = [
-  ['/practice', 'Practice', 'practice'],
-  ['/typing-test', 'Typing test', 'typing-test'],
+  ...NAV_LEARN.map(([h, l, , i]) => [h, l, i]),
   ['/exam-practice', 'Exam practice', 'exam-practice'],
-  ['/features', 'Features', 'features'],
+  ['/arcade', 'Arcade', 'gamepad'],
   ['/pricing', 'Pricing', 'pricing'],
-  ['/faq', 'FAQ', 'faq'],
+  ['/contact?topic=institutes', 'For institutes', 'institutes'],
+  ...NAV_RESOURCES.map(([h, l, , i]) => [h, l, i]),
 ];
 export const ACCOUNT_NAV = [
   ['/dashboard', 'Dashboard', 'grid'],
@@ -68,7 +85,7 @@ function current(path, href) {
   return path === href || path.startsWith(href + '/');
 }
 
-function userMenu(ctx) {
+function userMenu(ctx, withTheme) {
   const u = ctx.user;
   const first = String(u.fullName || '').trim().split(/\s+/)[0] || 'Account';
   const admin = ctx.role ? `<a role="menuitem" href="/admin">${icon('shield')}<span>Admin</span></a>` : '';
@@ -77,11 +94,14 @@ function userMenu(ctx) {
   <div class="menu" role="menu">
     <div class="menu-head"><strong>${esc(u.fullName || '')}</strong><span class="muted">${esc(u.email || '')}</span></div>
     <a role="menuitem" href="/dashboard">${icon('grid')}<span>Dashboard</span></a>
-    <a role="menuitem" href="/app">${icon('keyboard')}<span>Practice</span></a>
+    <a role="menuitem" href="/app">${icon('keyboard')}<span>Open the trainer</span></a>
+    <a role="menuitem" href="/arcade">${icon('gamepad')}<span>Arcade</span></a>
+    <a role="menuitem" href="/account/certificates">${icon('certificate')}<span>My certificates</span></a>
     <a role="menuitem" href="/account/plans">${icon('package')}<span>Plans &amp; billing</span></a>
     <a role="menuitem" href="/account/profile">${icon('user')}<span>Profile</span></a>
     <a role="menuitem" href="/account/settings">${icon('settings')}<span>Settings</span></a>
     ${admin}
+    ${withTheme ? '<button type="button" role="menuitem" data-theme-toggle="menu" aria-pressed="false"><span>Switch theme</span></button>' : ''}
     <hr>
     <button type="button" role="menuitem" data-signout>${icon('logout')}<span>Sign out</span></button>
   </div>
@@ -89,16 +109,43 @@ function userMenu(ctx) {
 }
 const themeButton = '<button type="button" class="icon-btn" data-theme-toggle aria-pressed="false"><span class="sr-only">Switch theme</span></button>';
 
+function navGroup(ctx, label, items) {
+  const here = items.some(([href]) => current(ctx.path, href));
+  const links = items.map(([href, text, sub, ic]) =>
+    `<a href="${href}"${current(ctx.path, href) ? ' aria-current="page"' : ''}><span class="ng-ic" aria-hidden="true">${icon(ic)}</span><span class="ng-text"><b>${text}</b><small>${sub}</small></span></a>`).join('');
+  return `<details class="nav-group"${here ? ' data-here' : ''}><summary>${label}${icon('chevronDown')}</summary><div class="nav-panel">${links}</div></details>`;
+}
+function navLink(ctx, href, inner, cls) {
+  const here = current(ctx.path, href.split('?')[0]) && !href.includes('?');
+  return `<a href="${href}"${cls ? ` class="${cls}"` : ''}${here ? ' aria-current="page"' : ''}>${inner}</a>`;
+}
+/** "4 days · 320 XP" from user_totals, filled in by the page loader for signed-in visitors. */
+function streakChip(ctx) {
+  const t = ctx.totals;
+  if (!t) return '';
+  const days = t.streak || 0, xp = t.xp || 0;
+  const label = `${days} day${days === 1 ? '' : 's'} streak, ${xp} XP`;
+  return `<a class="streak-chip" href="/dashboard" title="${label}" aria-label="${label}">${icon('bolt')}<span>${days} day${days === 1 ? '' : 's'}</span><span class="sc-dot" aria-hidden="true">·</span><span class="sc-xp">${xp} XP</span></a>`;
+}
 function siteHeader(ctx) {
-  const links = SITE_NAV.map(([href, label]) =>
-    `<a href="${href}"${current(ctx.path, href) ? ' aria-current="page"' : ''}>${label}</a>`).join('');
+  const links = [
+    navGroup(ctx, 'Learn', NAV_LEARN),
+    navLink(ctx, '/exam-practice', 'Exam practice <span class="nav-new">New</span>'),
+    navLink(ctx, '/arcade', `${icon('gamepad')}<span>Arcade</span>`, 'nav-arcade'),
+    // signed in, Upgrade stands in for Pricing, and both marketing links move into Resources
+    ...(ctx.user ? [] : [navLink(ctx, '/pricing', 'Pricing'), navLink(ctx, '/contact?topic=institutes', 'For institutes')]),
+    navGroup(ctx, 'Resources', ctx.user ? [...NAV_MORE, ...NAV_RESOURCES] : NAV_RESOURCES),
+  ].join('');
+  const free = !ctx.entitlements || !ctx.entitlements.plan || ctx.entitlements.plan === 'free';
   const actions = ctx.user
-    ? `<a class="btn btn-primary btn-sm hide-xs" href="/app">Open trainer</a>${userMenu(ctx)}`
+    ? `${streakChip(ctx)}${free ? '<a class="btn btn-upgrade btn-sm hide-sm" href="/account/plans">Upgrade</a>' : ''}<a class="btn btn-primary btn-sm hide-xs" href="/app">${icon('keyboard')}Open trainer</a>${userMenu(ctx, true)}`
     : `<a class="btn btn-ghost btn-sm" href="/login">Sign in</a><a class="btn btn-primary btn-sm" href="/signup">Start free</a>`;
-  return `<header class="site-head"><div class="container head-row">
+  const mobileOnly = ctx.user ? '<a class="nav-only-mobile" href="/app">Open the trainer</a>' : '<a class="nav-only-mobile" href="/login">Sign in</a>';
+  // signed in, the theme switch moves into the account menu to make room for the trainer button
+  return `<header class="site-head${ctx.user ? ' signed-in' : ''}"><div class="container head-row">
   ${brand('/')}
-  <nav class="site-nav" id="site-nav" aria-label="Main">${links}${ctx.user ? '' : '<a class="nav-only-mobile" href="/login">Sign in</a>'}</nav>
-  <div class="head-actions">${themeButton}${actions}
+  <nav class="site-nav" id="site-nav" aria-label="Main">${links}${mobileOnly}</nav>
+  <div class="head-actions">${ctx.user ? '' : themeButton}${actions}
     <button type="button" class="icon-btn nav-toggle" data-nav-toggle aria-controls="site-nav" aria-expanded="false">${icon('menu')}<span class="sr-only">Menu</span></button>
   </div>
 </div></header>`;

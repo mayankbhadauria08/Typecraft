@@ -97,3 +97,62 @@ test('old addresses and unknown pages', async () => {
   const css = await get('/site/site.css');
   assert.equal(css.status, 200);
 });
+
+test('the header: Learn and Resources groups, an Arcade button, Exam practice and For institutes', async () => {
+  const home = await get('/');
+  const head = home.text.slice(home.text.indexOf('<header class="site-head"'), home.text.indexOf('</header>'));
+  assert.match(head, /<details class="nav-group"><summary>Learn/);
+  assert.match(head, /<details class="nav-group"><summary>Resources/);
+  assert.match(head, /<a href="\/arcade" class="nav-arcade">/);
+  assert.match(head, /href="\/exam-practice">Exam practice <span class="nav-new">New<\/span>/);
+  assert.match(head, /href="\/contact\?topic=institutes">For institutes/);
+  assert.match(head, /href="\/verify"/);
+  assert.match(head, /href="\/signup">Start free/);
+  assert.doesNotMatch(head, /Open trainer|streak-chip/, 'signed out: no trainer button, no streak');
+  // the page you are on is marked, inside its dropdown too
+  const faq = await get('/faq');
+  assert.match(faq.text, /<details class="nav-group" data-here><summary>Resources/);
+  assert.match(faq.text, /<a href="\/faq" aria-current="page">/);
+});
+
+test('signed in: Open trainer is back, with the streak and XP chip and Upgrade on the Free plan', async () => {
+  const cookie = await signup('header@example.com', '203.0.113.88');
+  const page = await get('/pricing', { cookie });
+  const head = page.text.slice(page.text.indexOf('<header class="site-head'), page.text.indexOf('</header>'));
+  assert.match(head, /<a class="btn btn-primary btn-sm hide-xs" href="\/app">.*Open trainer<\/a>/);
+  assert.match(head, /class="streak-chip"[^>]*aria-label="0 days streak, 0 XP"/);
+  assert.match(head, /href="\/account\/plans">Upgrade<\/a>/);
+  assert.match(head, /<a href="\/arcade" class="nav-arcade">/);
+  // Pricing and For institutes move into Resources; the theme switch moves into the account menu
+  assert.match(head, /<details class="nav-group" data-here><summary>Resources.*href="\/pricing" aria-current="page"/s);
+  assert.doesNotMatch(head, /<a href="\/pricing"( aria-current="page")?>Pricing<\/a>/);
+  assert.match(head, /data-theme-toggle="menu"/);
+});
+
+test('/arcade opens the arcade straight away; signed-out visitors sign in first', async () => {
+  const out = await get('/arcade');
+  assert.equal(out.status, 302);
+  assert.equal(out.headers.get('location'), BASE + '/login?next=%2Farcade');
+  const cookie = await signup('arcade@example.com', '203.0.113.89');
+  const inn = await get('/arcade', { cookie });
+  assert.equal(inn.status, 302);
+  assert.equal(inn.headers.get('location'), BASE + '/app#arcade');
+  assert.match(inn.headers.get('cache-control'), /no-store/);
+  // after signing in, ?next=/arcade is honoured
+  const login = await get('/login?next=%2Farcade', { cookie });
+  assert.equal(new URL(login.headers.get('location')).pathname, '/arcade');
+});
+
+test('the streak chip counts a streak only while it is current (India time)', async () => {
+  const { headerTotals } = await import('../src/site.js');
+  const now = Date.parse('2026-11-19T06:00:00Z'); // 11:30 in India
+  assert.deepEqual(headerTotals({ xp: 320, streak_count: 4, streak_last: '2026-11-19' }, now), { streak: 4, xp: 320 });
+  assert.deepEqual(headerTotals({ xp: 320, streak_count: 4, streak_last: '2026-11-18' }, now), { streak: 4, xp: 320 });
+  assert.deepEqual(headerTotals({ xp: 320, streak_count: 4, streak_last: '2026-11-17' }, now), { streak: 0, xp: 320 });
+  assert.deepEqual(headerTotals(null, now), { streak: 0, xp: 0 });
+});
+
+test('the contact form takes an institutes topic', async () => {
+  const page = await get('/contact');
+  assert.match(page.text, /<option value="institutes">/);
+});
