@@ -18,7 +18,7 @@ export const body = `
     <select id="hist-range"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="all">Everything</option></select>
   </div>
   <div class="field" id="hist-dur-wrap" hidden><label for="hist-dur">Test length</label>
-    <select id="hist-dur"><option value="">All lengths</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option></select>
+    <select id="hist-dur"><option value="">All lengths</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option></select>
   </div>
 </div>
 <section class="section" id="hist-panel" role="tabpanel" aria-live="polite"><div class="skeleton" style="height:12rem"></div></section>
