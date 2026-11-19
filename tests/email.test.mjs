@@ -93,10 +93,17 @@ const SAMPLE = {
   contact_received: { topic: 'billing', message: `Help ${EVIL}` },
   support_reply: { body: 'Your plan is active now.\n\nThanks for waiting.', staffName: 'Rahul', original: 'I paid but my plan says Free.', subject: 'Re: your message to TypeCraft (payments and plans)' },
   contact_forward: { email: 'x@example.com', topic: 'billing', message: `Help ${EVIL}`, priority: true },
+  institute_invite: { instituteName: `Sharma Typing ${EVIL}`, role: 'admin', invitedBy: 'TypeCraft', email: 'boss@example.com', link: '/institute' },
+  student_invite: { instituteName: `Sharma ${EVIL}`, batchName: 'Morning', batchCode: 'KQ7M-PX3D', joinPath: '/join/KQ7M-PX3D' },
+  institute_reminder: { instituteName: 'Sharma', kind: 'ends', lastDay: '30 Nov 2026', days: 7, link: '/institute', online: true },
+  institute_payment: { instituteName: `Sharma ${EVIL}`, kind: 'new', what: `TypeCraft Pro plan for 20 students ${EVIL}`, amountPaise: 1998000, invoiceNumber: 'TC-2026-000009',
+    invoiceUrl: '/institute/ins_00000000000000000000/invoices/TC-2026-000009', link: 'javascript:alert(1)', seats: 20, lastDay: '2027-11-18' },
+  institute_weekly: { from: '16 November', to: '22 November', settingsUrl: '/institute', institutes: [{ name: `Sharma ${EVIL}`, link: 'javascript:alert(1)',
+    batches: [{ name: `Morning ${EVIL}`, students: 4, practised: 2, time: '1 h 5 min', top: [`Asha ${EVIL} (40 min)`], quiet: ['Ravi'], quietMore: 0, link: '/institute' }] }] },
 };
 
 test('every template renders a subject, escaped HTML and a text part', () => {
-  assert.equal(TEMPLATE_NAMES.length, 21);
+  assert.equal(TEMPLATE_NAMES.length, 26);
   const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com', unsubscribeUrl: 'https://typecrafttyping.in/api/email/unsubscribe?u=1&t=2' };
   for (const name of TEMPLATE_NAMES) {
     assert.ok(SAMPLE[name], `sample data for ${name}`);

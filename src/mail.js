@@ -38,6 +38,8 @@ const CATEGORY = {
   subscription_expired: 'billing', refund_processed: 'billing',
   announcement: 'platform', account_update: 'transactional', test_completed: 'transactional',
   contact_received: 'support', contact_forward: 'support', support_reply: 'support',
+  contact_received: 'support', contact_forward: 'support', institute_invite: 'transactional',
+  student_invite: 'transactional', institute_reminder: 'transactional', institute_payment: 'billing', institute_weekly: 'transactional',
 };
 const CATEGORIES = ['auth', 'security', 'transactional', 'billing', 'platform', 'support'];
 // per recipient per template, per hour
@@ -549,7 +551,7 @@ export async function adminAnnouncement(request, env, ctx) {
     return json({ test: true, status: r.status, to: user.email });
   }
   if (!(await hitLimit(env, `announce:${user.id}`, 5, 3600))) throw tooMany(60);
-  // With email campaigns switched on (migration 0012) an announcement is a campaign that starts now, so it
+  // With email campaigns switched on (migration 0015) an announcement is a campaign that starts now, so it
   // keeps to the daily limit (docs/ADMIN-PHASE-4.md §4). Before that, the old way below.
   try {
     const { campaignFromAnnouncement } = await import('./console/campaigns-api.js');

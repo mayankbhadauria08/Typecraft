@@ -42,6 +42,8 @@ export default `
     <p class="muted ex-note">These are practice tests made by TypeCraft, not the exams' own software. Each exam's notice has the final word on its rules, so check yours.</p>
   </header>
 
+  <section class="ex-batch" id="exBatch" hidden aria-live="polite" aria-label="Your batch's scheduled test"></section>
+
   <section class="ex-cards" id="exChoose" aria-label="Choose a test">
     ${X.ORDER.map((id) => card(X.MODES[id])).join('')}
   </section>

@@ -826,3 +826,15 @@ progress.meter::-moz-progress-bar { background: var(--accent); border-radius: 99
 .notice-line > .ic { flex: none; margin-top: 2px; color: var(--accent); }
 .notice-line.tone-offer > .ic { color: var(--warn); }
 .notice-line.tone-warning > .ic { color: var(--bad); }
+
+/* Institutes (docs/INSTITUTES.md §7) */
+.pre-wrap { white-space: pre-wrap; }
+
+.cap-panel { margin-bottom: 16px; }
+.cap-panel p { margin-top: 6px; }
+.cap-panel .panel-head .btn { margin-top: 0; }
+.cap-meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 10px; }
+.cap-fill { display: block; height: 100%; background: var(--teal-deep); }
+.cap-warn .cap-fill { background: var(--bad); }
+.cap-w0 { width: 1%; } .cap-w1 { width: 10%; } .cap-w2 { width: 20%; } .cap-w3 { width: 30%; } .cap-w4 { width: 40%; } .cap-w5 { width: 50%; }
+.cap-w6 { width: 60%; } .cap-w7 { width: 70%; } .cap-w8 { width: 80%; } .cap-w9 { width: 90%; } .cap-w10 { width: 100%; }

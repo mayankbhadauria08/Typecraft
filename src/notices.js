@@ -1,6 +1,6 @@
 // Notices for learners (docs/ADMIN-PHASE-4.md §5): short messages from the TypeCraft team, shown under the
 // website's header and at the top of the trainer's home screen. They are written in the admin console
-// (Notifications, src/console/notices-api.js) and kept in site_notices (migration 0012).
+// (Notifications, src/console/notices-api.js) and kept in site_notices (migration 0015).
 //
 //   GET /api/notices?place=site|trainer   the notices for whoever asks (signed in or not), minus the ones
 //                                          this browser closed (the tc_nd cookie, which the site shares)
@@ -24,7 +24,7 @@ async function loadLive(env) {
     return rows.map((r) => ({ id: r.id, message: r.message, linkUrl: r.link_url || null, linkLabel: r.link_label || null, tone: r.tone,
       audience: r.audience, place: r.place, startsAt: r.starts_at || null, endsAt: r.ends_at || null }));
   } catch {
-    return []; // before migration 0012 (or the database is busy): no notices, and the page is drawn as usual
+    return []; // before migration 0015 (or the database is busy): no notices, and the page is drawn as usual
   }
 }
 

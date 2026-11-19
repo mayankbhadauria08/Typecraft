@@ -117,26 +117,75 @@ Full notes: `docs/EXAM-MODES.md`.
 2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
 
-## 1i. The admin console, Phase 4a (Support and Business reports)
+## 1g. Institutes (five pull requests: #28, #30, #31, #32 and part 5)
 
-Full notes: `docs/ADMIN-PHASE-4.md`. Phase 4 comes as three pull requests (4a, 4b, 4c); merge them
-in that order. Its migrations are numbered 0011 to 0013 because the Institutes work (§1g, §1h) uses
-0009 and 0010; the two sets don't depend on each other.
+Full notes: `docs/INSTITUTES.md`. Nothing changes for learners until an institute exists, and
+institutes are only created in the console (part 2).
 
 1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
-   here), then apply `migrations/0011_support.sql` (two new tables, `support_replies` and
+   here), then apply `migrations/0009_institutes.sql` one statement at a time (six new tables and
+   their indexes; adds only, no row changes). Never `wrangler d1 migrations apply`. Check with
+   `SELECT name FROM sqlite_master WHERE name LIKE 'institute%' OR name LIKE 'batch%'`, and that
+   `users`, `user_subscriptions` and `lesson_scores` have the same counts as before.
+   Before this, the site works as today and the institute pages say they aren't switched on.
+2. **[You] Merge the pull requests in order** (part 1, then part 2, …). The new `/join` page and the
+   "Your institute" line on Plans appear; weak keys start showing in the console and in Analytics (no
+   new data is stored for that). Part 2 adds Core operations › Institutes to the console.
+3. To set up an institute: Console › Institutes › New institute, with their admin's email. Record their
+   payment when it reaches your bank: that switches it on. Their admin gets an email (needs
+   `RESEND_API_KEY`); until email works, tell them to sign in at `/institute` with that email.
+4. **[You] Before the first institute starts**: move to Workers Paid ($5 a month), Cloudflare dashboard ›
+   Workers & Pages › Plans (Capacity today on console › Institutes shows why); read `/institute-terms`
+   and the new privacy lines with a lawyer or CA. Full list: `docs/INSTITUTES.md` §11.
+
+## 1h. Institutes, Release 2 (targets, assignments, student invitations, reminders, invoices)
+
+1. **[Claude, after your OK] Database**: after 0009, take a restore bookmark, then apply
+   `migrations/0010_institutes_teaching.sql` one statement at a time (six new tables and indexes; adds
+   only). Before this, Release 1 works and the Release 2 parts stay hidden or say they aren't switched on.
+2. **[You] Merge** the Release 2 pull requests in order, after Release 1's.
+
+## 1i. Institutes, Release 3 (buying seats online, Razorpay test mode)
+
+1. **[Claude, after your OK] Database**: after 0010, take a restore bookmark, then apply
+   `migrations/0011_institute_orders.sql` one statement at a time (one table and one index; adds only).
+2. **[You] Merge** the Release 3 pull request after Release 2's.
+3. **[You] Razorpay test keys** in Cloudflare (`RAZORPAY_KEY_ID` = `rzp_test_…`, `RAZORPAY_KEY_SECRET`,
+   `RAZORPAY_WEBHOOK_SECRET`; the same webhook as for plans, with `payment.captured`, `payment.failed`,
+   `order.paid`).
+4. **[You] Prices**: Console › Institutes › Seats sold online › Change. Leave it **Off** until you have bought
+   seats once with a Razorpay test card, added seats and renewed, and seen the invoice email arrive.
+5. **[You] Live**: only after the test run, swap in the `rzp_live_…` keys. No real-money test is needed or done.
+
+## 1j. Institutes, later parts (scheduled mock tests, the Monday email)
+
+1. **[Claude, after your OK] Database**: take a restore bookmark, then apply `migrations/0012_batch_tests.sql`
+   one statement at a time (two tables and their indexes; adds only). Before it, the batch page simply
+   doesn't show *Scheduled tests*.
+2. **[You] Merge** after the earlier institute pull requests.
+3. **[Claude, after your OK] Database**: the Monday email needs `migrations/0013_institute_weekly.sql` (two
+   tables; adds only), applied the same way. It needs `RESEND_API_KEY` to actually send.
+
+## 1k. The admin console, Phase 4a (Support and Business reports)
+
+Full notes: `docs/ADMIN-PHASE-4.md`. Phase 4 comes as three pull requests (4a, 4b, 4c); merge them
+in that order. Its migrations are numbered 0014 to 0016 because the Institutes work (§1g to §1j) uses
+0009 to 0013; the two sets don't depend on each other.
+
+1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
+   here), then apply `migrations/0014_support.sql` (two new tables, `support_replies` and
    `support_assignments`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('support_replies', 'support_assignments')`.
 2. **[You] Merge the 4a pull request.** Nothing changes for learners.
 3. Replies from the console are emailed from the normal sending address with "reply to" set to
    the support address in Settings, so the customer's answer comes back to that inbox.
 
-## 1j. The admin console, Phase 4b (Email campaigns and Notifications)
+## 1l. The admin console, Phase 4b (Email campaigns and Notifications)
 
 Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1i) first: this builds on it.
 
 1. **[Claude, after your OK] Database**: take a restore bookmark in the D1 console (write it down
-   here), then apply `migrations/0012_campaigns.sql` (three new tables, `email_campaigns`,
+   here), then apply `migrations/0015_campaigns.sql` (three new tables, `email_campaigns`,
    `campaign_sends` and `site_notices`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('email_campaigns', 'campaign_sends', 'site_notices')`.
 2. **[You] Merge the 4b pull request.** Learners see "Update ready, reload" once (`sw.js` changed).

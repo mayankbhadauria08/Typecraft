@@ -9,9 +9,9 @@ live database, without the owner's yes.
 
 | PR | Branch | Contents | Migration |
 | --- | --- | --- | --- |
-| 4a | `console/phase4a-support-reports` | Support inbox, Business reports | `0011_support.sql` |
-| 4b | `console/phase4b-campaigns` | Email campaigns, learner notifications | `0012_campaigns.sql` |
-| 4c | `console/phase4c-coupons` | Coupons, promotions, checkout | `0013_coupons.sql` |
+| 4a | `console/phase4a-support-reports` | Support inbox, Business reports | `0014_support.sql` |
+| 4b | `console/phase4b-campaigns` | Email campaigns, learner notifications | `0015_campaigns.sql` |
+| 4c | `console/phase4c-coupons` | Coupons, promotions, checkout | `0016_coupons.sql` |
 
 ## Status
 
@@ -41,7 +41,7 @@ live database, without the owner's yes.
 
 Pages: `/console/support` (inbox) and `/console/support/msg_…` (one message).
 API: `src/console/support-api.js`. Data: `contact_messages` (already there) plus
-`support_replies` and `support_assignments` (`migrations/0011_support.sql`).
+`support_replies` and `support_assignments` (`migrations/0014_support.sql`).
 
 - **Inbox**: search by name, email, words in the message or the message ID; filter by status
   (new, answered, closed, or "still open" = new or answered), topic, and who looks after it (me,
@@ -80,7 +80,7 @@ Support no by default). No new tables.
 ## 4. Email campaigns and the email log (4b)
 
 Pages: `/console/campaigns`, `/console/campaigns/cmp_…`, `/console/email-log`.
-API: `src/console/campaigns-api.js`. Data: `email_campaigns`, `campaign_sends` (`migrations/0012_campaigns.sql`);
+API: `src/console/campaigns-api.js`. Data: `email_campaigns`, `campaign_sends` (`migrations/0015_campaigns.sql`);
 the daily limit is `platform_settings` key `campaigns` (`{"dailyCap": 80}`).
 
 - **Audiences**: everyone who gets product news; people on Free; people with any paid plan; people on
@@ -103,7 +103,7 @@ the daily limit is `platform_settings` key `campaigns` (`{"dailyCap": 80}`).
   Resend's free plan allows 100 emails a day in all and sign-in codes, receipts and support replies must
   still go through. Raise it after upgrading the Resend plan.
 - **The old `/admin` Announcement** now creates a campaign that starts at once, so it also keeps to the
-  daily limit (until migration 0012 is applied it works the old way).
+  daily limit (until migration 0015 is applied it works the old way).
 - **Email log** (`emails.view`; "Send again" needs `emails.retry`): every email, newest first, by
   status, kind, address or subject, with the counts for the last 24 hours. Sign-in codes and links are
   never sent again.
@@ -112,7 +112,7 @@ the daily limit is `platform_settings` key `campaigns` (`{"dailyCap": 80}`).
 
 Page: `/console/notifications`. API: `src/console/notices-api.js` (`notices.view`: Admin and Support;
 `notices.manage`: Admin). Learners: `src/notices.js`, `GET /api/notices?place=site|trainer`.
-Data: `site_notices` (`migrations/0012_campaigns.sql`).
+Data: `site_notices` (`migrations/0015_campaigns.sql`).
 
 - A notification is one line (up to 200 characters) with an optional link (a page on the site such as
   `/pricing`, or an `https://` address), a kind (information, offer, warning: green, gold, red), who
@@ -128,12 +128,12 @@ Data: `site_notices` (`migrations/0012_campaigns.sql`).
 ## 6. Going live
 
 Same pattern as before: a restore bookmark first, then the migration by hand (never
-`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1i and §1j.
+`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1k and §1l.
 
-1. Bookmark, then apply `migrations/0011_support.sql` (two new tables; changes no rows).
+1. Bookmark, then apply `migrations/0014_support.sql` (two new tables; changes no rows).
 2. Merge 4a. Until the migration is applied, the Support pages answer "not switched on yet" (503)
    and Business reports work (they need no new table).
-3. Bookmark, then apply `migrations/0012_campaigns.sql` (three new tables; changes no rows).
-4. Merge 4b. Learners see "Update ready, reload" once (`sw.js` changed). Until 0012 is applied, the
+3. Bookmark, then apply `migrations/0015_campaigns.sql` (three new tables; changes no rows).
+4. Merge 4b. Learners see "Update ready, reload" once (`sw.js` changed). Until 0015 is applied, the
    campaign and notification pages answer "not switched on yet", learners see no notices, and the old
    `/admin` Announcement works as before.

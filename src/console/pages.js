@@ -13,6 +13,7 @@ import { skeletonRows, lines, select, section, listFrame, downloadButton } from 
 import { CORE_PAGES } from './pages-core.js';
 import { LEARNING_PAGES } from './pages-learning.js';
 import { GROWTH_PAGES } from './pages-growth.js';
+import { INSTITUTE_PAGES } from './pages-institutes.js';
 
 /* ---------- Home ---------- */
 // What the current admin (/admin) looks after, by the console module that takes it over.
@@ -197,6 +198,7 @@ export const PAGES = [
   { key: 'customers', match: /^\/customers\/([\w-]{1,64})$/, names: ['id'], title: 'Customer', crumbs: ['Core operations', ['Customers', '/customers'], 'Customer'],
     permission: 'customers.view', body: customerBody, scripts: ['plan-actions.js', 'access-actions.js', 'customer.js'] },
   ...CORE_PAGES,
+  ...INSTITUTE_PAGES,
   ...LEARNING_PAGES,
   ...GROWTH_PAGES,
   { key: 'roles', path: '/roles', title: 'Roles and permissions', crumbs: ['Infrastructure', 'Roles and permissions'],

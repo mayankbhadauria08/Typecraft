@@ -1,6 +1,7 @@
 // Exam practice and verifiable certificates (docs/EXAM-MODES.md).
 //
-//   POST /api/exams/results                    signed in   marks an attempt (shared/exam-rules.js) and saves the numbers
+//   POST /api/exams/results                    signed in   marks an attempt (shared/exam-rules.js) and saves the numbers;
+//                                                          with batchTestId, it may count for a batch's scheduled test (src/institute-tests.js)
 //   GET  /api/exams/results                    signed in   recent attempts, best per test, certificate codes
 //   POST /api/exams/results/:id/certificate    signed in   a code for a passed attempt
 //   GET  /api/me/certificates                  signed in   every certificate (course speed certificates and passed tests) with its code
@@ -14,6 +15,7 @@ import '../shared/exam-rules.js';
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { todayOf } from './api.js';
+import { countResult } from './institute-tests.js';
 
 const X = globalThis.TC_EXAMS;
 export const DAILY_SAVES = 20;
@@ -71,7 +73,11 @@ export async function postResult(request, env) {
       DB.prepare('SELECT * FROM exam_results WHERE id = ?1 AND user_id = ?2').bind(body.id, user.id),
       DB.prepare('SELECT COUNT(*) AS n FROM exam_results WHERE user_id = ?1 AND day = ?2').bind(user.id, day),
     ]);
-    if (dup.results[0]) return json({ saved: false, duplicate: true, result: resultView(dup.results[0]), verdict: X.verdict(res) });
+    const batchTestId = typeof body.batchTestId === 'string' && body.batchTestId ? body.batchTestId : null;
+    if (dup.results[0]) {
+      return json({ saved: false, duplicate: true, result: resultView(dup.results[0]), verdict: X.verdict(res),
+        ...(batchTestId ? { batchTest: await countResult(env, user.id, batchTestId, dup.results[0]) } : {}) });
+    }
     if (used.results[0].n >= DAILY_SAVES) throw new HttpError(429, 'daily_limit', `You've saved ${DAILY_SAVES} exam results today. Your result is shown, but it can't be kept until tomorrow.`);
     const now = nowIso();
     const row = {
@@ -85,7 +91,8 @@ export async function postResult(request, env) {
                                   ON CONFLICT (id) DO NOTHING`).bind(...cols.map((c) => row[c])).run();
     // the same id from another account: refuse rather than mix them up
     if (!ins.meta || !ins.meta.changes) throw new HttpError(409, 'id_taken', 'That result was already saved. Please take the test again.');
-    return json({ saved: true, result: resultView(row), verdict: X.verdict(res), today: { date: day, used: used.results[0].n + 1, limit: DAILY_SAVES } }, 201);
+    return json({ saved: true, result: resultView(row), verdict: X.verdict(res), today: { date: day, used: used.results[0].n + 1, limit: DAILY_SAVES },
+      ...(batchTestId ? { batchTest: await countResult(env, user.id, batchTestId, row) } : {}) }, 201);
   }, NOT_READY_SAVE);
 }
 
@@ -110,7 +117,7 @@ export async function getResults(request, env) {
 }
 
 /** The code for one certificate, made the first time it is asked for. */
-async function codeFor(env, userId, kind, ref) {
+export async function codeFor(env, userId, kind, ref) {
   const DB = env.DB;
   const have = await DB.prepare('SELECT code, shared FROM certificate_codes WHERE user_id = ?1 AND kind = ?2 AND ref = ?3').bind(userId, kind, ref).first();
   if (have) return have;
@@ -168,12 +175,12 @@ export async function getMyCertificates(request, env) {
   for (const e of exams) out.push(examView(e, byKey.get('exam:' + e.id)));
   return json({ ready: true, certificates: out });
 }
-function levelView(l, c) {
+export function levelView(l, c) {
   return { kind: 'level', level: l.level, title: `${Math.round(l.wpm)} words a minute`, test: `${testWords(l.seconds)} in the TypeCraft course (the ${l.level} wpm certificate)`,
     wpm: Math.round(l.wpm), accuracy: Math.round(l.accuracy), seconds: Math.round(l.seconds), at: l.at,
     code: c ? showCode(c.code) : null, shared: c ? !!c.shared : null };
 }
-function examView(e, c) {
+export function examView(e, c) {
   const M = X.MODES[e.mode] || { certificate: 'Typing test', minutes: 0 };
   // rounded down, so a certificate never shows more than was typed (41.6 wpm is 41, 0.29% mistakes is 99% right)
   const wpm = Math.floor(e.net_wpm);
@@ -202,6 +209,23 @@ export async function putMyCertificate(request, env, ctx, params) {
   }, NOT_READY_SAVE);
 }
 
+/**
+ * The institute a learner had a seat at when they earned a certificate (docs/INSTITUTES.md §9), or null.
+ * Before migration 0009 there is none.
+ */
+export async function instituteAt(env, userId, at) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT i.name FROM institute_students s JOIN institutes i ON i.id = s.institute_id
+        WHERE s.user_id = ?1 AND s.joined_at <= ?2 AND (s.ended_at IS NULL OR s.ended_at >= ?2) ORDER BY s.joined_at DESC LIMIT 1`
+    ).bind(userId, at).first();
+    return row ? row.name : null;
+  } catch (err) {
+    if (/no such table/i.test(String(err && err.message))) return null;
+    throw err;
+  }
+}
+
 /* ---------------- GET /api/certificates/:code (public) ---------------- */
 const NOT_FOUND = 'No certificate matches this code, or its holder has stopped sharing it. Check the code and try again.';
 export async function getCertificate(request, env, ctx, params) {
@@ -223,7 +247,8 @@ export async function getCertificate(request, env, ctx, params) {
     }
     if (!cert) throw new HttpError(404, 'not_found', NOT_FOUND);
     const { shared, id, ...view } = cert;
-    return json({ certificate: { ...view, holder: c.full_name || 'TypeCraft learner', checkedAt: nowIso() } },
+    const institute = await instituteAt(env, c.user_id, cert.at);
+    return json({ certificate: { ...view, holder: c.full_name || 'TypeCraft learner', institute, checkedAt: nowIso() } },
       200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
   }, NOT_READY_CHECK);
 }

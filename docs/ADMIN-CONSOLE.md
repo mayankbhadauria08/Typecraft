@@ -48,7 +48,7 @@ The sidebar, the permission grid and the URL structure all follow these. The lis
 `src/console/modules.js`; a module without a `path` is shown as a label with its phase, never as
 a link.
 
-1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access
+1. **Core operations** (built): Dashboard, Customers, Payments, Refunds, Packages, Subscriptions, Learning access, Institutes (docs/INSTITUTES.md §7)
 2. **Learning operations** (built: docs/ADMIN-PHASE-3.md): Courses, Modules, Levels, Lessons, Exercises, Unlock conditions (docs/UNLOCK-RULES.md), Student progress, Learning analytics
 3. **Business growth** (docs/ADMIN-PHASE-4.md): Coupons, Promotions, Email campaigns (built), Support (built), Notifications (built), Business reports (built)
 4. **Infrastructure**: Administrators, Roles and permissions (built), Activity logs, System health, Integrations, Security, Settings
@@ -185,14 +185,14 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
-- `0012_campaigns.sql` (Phase 4b): `email_campaigns`, `campaign_sends`, `site_notices`. Three new tables,
+- `0015_campaigns.sql` (Phase 4b): `email_campaigns`, `campaign_sends`, `site_notices`. Three new tables,
   no row changes, safe to run twice. Before it is applied, the campaign and notification pages answer
   "not switched on yet" (503), learners see no notices, and the old Announcement works the old way.
-  Go-live steps: `docs/ADMIN-PHASE-4.md` §6 and `docs/LAUNCH.md` §1j.
-- `0011_support.sql` (Phase 4a; 0009 and 0010 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
+  Go-live steps: `docs/ADMIN-PHASE-4.md` §6 and `docs/LAUNCH.md` §1l.
+- `0014_support.sql` (Phase 4a; 0009 to 0013 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the Support pages answer "not switched on yet"
   (503); Business reports need no new table. Go-live steps: `docs/ADMIN-PHASE-4.md` §4 and
-  `docs/LAUNCH.md` §1i.
+  `docs/LAUNCH.md` §1k.
 - `0007_course.sql` (Phase 3): `course_drafts`, `course_releases`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the course pages answer "not switched on yet"
   (503) and learners get the course exactly as it is in the code. Go-live steps:
