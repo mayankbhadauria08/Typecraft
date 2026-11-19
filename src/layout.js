@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '10';
+export const ASSET_VERSION = '11';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -119,6 +119,18 @@ const KEYBOARD_NOTE = `<div class="container"><div class="kb-note" data-kb-note 
   <div class="kb-actions"><button type="button" class="btn btn-primary btn-sm" data-share-link>${icon('send')}Send link</button><button type="button" class="btn btn-ghost btn-sm" data-kb-dismiss>I have a keyboard</button></div>
 </div></div>`;
 
+/* Notices from the TypeCraft team (src/notices.js, written in the admin console): a slim bar under the header.
+   The close button (site.js) hides it and remembers that in the tc_nd cookie, so it stays closed on every page. */
+const NOTICE_ICON = { info: 'info', offer: 'sparkle', warning: 'alert' };
+function noticeBars(ctx) {
+  const list = ctx.notices || [];
+  if (!list.length) return '';
+  return `<div class="notice-bars">${list.map((n) => `<div class="notice-bar tone-${esc(n.tone)}" data-notice="${esc(n.id)}" role="note">
+<div class="container notice-row"><span class="notice-ic" aria-hidden="true">${icon(NOTICE_ICON[n.tone] || 'info')}</span>
+<p class="notice-text">${esc(n.message)}${n.linkUrl ? ` <a href="${esc(n.linkUrl)}"${/^https:/.test(n.linkUrl) ? ' rel="noopener"' : ''}>${esc(n.linkLabel || 'Find out more')}${icon('arrowRight')}</a>` : ''}</p>
+<button type="button" class="notice-x" data-notice-close aria-label="Close this message">${icon('x')}</button></div></div>`).join('')}</div>`;
+}
+
 function navGroup(ctx, label, items) {
   const here = items.some(([href]) => current(ctx.path, href));
   const links = items.map(([href, text, sub, ic]) =>
@@ -201,7 +213,7 @@ function layoutBody(layout, ctx, body) {
     case 'admin':
       return shellLayout(ctx, body, ADMIN_NAV, 'Admin');
     default:
-      return `${siteHeader(ctx)}<main id="main" class="site-main" tabindex="-1">${ctx.needsKeyboard ? KEYBOARD_NOTE : ''}${body}</main>${siteFooter(ctx)}`;
+      return `${siteHeader(ctx)}${noticeBars(ctx)}<main id="main" class="site-main" tabindex="-1">${ctx.needsKeyboard ? KEYBOARD_NOTE : ''}${body}</main>${siteFooter(ctx)}`;
   }
 }
 

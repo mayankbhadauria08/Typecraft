@@ -39,9 +39,9 @@ export const LAYERS = [
     modules: [
       { key: 'coupons', label: 'Coupons', icon: 'hash', phase: 4 },
       { key: 'promotions', label: 'Promotions', icon: 'sparkle', phase: 4 },
-      { key: 'emails', label: 'Email campaigns', icon: 'mail', phase: 4 },
+      { key: 'emails', label: 'Email campaigns', icon: 'mail', path: '/campaigns', permission: 'emails.view' },
       { key: 'support', label: 'Support', icon: 'inbox', path: '/support', permission: 'support.view' },
-      { key: 'notifications', label: 'Notifications', icon: 'send', phase: 4 },
+      { key: 'notifications', label: 'Notifications', icon: 'send', path: '/notifications', permission: 'notices.view' },
       { key: 'reports', label: 'Business reports', icon: 'receipt', path: '/reports', permission: 'revenue.view' },
     ],
   },

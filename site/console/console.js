@@ -71,6 +71,8 @@
     access: { allow: ['Opened', 'ok'], deny: ['Closed', 'bad'] },
     email: { sent: ['Sent', 'ok'], delivered: ['Delivered', 'ok'], queued: ['Waiting', 'warn'], failed: ['Failed', 'bad'], bounced: ['Bounced', 'bad'], cancelled: ['Cancelled', ''] },
     support: { new: ['New', 'warn'], answered: ['Answered', 'ok'], closed: ['Closed', ''] },
+    campaign: { draft: ['Draft', ''], scheduled: ['Scheduled', 'warn'], sending: ['Sending', 'warn'], sent: ['Sent', 'ok'], cancelled: ['Stopped', 'bad'] },
+    notice: { live: ['Showing', 'ok'], scheduled: ['Starts later', 'warn'], ended: ['Ended', ''], off: ['Off', ''] },
     institute: { pending: ['Not paid yet', 'warn'], active: ['On', 'ok'], suspended: ['Paused', 'bad'], closed: ['Closed', ''] },
     staff: { invited: ['Invited', 'warn'], active: ['Joined', 'ok'], removed: ['Removed', ''] }
   };
@@ -92,6 +94,13 @@
     options.timeZone = ZONE;
     return new Intl.DateTimeFormat(LOCALE, options).format(d);
   }
+  /** ISO time → the value of a datetime-local field in this browser's time ('' for none), and back. */
+  function localInput(iso) {
+    var d = new Date(iso); if (!iso || isNaN(d)) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fromLocalInput(value) { if (!value) return null; var d = new Date(value); return isNaN(d) ? null : d.toISOString(); }
   var fmt = {
     date: function (iso) { return shown(iso, { day: 'numeric', month: 'short', year: 'numeric' }); },
     /** '2026-11-18' (an India day, as the server sends it) → '18 Nov'. */
@@ -207,7 +216,7 @@
    * A dialog with fields. It stays open until opts.submit(values) succeeds, and shows what the server
    * says about a field under that field. → what submit returned (true if nothing), or false when cancelled.
    * opts: { title, text, submitLabel, danger, submit(values) → Promise,
-   *         fields: [{ name, label, type: 'text' | 'email' | 'date' | 'textarea' | 'number' | 'select' | 'radio', value, required,
+   *         fields: [{ name, label, type: 'text' | 'email' | 'date' | 'textarea' | 'number' | 'select' | 'radio' | 'datetime' (local 'YYYY-MM-DDTHH:MM'), value, required,
    *                    maxlength, min, max, placeholder, hint, inputmode, options: [{ value, label, hint } | { group, options }] }] }
    */
   function formDialog(opts) {
@@ -233,7 +242,7 @@
           if (o.group) return el('optgroup', { label: o.group }, o.options.map(function (x) { return el('option', { value: x.value, text: x.label }); }));
           return el('option', { value: o.value, text: o.label });
         }));
-        else control = el('input', { id: id, type: f.type === 'number' || f.type === 'date' || f.type === 'email' ? f.type : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
+        else control = el('input', { id: id, type: f.type === 'number' || f.type === 'date' || f.type === 'email' ? f.type : f.type === 'datetime' ? 'datetime-local' : 'text', maxlength: f.maxlength, min: f.min, max: f.max, step: f.step, placeholder: f.placeholder,
           inputmode: f.inputmode || (f.type === 'number' ? 'numeric' : null), autocomplete: 'off' });
         if (f.value !== undefined && f.value !== null) control.value = String(f.value);
         controls[f.name] = { read: function () { return control.value; }, node: control, first: function () { return control; } };
@@ -737,7 +746,7 @@
   window.AC = {
     base: base, boot: boot, me: me,
     can: function (permission) { return !!(me && me.permissions.indexOf(permission) !== -1); },
-    el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, badge: badge, toast: toast, busy: busy,
+    el: el, svg: svg, clear: clear, icon: icon, fmt: fmt, money: money, localInput: localInput, fromLocalInput: fromLocalInput, badge: badge, toast: toast, busy: busy,
     status: status, method: method, source: source,
     confirm: confirmDialog, formDialog: formDialog, api: api, download: download, list: list, listPage: listPage, options: options,
     record: record, head: head, notice: notice, fill: fill, quiet: quiet, table: table, fact: fact, facts: facts, idFact: idFact, copyButton: copyButton, timeline: timeline,

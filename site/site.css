@@ -653,6 +653,23 @@ form{margin:0}
 .install-status p .ic{width:18px;height:18px;color:var(--teal);vertical-align:-4px;margin-right:8px}
 .install-phone .btn{margin-top:10px}
 .install-steps{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.55}
+
+/* ---------- notices from the team (written in the admin console: Notifications) ---------- */
+.notice-bar{border-bottom:1px solid var(--line);background:var(--teal-soft)}
+.notice-bar.tone-offer{background:var(--brass-soft)}
+.notice-bar.tone-warning{background:var(--red-soft)}
+.notice-row{display:flex;align-items:center;gap:12px;min-height:46px;padding-top:6px;padding-bottom:6px}
+.notice-ic{display:inline-grid;place-items:center;flex:none;color:var(--teal)}
+.tone-offer .notice-ic{color:var(--brass)} .tone-warning .notice-ic{color:var(--red)}
+.notice-ic svg{width:18px;height:18px}
+.notice-text{flex:1;min-width:0;margin:0;font-size:14.5px;line-height:1.45}
+.notice-text a{display:inline-flex;align-items:center;gap:4px;font-weight:600;color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.notice-text a svg{width:15px;height:15px}
+.notice-x{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer}
+.notice-x:hover{color:var(--text);border-color:var(--line-strong)}
+.notice-x:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.notice-x svg{width:16px;height:16px}
+
 /* the institute's own pages (docs/INSTITUTES.md §8) */
 .back-link{font-size:14px;color:var(--muted)}
 .ins-sec-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:14px}
