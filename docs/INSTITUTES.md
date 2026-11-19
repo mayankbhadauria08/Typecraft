@@ -12,10 +12,10 @@ Release 1 is built in five pull requests. This file grows with each one.
 | 1. Foundations (A1–A6) | tables, seat → plan, join codes, seat count and end date, staff checks, weak keys | pull request #28 |
 | 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request #30 |
 | 3. Institute portal (C1–C4) | institute home, teachers, batches, students | pull request #31 |
-| 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | pull request 4 |
-| 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | |
+| 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | pull request #32 |
+| 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | pull request 5 |
 
-Nobody can join anything until part 2 is live: institutes are only created in the console.
+Nobody can join anything until an institute is created in the console and its payment recorded.
 
 ## 1. Words
 
@@ -191,3 +191,40 @@ Only numbers TypeCraft saved from the student's own practice; staff can't type a
   <institute>" when the holder had a seat there on the day they earned it (`instituteAt` in
   `src/exams.js`).
 - Admins see every batch; a teacher only theirs (§5). Everything else is 404.
+
+## 10. Terms, privacy, capacity, guide
+
+- **`/institute-terms`** (Terms for institutes, linked in the footer and from `/institute`): seats and term,
+  payment before seats switch on, admins and teachers, students 18 or older, what staff see and that it
+  stops when a student leaves or the term ends, certificates, pausing and closing, law. **A starting
+  point, not legal advice: read it with a lawyer or CA before the first institute signs.** It uses the
+  seller details from console Settings and the same `[Your city]` placeholder as the other legal pages.
+- **Privacy policy**: two lines (what we keep about seats and roles; what an institute's staff see and
+  when that stops), linking the institute terms. The `/join` page links the privacy policy.
+- **`/institute-guide`** (Guide for institutes): nine short steps for an institute's admin, from getting
+  seats to archiving a batch.
+- **Capacity today** (console › Institutes): lessons finished today (from today's `events`, by their
+  index), learners, institute seats in use, and the database size D1 reports. It compares lessons with
+  about 2,083 a day: the free plan's 100,000 rows written a day ÷ about 48 rows a lesson (measured on a
+  test copy, index updates included). The bar turns red past half. **Before the first institute starts,
+  move to Workers Paid ($5 a month)** in the Cloudflare dashboard (Workers & Pages › Plans): that is your
+  step; nothing in the code changes it.
+- **End to end** (`tests/institute-e2e.test.mjs`): set up in the console with the admin's email →
+  admin accepts (after confirming their email) → batch prepared before payment, nobody can join →
+  payment recorded, institute on → teacher invited, accepts, given the batch → student joins with the
+  code, gets the plan, practises → teacher sees the report, CSV and the student's page → certificate
+  printed with the institute's name and checked on the verify page → console shows seats, payment and
+  the institute's own changes → batch archived, seat freed, student back on Free with their progress.
+
+## 11. Before the first institute (your steps)
+
+1. Merge the five pull requests in order (#28, #30, #31, #32, then part 5).
+2. Let Claude apply `migrations/0009_institutes.sql` on the live database after a restore bookmark
+   (`docs/LAUNCH.md` §1g). Deploy.
+3. Move to Workers Paid ($5 a month) in the Cloudflare dashboard.
+4. Read `/institute-terms` and the privacy lines with a lawyer or CA; fill the `[Your city]` placeholder
+   and the seller details in console Settings if not done yet.
+5. Make sure `RESEND_API_KEY` is set so invitation emails go out (without it, tell the admin to sign in
+   at `/institute` with the invited email).
+6. Console › Institutes › New institute, with their admin's email. Record their payment when it reaches
+   your bank.

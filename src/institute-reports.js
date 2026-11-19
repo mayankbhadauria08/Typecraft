@@ -38,7 +38,7 @@ async function batchReport(env, batch) {
                        (SELECT MAX(best_wpm) FROM lesson_scores l WHERE l.user_id = s.user_id) AS best,
                        (SELECT AVG(best_accuracy) FROM lesson_scores l WHERE l.user_id = s.user_id AND l.status = 'completed') AS acc,
                        (SELECT COALESCE(SUM(seconds), 0) FROM daily_totals d WHERE d.user_id = s.user_id AND d.day >= ?2) AS week_secs,
-                       (SELECT MAX(day) FROM daily_totals d WHERE d.user_id = s.user_id AND d.seconds > 0) AS last_day
+                       (SELECT MAX(day) FROM daily_totals d WHERE d.user_id = s.user_id AND (d.seconds > 0 OR d.runs > 0 OR d.steps > 0)) AS last_day
                   FROM institute_students s JOIN users u ON u.id = s.user_id
                  WHERE s.batch_id = ?1 AND s.status = 'active' ORDER BY u.full_name COLLATE NOCASE, u.email`).bind(batch.id, since),
     DB.prepare(`SELECT user_id, k, attempts, errors FROM (${keyStatsManySql(inBatch)}) WHERE attempts >= ${KEY_MIN}`).bind(batch.id),

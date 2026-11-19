@@ -224,7 +224,7 @@ export async function getStudents(request, env, ctx, params) {
   const since = istDay(Date.now() - 6 * 86400000);
   const rows = (await env.DB.prepare(
     `SELECT s.id, s.joined_at, u.id AS user_id, u.full_name, u.email,
-            (SELECT MAX(day) FROM daily_totals d WHERE d.user_id = s.user_id AND d.seconds > 0) AS last_day
+            (SELECT MAX(day) FROM daily_totals d WHERE d.user_id = s.user_id AND (d.seconds > 0 OR d.runs > 0 OR d.steps > 0)) AS last_day
        FROM institute_students s JOIN users u ON u.id = s.user_id
       WHERE s.batch_id = ?1 AND s.status = 'active' ORDER BY u.full_name, u.email`
   ).bind(batch.id).all()).results;

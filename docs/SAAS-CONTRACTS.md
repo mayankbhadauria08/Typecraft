@@ -258,6 +258,8 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - Reports (`src/institute-reports.js`, docs/INSTITUTES.md §9), staff of the batch: `GET /api/institutes/:id/batches/:bid/report`,
   `…/report.csv`, `…/certificates`; `GET /api/institutes/:id/students/:mid`. `GET /api/certificates/:code` adds `institute`
   (name or null). Page `/institute/:id/students/:mid`.
+- Console capacity: `GET /api/console/institutes/capacity` (institutes.view) → `{ today, lessonsToday, learnersToday, seatsInUse,
+  databaseBytes | null, freeDatabaseBytes, freeLessonsADay, writesALesson, freeWritesADay }`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.
@@ -295,7 +297,8 @@ Each exports `PAGES = [ { meta, body, scripts:['/site/js/x.js'] } ]`.
 | `/practice` | public | Typing Practice (explains course; CTA → `/app`) |
 | `/typing-test` | public | Typing test (works signed out; saved + limited when signed in) |
 | `/pricing` | public | Plans from `GET /api/packages` |
-| `/privacy` `/terms` `/refund-policy` | public | legal (seller details from settings) |
+| `/privacy` `/terms` `/refund-policy` `/institute-terms` | public | legal (seller details from settings) |
+| `/institute-guide` | public | how an institute runs its batches (docs/INSTITUTES.md §10) |
 | `/signup` `/login` `/forgot-password` | guest | |
 | `/reset-password` `/verify-email` `/verify-otp` | public | token/code in `#hash` |
 | `/app` | user | the trainer (`index.html`), with plan locks |

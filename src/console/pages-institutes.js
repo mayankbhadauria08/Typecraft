@@ -11,6 +11,7 @@ function institutesBody(me) {
     search: { label: 'Search institutes', placeholder: 'Name, city or email' },
     filters: select('status', 'Status', [['', 'All institutes'], ['pending', 'Not paid yet'], ['active', 'On'], ['ending', 'Ending in 30 days'], ['suspended', 'Paused'], ['closed', 'Closed']]),
     heads: [['Institute'], ['Status', 'col-fit'], ['Seats', 'num'], ['Last day', 'col-wide'], ['Admin', 'col-wide'], ['Paid', 'num col-wide']],
+    note: `<section class="panel cap-panel" aria-labelledby="capTitle"><h2 id="capTitle">Capacity today</h2><div id="capBody">${lines(2)}</div></section>`,
   });
 }
 

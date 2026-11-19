@@ -20,6 +20,6 @@ export const body = `
   <div class="actions"><button type="submit" class="btn btn-primary" id="joinCheck">Check the code</button></div>
 </form>
 <section id="joinResult" aria-live="polite"></section>
-<p class="muted join-small">While you are in a batch, your institute's staff can see your name, email, course progress, speeds, accuracy, weak keys and exam practice results. You can leave at any time from <a href="/account/plans">Plans</a>; your progress stays yours.</p>
+<p class="muted join-small">While you are in a batch, your institute's staff can see your name, email, course progress, speeds, accuracy, weak keys and exam practice results. You can leave at any time from <a href="/account/plans">Plans</a>; your progress stays yours. More in our <a href="/privacy">privacy policy</a>.</p>
 `;
 export default body;

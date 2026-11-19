@@ -161,7 +161,7 @@ function siteFooter(ctx) {
     <div class="foot-brand">${brand('/')}<p class="muted">A calm, thorough typing course: 78 lessons, a coach that finds your weak keys, and an arcade to practise in. Made in India.</p></div>
     <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a></nav>
     <nav aria-label="Company"><h2 class="foot-h">Company</h2><a href="/about">About</a><a href="/contact">Contact</a><a href="/faq">FAQ</a></nav>
-    <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a></nav>
+    <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a><a href="/institute-terms">Terms for institutes</a></nav>
   </div>
   <div class="foot-base"><span>© ${year} TypeCraft</span><span>Payments are processed securely by Razorpay</span><a href="mailto:hello@typecrafttyping.com">hello@typecrafttyping.com</a></div>
 </div></footer>`;

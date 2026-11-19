@@ -32,6 +32,31 @@
     row: row, onData: function (d) { packages = d.packages; today = d.today; }
   });
 
+  /* Capacity today: GET /api/console/institutes/capacity → { lessonsToday, learnersToday, seatsInUse, databaseBytes | null,
+     freeDatabaseBytes, freeLessonsADay, writesALesson, freeWritesADay } */
+  function capacity() {
+    var box = doc.getElementById('capBody');
+    if (!box) return;
+    AC.api('GET', '/api/console/institutes/capacity').then(function (c) {
+      var share = c.freeLessonsADay ? c.lessonsToday / c.freeLessonsADay : 0;
+      var n = function (x) { return Number(x).toLocaleString('en-IN'); };
+      var meter = AC.el('div', { class: 'cap-meter' + (share >= 0.5 ? ' cap-warn' : ''), role: 'img', 'aria-label': n(c.lessonsToday) + ' of about ' + n(c.freeLessonsADay) + ' lessons a day' },
+        AC.el('span', { class: 'cap-fill cap-w' + Math.min(10, Math.round(share * 10)) }));
+      AC.clear(box);
+      box.appendChild(AC.el('div', null, [
+        AC.el('p', null, [AC.el('strong', { text: n(c.lessonsToday) + ' lessons' }), ' finished today by ' + n(c.learnersToday) + (c.learnersToday === 1 ? ' learner' : ' learners') +
+          ' (since midnight, India time). ' + n(c.seatsInUse) + ' institute seats are in use.']),
+        meter,
+        AC.el('p', { class: 'cell-sub', text: 'An estimate: on Cloudflare\u2019s free plan the database takes ' + n(c.freeWritesADay) + ' writes a day, about ' + n(c.freeLessonsADay) +
+          ' lessons (a lesson writes about ' + c.writesALesson + ' rows). Past that, saving stops for everyone until 5:30 am. Move to Workers Paid ($5 a month) before you are near it: ' +
+          'Cloudflare dashboard \u203a Workers & Pages \u203a Plans.' }),
+        AC.el('p', { class: 'cell-sub', text: c.databaseBytes == null ? 'Database size isn\u2019t available right now.' :
+          'Database size: ' + (c.databaseBytes / 1e6).toLocaleString('en-IN', { maximumFractionDigits: 1 }) + ' MB of ' + n(c.freeDatabaseBytes / 1e9) + ' GB on the free plan.' })
+      ]));
+    }, function (err) { AC.clear(box); box.appendChild(AC.quiet("Couldn't load today's numbers. " + err.message)); });
+  }
+  capacity();
+
   var btn = doc.getElementById('newInstituteBtn');
   if (btn) btn.addEventListener('click', function () {
     if (!today) return AC.toast('Wait a moment for the list to load.', 'bad');
