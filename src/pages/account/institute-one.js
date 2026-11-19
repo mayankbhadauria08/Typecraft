@@ -16,6 +16,10 @@ export const body = `
   <div class="ins-sec-head"><h2 id="io-batches-h">Batches</h2><div id="io-batches-act"></div></div>
   <div id="io-batches"><div class="skeleton" style="height:6rem"></div></div>
 </section>
+<section class="section" id="io-inv-sec" hidden aria-labelledby="io-inv-h">
+  <h2 id="io-inv-h">Invoices</h2>
+  <div id="io-inv"></div>
+</section>
 <section class="section" id="io-staff-sec" hidden aria-labelledby="io-staff-h">
   <div class="ins-sec-head"><h2 id="io-staff-h">Admins and teachers</h2><div id="io-staff-act"></div></div>
   <div id="io-staff"></div>
