@@ -97,10 +97,12 @@ const SAMPLE = {
   institute_reminder: { instituteName: 'Sharma', kind: 'ends', lastDay: '30 Nov 2026', days: 7, link: '/institute', online: true },
   institute_payment: { instituteName: `Sharma ${EVIL}`, kind: 'new', what: `TypeCraft Pro plan for 20 students ${EVIL}`, amountPaise: 1998000, invoiceNumber: 'TC-2026-000009',
     invoiceUrl: '/institute/ins_00000000000000000000/invoices/TC-2026-000009', link: 'javascript:alert(1)', seats: 20, lastDay: '2027-11-18' },
+  institute_weekly: { from: '16 November', to: '22 November', settingsUrl: '/institute', institutes: [{ name: `Sharma ${EVIL}`, link: 'javascript:alert(1)',
+    batches: [{ name: `Morning ${EVIL}`, students: 4, practised: 2, time: '1 h 5 min', top: [`Asha ${EVIL} (40 min)`], quiet: ['Ravi'], quietMore: 0, link: '/institute' }] }] },
 };
 
 test('every template renders a subject, escaped HTML and a text part', () => {
-  assert.equal(TEMPLATE_NAMES.length, 24);
+  assert.equal(TEMPLATE_NAMES.length, 25);
   const site = { siteUrl: 'https://typecrafttyping.in', supportEmail: 'hello@typecrafttyping.com', unsubscribeUrl: 'https://typecrafttyping.in/api/email/unsubscribe?u=1&t=2' };
   for (const name of TEMPLATE_NAMES) {
     assert.ok(SAMPLE[name], `sample data for ${name}`);

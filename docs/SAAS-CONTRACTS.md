@@ -289,6 +289,9 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   mine: { starts, submittedAt, result } }`; `POST …/start` (409 `test_upcoming` / `test_closed` / `test_cancelled` / `already`).
   `POST /api/exams/results` takes `batchTestId` → `batchTest: { counted, why?: already | late | not_started | other_test | cancelled | not_yours }`.
   `GET /api/me/batches` adds `tests: [{ id, title, opensAt, closesAt, note, state, mine, link }]`.
+- The Monday email (`src/institute-weekly.js`, docs/INSTITUTES.md §17): `GET /api/me/institute-email` → `{ weekly }` (503 `weekly_not_ready`
+  before migration 0013), `PUT` `{ weekly: boolean }`. Template `institute_weekly` `{ name, from*, to*, institutes*: [{ name, link, batches:
+  [{ name, students, practised, time, top, quiet, quietMore, link }] }], settingsUrl }` (transactional).
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

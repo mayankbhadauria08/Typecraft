@@ -30,5 +30,9 @@ export const body = `
   <div class="ins-sec-head"><h2 id="io-staff-h">Admins and teachers</h2><div id="io-staff-act"></div></div>
   <div id="io-staff"></div>
 </section>
+<section class="section" id="io-weekly-sec" hidden aria-labelledby="io-weekly-h">
+  <h2 id="io-weekly-h">Your Monday email</h2>
+  <div id="io-weekly"></div>
+</section>
 `;
 export default body;

@@ -30,6 +30,8 @@
 //   student_invite                { name, instituteName*, batchName*, batchCode*, joinPath* }  (not 'code'/'link': kept for retries)
 //   institute_reminder            { name, instituteName*, kind* ('seats' | 'ends'), seats, seatsUsed, lastDay, days, link, online (bool) }
 //   institute_payment             { name, instituteName*, kind ('new' | 'seats' | 'renew'), what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }
+//   institute_weekly              { name, from*, to*, institutes*: [{ name, link, batches: [{ name, students, practised, time, top: [text], quiet: [name],
+//                                   quietMore, link }] }], settingsUrl }
 // URLs given in data may be absolute https URLs or site paths ('/pricing'); anything else is dropped.
 
 const ACCENT = '#0b6e63';
@@ -157,6 +159,7 @@ const HEADS = {
   student_invite: ['Institute', null],
   institute_reminder: ['Institute', null],
   institute_payment: ['Payment', 'Payment received'],
+  institute_weekly: ['Institute', 'Your batches last week'],
 };
 const DARK = '#0f1b19';
 
@@ -462,6 +465,25 @@ export const TEMPLATES = {
       Button('View and print invoice', url(site, d.invoiceUrl) || `${site.siteUrl}/institute`),
       Small(`Open your institute any time at ${url(site, d.link) || `${site.siteUrl}/institute`}. Only its admins can open the invoice.`),
     ] });
+  },
+
+  institute_weekly(d, site) {
+    const list = Array.isArray(d.institutes) ? d.institutes.slice(0, 10) : [];
+    const one = list.length === 1;
+    const subject = `${one ? `${String(list[0].name || '').replace(/[\r\n]+/g, ' ')}: ` : ''}your batches from ${d.from} to ${d.to}`;
+    const blocks = [P(hi(d)), P(`Here is how your students practised last week, ${d.from} to ${d.to}.`)];
+    for (const i of list) {
+      if (!one) blocks.push(P(`${i.name}`));
+      for (const b of (Array.isArray(i.batches) ? i.batches.slice(0, 20) : [])) {
+        blocks.push(P(`${b.name}: ${b.practised} of ${b.students} student${b.students === 1 ? '' : 's'} practised, ${b.time} in all.`));
+        const quiet = (b.quiet || []).join(', ') + (b.quietMore ? ` and ${b.quietMore} more` : '');
+        blocks.push(Rows([['Most practice', (b.top || []).join(', ') || 'Nobody practised'], ["Didn't practise", quiet || 'Everyone practised']]));
+      }
+    }
+    const first = list[0] ? url(site, list[0].link) : null;
+    blocks.push(Button(one ? 'Open your institute' : 'Open your institutes', first && one ? first : `${site.siteUrl}/institute`));
+    blocks.push(Small(`You get this every Monday because you teach or run batches on TypeCraft. To stop it, switch off "Your Monday email" on your institute's page: ${url(site, d.settingsUrl) || `${site.siteUrl}/institute`}`));
+    return layout(site, { subject, preheader: list.length ? `${list.reduce((n, i) => n + (i.batches || []).length, 0)} batches: who practised and who didn't.` : 'Your batches last week.', blocks });
   },
 
   test_completed(d, site) {

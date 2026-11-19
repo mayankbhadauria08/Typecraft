@@ -16,7 +16,8 @@ Release 1 is built in five pull requests. This file grows with each one.
 | 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | pull request #34 |
 | Release 2 (D3–D5, D7, C5, G2, B4) | targets, assignments, exam results by batch, leaderboard, invitations, reminders, invoices | pull requests #35, #37, #38 |
 | Release 3 (F1–F3) | buying seats online: new institutes, more seats, renewals, invoice by email (§15) | pull request #39 |
-| Later: D6 | scheduled mock test for a batch (§16) | this pull request |
+| Later: D6 | scheduled mock test for a batch (§16) | pull request #40 |
+| Later: G3 | the Monday email to teachers and admins (§17) | this pull request |
 
 Nobody can join anything until an institute is created in the console and its payment recorded, or its
 seats are bought online and Razorpay confirms the payment (§15).
@@ -343,4 +344,18 @@ needs Razorpay's keys (test keys first). Bank transfer stays as it was.
 - API: `GET/POST /api/institutes/:id/batches/:bid/tests`, `GET …/tests/:tid`, `GET …/tests/:tid/results.csv`,
   `POST …/tests/:tid/cancel`; students: `GET /api/me/batch-tests/:tid`, `POST …/start`; `POST /api/exams/results`
   takes `batchTestId` and answers `batchTest: { counted, why? }`; `GET /api/me/batches` lists `tests`.
+
+## 17. Later (G3): the Monday email — `src/institute-weekly.js`, migration 0013
+
+- Every Monday (the nightly job, 02:47 India time) each teacher gets one email about the batches they teach,
+  and each admin about every batch of their institute: for last week (Monday to Sunday), how many students
+  practised and for how long in all, the three who practised most, and who didn't practise (up to 12 names,
+  then "and N more"). Someone who helps run two institutes gets one email covering both.
+- Left out: archived batches, batches without students, removed staff, and institutes that are paused, closed
+  or outside their term. It goes once a week per person (a claim row per person and week), so a second run
+  sends nothing.
+- On by default. Anyone can switch it off, or on again, under **Your Monday email** on their institute's page;
+  the email says where. Template `institute_weekly`.
+- API: `GET/PUT /api/me/institute-email` `{ weekly }` (signed in). Before migration 0013 the page hides the
+  setting and nothing is sent.
 
