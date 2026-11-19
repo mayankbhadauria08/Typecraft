@@ -1,5 +1,5 @@
 // /institute/:id/batches/:bid — one batch: its join code, its students' progress (CSV), certificates to print, and (admins) its settings
-// (docs/INSTITUTES.md §8). Data: GET /api/institutes/:id/batches/:bid and …/students.
+// and scheduled mock tests (docs/INSTITUTES.md §8, §16). Data: GET /api/institutes/:id/batches/:bid, …/students and …/tests.
 export const meta = {
   path: '/institute/:id/batches/:bid', title: 'Batch', description: 'A batch: its code and its students.',
   access: 'user', layout: 'account', nav: 'institute', noindex: true,
@@ -26,6 +26,11 @@ export const body = `
   <div id="ib-asg"></div>
   <div class="ins-sec-head ins-sub-head"><h3>Exam practice</h3></div>
   <div id="ib-exams"></div>
+</section>
+<section class="section" id="ib-tests-sec" hidden aria-labelledby="ib-tests-h">
+  <div class="ins-sec-head"><h2 id="ib-tests-h">Scheduled tests</h2><div id="ib-tests-act"></div></div>
+  <div id="ib-tests"></div>
+  <div id="ib-test-one" aria-live="polite"></div>
 </section>
 <section class="section" id="ib-certs-sec" hidden aria-labelledby="ib-certs-h">
   <div class="ins-sec-head"><h2 id="ib-certs-h">Certificates</h2><div id="ib-certs-act"></div></div>

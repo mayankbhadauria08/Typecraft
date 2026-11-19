@@ -1,6 +1,7 @@
 // Exam practice and verifiable certificates (docs/EXAM-MODES.md).
 //
-//   POST /api/exams/results                    signed in   marks an attempt (shared/exam-rules.js) and saves the numbers
+//   POST /api/exams/results                    signed in   marks an attempt (shared/exam-rules.js) and saves the numbers;
+//                                                          with batchTestId, it may count for a batch's scheduled test (src/institute-tests.js)
 //   GET  /api/exams/results                    signed in   recent attempts, best per test, certificate codes
 //   POST /api/exams/results/:id/certificate    signed in   a code for a passed attempt
 //   GET  /api/me/certificates                  signed in   every certificate (course speed certificates and passed tests) with its code
@@ -14,6 +15,7 @@ import '../shared/exam-rules.js';
 import { HttpError, json, readJson, fieldError, nowIso, clientIp } from './http.js';
 import { requireSession, hitLimit, tooMany } from './session.js';
 import { todayOf } from './api.js';
+import { countResult } from './institute-tests.js';
 
 const X = globalThis.TC_EXAMS;
 export const DAILY_SAVES = 20;
@@ -71,7 +73,11 @@ export async function postResult(request, env) {
       DB.prepare('SELECT * FROM exam_results WHERE id = ?1 AND user_id = ?2').bind(body.id, user.id),
       DB.prepare('SELECT COUNT(*) AS n FROM exam_results WHERE user_id = ?1 AND day = ?2').bind(user.id, day),
     ]);
-    if (dup.results[0]) return json({ saved: false, duplicate: true, result: resultView(dup.results[0]), verdict: X.verdict(res) });
+    const batchTestId = typeof body.batchTestId === 'string' && body.batchTestId ? body.batchTestId : null;
+    if (dup.results[0]) {
+      return json({ saved: false, duplicate: true, result: resultView(dup.results[0]), verdict: X.verdict(res),
+        ...(batchTestId ? { batchTest: await countResult(env, user.id, batchTestId, dup.results[0]) } : {}) });
+    }
     if (used.results[0].n >= DAILY_SAVES) throw new HttpError(429, 'daily_limit', `You've saved ${DAILY_SAVES} exam results today. Your result is shown, but it can't be kept until tomorrow.`);
     const now = nowIso();
     const row = {
@@ -85,7 +91,8 @@ export async function postResult(request, env) {
                                   ON CONFLICT (id) DO NOTHING`).bind(...cols.map((c) => row[c])).run();
     // the same id from another account: refuse rather than mix them up
     if (!ins.meta || !ins.meta.changes) throw new HttpError(409, 'id_taken', 'That result was already saved. Please take the test again.');
-    return json({ saved: true, result: resultView(row), verdict: X.verdict(res), today: { date: day, used: used.results[0].n + 1, limit: DAILY_SAVES } }, 201);
+    return json({ saved: true, result: resultView(row), verdict: X.verdict(res), today: { date: day, used: used.results[0].n + 1, limit: DAILY_SAVES },
+      ...(batchTestId ? { batchTest: await countResult(env, user.id, batchTestId, row) } : {}) }, 201);
   }, NOT_READY_SAVE);
 }
 

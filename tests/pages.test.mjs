@@ -202,6 +202,8 @@ const SAMPLE = [
   [/\/staff\/\$\{[^}]+\}/, '/staff/stf_00000000000000000000'],
   [/\/students\/\$\{[^}]+\}/, '/students/mem_00000000000000000000'],
   [/\/assignments\/\$\{[^}]+\}/, '/assignments/asg_00000000000000000000'],
+  [/\/api\/me\/batch-tests\/\$\{[^}]+\}/, '/api/me/batch-tests/btst_00000000000000000000'],
+  [/\/tests\/\$\{[^}]+\}/, '/tests/btst_00000000000000000000'],
   [/\/api\/console\/institutes\/\$\{[^}]+\}/, '/api/console/institutes/ins_00000000000000000000'],
   [/\/invoices\/\$\{[^}]+\}/, '/invoices/TC-2026-999999'],
 ];

@@ -316,7 +316,7 @@ test('export lists seats and roles; deleting the account frees the seat', async 
 /* ---------------- before migration 0009 ---------------- */
 test('before the institute tables exist: plans work as before, institute pages say they are not switched on', async () => {
   const env = makeEnv({ OWNER_EMAILS: OWNER });
-  for (const t of ['batch_teachers', 'institute_students', 'institute_payments', 'institute_staff', 'batches', 'institutes']) env.DB.db.exec(`DROP TABLE ${t}`);
+  for (const t of ['batch_test_attempts', 'batch_tests', 'batch_teachers', 'institute_students', 'institute_payments', 'institute_staff', 'batches', 'institutes']) env.DB.db.exec(`DROP TABLE ${t}`);
   const Q = { env, srv: await startServer(env, 8790) };
   Q.base = `http://localhost:${Q.srv.port}`;
   const Kq = kit(Q, { ipPrefix: '10.74.0.' });

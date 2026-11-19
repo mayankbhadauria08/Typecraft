@@ -281,6 +281,14 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `{ on, packageId, minSeats, prices: { 6, 12 } }`. Webhooks: through `POST /api/webhooks/razorpay`. Page `/institute/buy` (user, account).
 - Email template `institute_payment` `{ name, instituteName*, kind, what*, amountPaise*, invoiceNumber, invoiceUrl, link, seats, lastDay }`
   (billing); `institute_reminder` also takes `online`.
+- Scheduled tests (`src/institute-tests.js`, docs/INSTITUTES.md §16), staff of the batch: `GET /api/institutes/:id/batches/:bid/tests`
+  → `{ tests: [{ id, mode, modeName, short, minutes, passageId, passageTitle, opensAt, closesAt, note, state, started, submitted, passed }],
+  students, modes, windows, today, now }`; `POST …/tests` `{ mode, passageId, day, time, windowMinutes, note? }` → 201 `{ test }` (409 `too_many`,
+  `archived`); `GET …/tests/:tid` → `{ test, rows: [{ name, email, inBatch, state, starts, startedAt, submittedAt, result }] }`;
+  `GET …/tests/:tid/results.csv`; `POST …/tests/:tid/cancel`. Students of the batch: `GET /api/me/batch-tests/:tid` → `{ test, batch, institute,
+  mine: { starts, submittedAt, result } }`; `POST …/start` (409 `test_upcoming` / `test_closed` / `test_cancelled` / `already`).
+  `POST /api/exams/results` takes `batchTestId` → `batchTest: { counted, why?: already | late | not_started | other_test | cancelled | not_yours }`.
+  `GET /api/me/batches` adds `tests: [{ id, title, opensAt, closesAt, note, state, mine, link }]`.
 - Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.

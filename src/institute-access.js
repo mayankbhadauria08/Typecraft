@@ -13,7 +13,7 @@ export function newId(prefix) {
   crypto.getRandomValues(b);
   return prefix + '_' + Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 }
-export const ID_RE = /^(ins|bat|stf|mem|ipay|asg|sinv|iord)_[0-9a-f]{20}$/;
+export const ID_RE = /^(ins|bat|stf|mem|ipay|asg|sinv|iord|btst)_[0-9a-f]{20}$/;
 export const isId = (v, prefix) => typeof v === 'string' && ID_RE.test(v) && v.startsWith(prefix + '_');
 
 /** A join code: 8 random characters (40 bits). Wrong guesses are rate limited (src/institutes.js). */

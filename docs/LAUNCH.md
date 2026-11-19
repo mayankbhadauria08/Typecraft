@@ -157,6 +157,13 @@ institutes are only created in the console (part 2).
    seats once with a Razorpay test card, added seats and renewed, and seen the invoice email arrive.
 5. **[You] Live**: only after the test run, swap in the `rzp_live_…` keys. No real-money test is needed or done.
 
+## 1j. Institutes, later parts (scheduled mock tests)
+
+1. **[Claude, after your OK] Database**: take a restore bookmark, then apply `migrations/0012_batch_tests.sql`
+   one statement at a time (two tables and their indexes; adds only). Before it, the batch page simply
+   doesn't show *Scheduled tests*.
+2. **[You] Merge** after the earlier institute pull requests.
+
 ## 2. Secrets and settings checklist
 
 | Name | Where | Required | What |
