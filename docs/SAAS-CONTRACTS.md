@@ -245,6 +245,11 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   batch: { id, name, archived, students, joinCode, teachers: [{ id, name }] } }`.
 - Not staff, not their batch, closed institute, unknown id: 404 (one answer for all). Before migration 0009: 503
   `institutes_not_ready`.
+- Console (`src/console/institutes-api.js`, docs/INSTITUTES.md §7): `GET/POST /api/console/institutes`,
+  `GET/PUT /api/console/institutes/:id`, `POST …/:id/term`, `…/:id/status`, `…/:id/payments`,
+  `…/:id/payments/:pid/remove`, `…/:id/staff`, `…/:id/staff/:sid/resend`, `…/:id/staff/:sid/remove`;
+  permissions `institutes.view`, `institutes.manage`, `institutes.payments` (sensitive).
+- Email template `institute_invite` `{ name, instituteName*, role*, invitedBy, email*, link* }`.
 - Entitlements: `seats: [{ id, instituteId, instituteName, batchName, packageId, packageName, joinedAt, expiresAt }]`;
   a seat in an active institute inside its term counts like a plan period of its package.
 

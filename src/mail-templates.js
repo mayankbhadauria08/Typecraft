@@ -26,6 +26,7 @@
 //   test_completed                { name, wpm*, accuracy*, duration (s), errors, best (bool) }
 //   contact_received              { name, topic, message*, replyDays = 2 }
 //   contact_forward               { name*, email*, topic, message*, userId, priority (bool), plan, messageId }
+//   institute_invite              { name, instituteName*, role* ('admin' | 'teacher'), invitedBy, email*, link* }
 // URLs given in data may be absolute https URLs or site paths ('/pricing'); anything else is dropped.
 
 const ACCENT = '#0b6e63';
@@ -149,6 +150,7 @@ const HEADS = {
   test_completed: ['Typing test', 'Your typing test result'],
   contact_received: ['Support', 'We got your message'],
   contact_forward: ['Support', 'New contact message'],
+  institute_invite: ['Institute', null],
 };
 const DARK = '#0f1b19';
 
@@ -401,6 +403,20 @@ export const TEMPLATES = {
       P(hi(d)),
       Paragraphs(d.message),
       cta ? Button(d.ctaLabel || 'Open TypeCraft', cta) : Raw('', ''),
+    ] });
+  },
+
+  institute_invite(d, site) {
+    const admin = d.role === 'admin';
+    const subject = `You're invited to ${String(d.instituteName || 'an institute').replace(/[\r\n]+/g, ' ')} on TypeCraft`;
+    return layout(site, { subject, preheader: admin ? 'Set up batches and see your students\u2019 progress.' : 'See the progress of the batches you teach.', blocks: [
+      P(hi(d)),
+      P(`${d.invitedBy || 'TypeCraft'} has invited you to ${d.instituteName} on TypeCraft as ${admin ? 'its admin' : 'a teacher'}.`),
+      P(admin ? 'As the admin you set up batches, invite teachers, add students and see everyone\u2019s progress.'
+        : 'As a teacher you see the progress of the batches you teach and print their certificates.'),
+      P(`Sign in, or create an account, with this email address${d.email ? ` (${d.email})` : ''}. Then accept the invitation.`),
+      Button('Open the invitation', url(site, d.link) || `${site.siteUrl}/institute`),
+      Small("If you weren't expecting this, you can ignore this email: nothing happens unless you accept."),
     ] });
   },
 

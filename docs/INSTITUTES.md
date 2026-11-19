@@ -9,8 +9,8 @@ Release 1 is built in five pull requests. This file grows with each one.
 
 | Part | What | State |
 |---|---|---|
-| 1. Foundations (A1–A6) | tables, seat → plan, join codes, seat count and end date, staff checks, weak keys | this pull request |
-| 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats | next |
+| 1. Foundations (A1–A6) | tables, seat → plan, join codes, seat count and end date, staff checks, weak keys | pull request #28 |
+| 2. Console (B1–B3, B5) | create institutes, record payments, renew and add seats, invite their admin | pull request 2 |
 | 3. Institute portal (C1–C4) | institute home, teachers, batches, students | |
 | 4. Reports and certificates (D1, D2, E1, E2) | batch report and CSV, student page, batch certificates | |
 | 5. Terms, capacity, final check (G1, G4, G5) | institute terms, privacy lines, capacity card, guide | |
@@ -110,3 +110,32 @@ which the app doesn't call, and by a one-time copy for older accounts. Reading `
 weak keys empty in the console (learner page, learning analytics) and in the learner's own Analytics
 key map. They now read both, the larger total for each key winning (they hold the same running
 totals, never parts to add). Nothing new is written, so this costs no database writes.
+
+## 7. The console — `src/console/institutes-api.js`, Core operations › Institutes
+
+TypeCraft staff run institutes from the console. Three permissions (Roles and permissions grid):
+
+| Permission | Admin | Support | What |
+|---|---|---|---|
+| `institutes.view` | yes | yes | the list and each institute, without money for roles that lack the next one or `revenue.view` |
+| `institutes.manage` | yes | no | create, edit details, change seats and term, switch on, pause, close, invite and remove staff |
+| `institutes.payments` | yes | no | record and remove payments; asks for the password again |
+
+- **Create** (New institute): name, city, contact, GSTIN (checked: 15 characters), the plan a seat gives
+  (any paid package), seats (1 to 10,000), price per seat for the term (₹), first and last day (India
+  days; a term is at most three years), their admin's email (optional), private notes. It starts
+  **Not paid yet** (`pending`).
+- **Record payment**: amount, how (bank transfer, UPI, cheque, cash, other), reference (required except
+  for cash), the day the money arrived (not in the future), note. **The first payment switches a
+  pending institute on.** A payment recorded by mistake can be removed with a reason; the activity log
+  keeps everything it said. Money is never taken from a page in the browser: only staff record it.
+- **Change seats or term**: seats (never below the seats in use), first and last day, price per seat,
+  with a reason. Renewing = moving the last day on. Every change is logged with from and to.
+- **Status**: Not paid yet → On or Closed; On → Paused or Closed; Paused → On or Closed. Closed is final
+  (students lose the plan, staff lose access). Each change needs a reason.
+- **Admin and teachers**: invite by email (admin or teacher), send the email again, remove (their batches
+  go back to the admins). The invitation email (`institute_invite`) links to `/institute`, where the
+  invited account accepts (part 3). It carries no secret: only the account with that verified email can
+  accept.
+- **History**: every change, by whom and when (`audit_logs`, target `institute:<id>`), for roles with
+  `audit.view`.
