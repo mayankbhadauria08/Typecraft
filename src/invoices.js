@@ -47,7 +47,14 @@ export async function ensureInvoice(env, orderId) {
   const seq = await nextSeq(env);
   const number = formatNumber(seq, issuedAt);
   const period = o.validity_days ? `${o.validity_days} days` : 'lifetime access';
-  const lines = [{ description: `TypeCraft ${o.package_name} plan (${period})`, quantity: 1, amountPaise: o.amount_paise }];
+  let lines = [{ description: `TypeCraft ${o.package_name} plan (${period})`, quantity: 1, amountPaise: o.amount_paise }];
+  // a coupon or a sale (migration 0011): the plan at its own price, then the discount, adding up to what was paid
+  let d = null;
+  try { d = await DB.prepare('SELECT list_price_paise, discount_paise, label FROM order_discounts WHERE order_id = ?1').bind(orderId).first(); } catch { d = null; }
+  if (d && d.list_price_paise - d.discount_paise === o.amount_paise) {
+    lines = [{ description: `TypeCraft ${o.package_name} plan (${period})`, quantity: 1, amountPaise: d.list_price_paise },
+      { description: `Discount: ${d.label}`, quantity: 1, amountPaise: -d.discount_paise }];
+  }
   await DB.prepare(
     `INSERT INTO invoices (id, number, seq, order_id, user_id, amount_paise, currency, billed_name, billed_email, seller, lines, issued_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) ON CONFLICT (order_id) DO NOTHING`

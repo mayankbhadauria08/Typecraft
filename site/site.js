@@ -223,10 +223,10 @@
 
   /* ---------- formatting ---------- */
   function money(paise, currency) {
-    const n = Number(paise || 0) / 100;
+    const n = Math.abs(Number(paise || 0)) / 100;
     const whole = Math.round(n * 100) % 100 === 0;
     const sym = !currency || currency === 'INR' ? '₹' : currency + ' ';
-    return sym + n.toLocaleString('en-IN', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+    return (Number(paise) < 0 ? '\u2212' : '') + sym + n.toLocaleString('en-IN', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
   }
   function date(iso) {
     if (!iso) return '—';

@@ -1,5 +1,5 @@
 // Page frames for Layer 3, business growth (docs/ADMIN-PHASE-4.md): Support, Business reports, Email campaigns
-// (with the email log) and Notifications.
+// (with the email log), Notifications, Coupons and Promotions.
 // Each frame carries no data; its script in site/console/ asks for it.
 import { esc } from '../layout.js';
 import { icon } from './icons.js';
@@ -152,6 +152,43 @@ function noticesBody(me) {
   });
 }
 
+/* ---------- Coupons and Promotions ---------- */
+function couponsBody(me) {
+  return listFrame({
+    title: 'Coupons',
+    sub: 'Codes customers type at checkout for money off. When a sale is on as well, the customer gets whichever takes more off, never both.',
+    action: has(me, 'coupons.manage') ? `<button type="button" class="btn btn-primary" id="newCoupon">${icon('plus')}<span>New coupon</span></button>` : '',
+    label: 'Find coupons',
+    search: { label: 'Search coupons', placeholder: 'Code or note' },
+    filters: select('status', 'Status', [['', 'All coupons'], ['live', 'Works now'], ['scheduled', 'Starts later'], ['used_up', 'Used up'], ['ended', 'Expired'], ['off', 'Turned off']]),
+    heads: [['Code'], ['Takes off', 'col-wide'], ['For', 'col-wide'], ['Used', 'col-fit'], ['When', 'col-wide'], ['Status', 'col-fit']],
+    note: '<div class="limit-bar" id="couponTotals" aria-live="polite"></div>',
+  });
+}
+
+function couponBody() {
+  return recordFrame({
+    back: ['Coupons', '/coupons'],
+    missing: ['Coupon not found', 'There is no coupon with this ID. It may have been deleted.'],
+    main: `${section('terms', 'What it does', lines(4))}
+${section('uses', 'Orders that used it', lines(3), '<span class="panel-meta" id="usesMeta"></span>')}`,
+    side: `${panel('prices', 'Prices with this code', 3)}
+${panel('history', 'History', 3)}`,
+    sideLabel: 'About this coupon',
+  });
+}
+
+function promotionsBody(me) {
+  return listFrame({
+    title: 'Promotions',
+    sub: 'Sales: lower prices for everyone for a set time. The pricing page shows the old price crossed out and the sale\'s name. A coupon applies instead only when it takes more off.',
+    action: has(me, 'promotions.manage') ? `<button type="button" class="btn btn-primary" id="newPromotion">${icon('plus')}<span>New sale</span></button>` : '',
+    label: 'Find sales',
+    filters: select('status', 'Status', [['', 'All sales'], ['live', 'On now'], ['scheduled', 'Starts later'], ['ended', 'Ended'], ['off', 'Turned off']]),
+    heads: [['Sale'], ['Takes off', 'col-wide'], ['For', 'col-wide'], ['When', 'col-wide'], ['Orders', 'col-fit'], ['Status', 'col-fit'], ['', 'col-fit']],
+  });
+}
+
 export const GROWTH_PAGES = [
   { key: 'support', path: '/support', title: 'Support', crumbs: ['Business growth', 'Support'],
     permission: 'support.view', body: supportBody, scripts: ['support.js'] },
@@ -167,4 +204,10 @@ export const GROWTH_PAGES = [
     permission: 'emails.view', body: emailLogBody, scripts: ['email-log.js'] },
   { key: 'notifications', path: '/notifications', title: 'Notifications', crumbs: ['Business growth', 'Notifications'],
     permission: 'notices.view', body: noticesBody, scripts: ['notices.js'] },
+  { key: 'coupons', path: '/coupons', title: 'Coupons', crumbs: ['Business growth', 'Coupons'],
+    permission: 'coupons.view', body: couponsBody, scripts: ['discount-kit.js', 'coupons.js'] },
+  { key: 'coupons', match: /^\/coupons\/(cpn_[a-z0-9]{16})$/, names: ['id'], title: 'Coupon', crumbs: ['Business growth', ['Coupons', '/coupons'], 'Coupon'],
+    permission: 'coupons.view', body: couponBody, scripts: ['discount-kit.js', 'coupon.js'] },
+  { key: 'promotions', path: '/promotions', title: 'Promotions', crumbs: ['Business growth', 'Promotions'],
+    permission: 'promotions.view', body: promotionsBody, scripts: ['discount-kit.js', 'promotions.js'] },
 ];
