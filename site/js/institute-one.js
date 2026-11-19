@@ -4,7 +4,7 @@
    POST /api/institutes/:id/batches { name }, POST …/staff { email, role }, …/staff/:sid/resend, …/staff/:sid/remove.
    Admins, when seats are sold online: GET /api/institutes/:id/buy → { open, why, seats, seatsUsed, lastDay, maxPaise,
      addSeats: { available, days, pricePerSeatPaise, from, to }, renew: { available, opensOn | from, minSeats, terms: [{ months, pricePerSeatPaise, to }] } },
-   paid with K.buySeats (institute-pay.js). docs/INSTITUTES.md §8, §15. */
+   paid with K.buySeats (institute-pay.js). Everyone: GET/PUT /api/me/institute-email { weekly } (§17). docs/INSTITUTES.md §8, §15, §17. */
 (function () {
   'use strict';
   const K = window.TCK, h = K.h, $ = K.$;
@@ -192,6 +192,28 @@
     K.mount($('#io-buy'), cards);
   }
 
+  /* The Monday email (§17): one a week, about the batches you teach (admins: all of them). */
+  async function weekly() {
+    const res = await K.api('GET', '/api/me/institute-email');
+    const sec = $('#io-weekly-sec');
+    sec.hidden = !res.ok;
+    if (!res.ok) return;
+    const on = res.data.weekly;
+    const btn = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: on ? 'Switch it off' : 'Switch it on' });
+    btn.addEventListener('click', async () => {
+      K.busy(btn, true);
+      const r = await K.api('PUT', '/api/me/institute-email', { weekly: !on });
+      K.busy(btn, false);
+      if (!r.ok) return K.toast(K.errMsg(r), 'bad');
+      K.toast(r.data.weekly ? 'The Monday email is on.' : 'The Monday email is off.');
+      weekly();
+    });
+    K.mount($('#io-weekly'), h('div', { class: 'card ins-weekly' },
+      h('p', null, h('strong', { text: on ? 'On. ' : 'Off. ' }),
+        h('span', { class: 'muted', text: `${on ? 'Every Monday morning you get' : 'Switch it on to get, every Monday morning,'} an email about ${data.role === 'admin' ? 'every batch here' : 'the batches you teach'}: who practised last week and who didn't.` })),
+      h('div', { class: 'actions' }, btn)));
+  }
+
   async function load() {
     const res = await K.api('GET', `/api/institutes/${encodeURIComponent(id)}`);
     if (!res.ok) {
@@ -207,6 +229,7 @@
     stats(i);
     batches(data);
     if (data.role === 'admin') { staff(); invoices(); buy(); }
+    weekly();
   }
   if (K.qs('paid')) {
     // back from /institute/buy: the server switched the seats on before sending the browser here

@@ -696,4 +696,5 @@ a.ins-link:hover{border-color:var(--teal)}
 .ins-test-results .card-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 .ins-test-results h3{font-size:18px;margin:0}
 .ins-test-results p{margin:0}
-
+.card.ins-weekly{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;max-width:760px}
+.ins-weekly p{margin:0;max-width:60ch}

@@ -38,7 +38,7 @@ const CATEGORY = {
   subscription_expired: 'billing', refund_processed: 'billing',
   announcement: 'platform', account_update: 'transactional', test_completed: 'transactional',
   contact_received: 'support', contact_forward: 'support', institute_invite: 'transactional',
-  student_invite: 'transactional', institute_reminder: 'transactional', institute_payment: 'billing',
+  student_invite: 'transactional', institute_reminder: 'transactional', institute_payment: 'billing', institute_weekly: 'transactional',
 };
 const CATEGORIES = ['auth', 'security', 'transactional', 'billing', 'platform', 'support'];
 // per recipient per template, per hour
