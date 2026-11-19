@@ -138,7 +138,7 @@ function siteHeader(ctx) {
   ].join('');
   const free = !ctx.entitlements || !ctx.entitlements.plan || ctx.entitlements.plan === 'free';
   const actions = ctx.user
-    ? `${streakChip(ctx)}${free ? '<a class="btn btn-upgrade btn-sm hide-sm" href="/account/plans">Upgrade</a>' : ''}<a class="btn btn-primary btn-sm hide-xs" href="/app">${icon('keyboard')}Open trainer</a>${userMenu(ctx, true)}`
+    ? `${streakChip(ctx)}${free ? '<a class="btn btn-upgrade btn-sm hide-sm" href="/account/plans">Upgrade</a>' : ''}${userMenu(ctx, true)}`
     : `<a class="btn btn-ghost btn-sm" href="/login">Sign in</a><a class="btn btn-primary btn-sm" href="/signup">Start free</a>`;
   const mobileOnly = ctx.user ? '<a class="nav-only-mobile" href="/app">Open the trainer</a>' : '<a class="nav-only-mobile" href="/login">Sign in</a>';
   // signed in, the theme switch moves into the account menu to make room for the trainer button
