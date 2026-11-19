@@ -14,6 +14,7 @@ import { PAGES as PAYMENT_PAGES } from './pages/payment.js';
 import { PAGES as ADMIN_PAGES } from './pages/admin.js';
 import { loadSettings } from './site-data.js';
 import { freeLessons } from './package-view.js';
+import { remember, PUBLIC_DATA_TTL } from './memo.js';
 import '../shared/course-meta.js';
 import '../shared/lesson-access.js';
 import notFoundBody, { meta as notFoundMeta } from './pages/public/not-found.js';
@@ -144,10 +145,14 @@ async function sessionFor(env, request) {
 }
 async function whoFor(env, session) {
   if (!session) return { user: null, entitlements: null, role: null, totals: null };
-  let entitlements = null, role = null, totals = null;
-  try { const e = await entitlementsFor(env, session.user.id); entitlements = { plan: e.plan, planName: e.planName, expiresAt: e.expiresAt, features: e.features, limits: e.limits }; } catch { entitlements = null; }
-  try { role = await roleOf(env, session.user); } catch { role = null; }
-  try { totals = headerTotals(await env.DB.prepare('SELECT xp, streak_count, streak_last FROM user_totals WHERE user_id = ?1').bind(session.user.id).first()); } catch { totals = null; }
+  // asked at the same time, not one after another: each trip to the database costs a few hundred ms from India
+  const [e, role, row] = await Promise.all([
+    entitlementsFor(env, session.user.id).catch(() => null),
+    roleOf(env, session.user).catch(() => null),
+    (async () => env.DB.prepare('SELECT xp, streak_count, streak_last FROM user_totals WHERE user_id = ?1').bind(session.user.id).first())().catch(() => undefined),
+  ]);
+  const entitlements = e ? { plan: e.plan, planName: e.planName, expiresAt: e.expiresAt, features: e.features, limits: e.limits } : null;
+  const totals = row === undefined ? null : headerTotals(row);
   const u = session.user;
   return { user: { id: u.id, fullName: u.fullName, email: u.email, emailVerified: u.emailVerified }, entitlements, role, totals };
 }
@@ -168,7 +173,7 @@ export function headerTotals(row, now = Date.now()) {
    says the same as the page. The words are plain letters, digits and dashes, safe in HTML and in JSON. */
 async function fillFree(env, html) {
   if (!html.includes('{{free.')) return html;
-  const A = globalThis.TC_ACCESS, d = await freeLessons(env), set = new Set(A.idsOf(d.value));
+  const A = globalThis.TC_ACCESS, d = await remember(env, 'freeLessons', PUBLIC_DATA_TTL, () => freeLessons(env)), set = new Set(A.idsOf(d.value));
   const vals = { lessons: d.text, Lessons: d.Text, badge: d.all ? 'Every lesson free' : d.short + ' free' };
   for (const n of A.LEVELS) {
     const ids = A.BY_LEVEL[n], k = ids.filter((id) => set.has(id)).length;
@@ -180,7 +185,7 @@ async function fillFree(env, html) {
 
 async function fillTokens(env, html, url) {
   if (!html.includes('{{')) return html;
-  const s = await loadSettings(env);
+  const s = await remember(env, 'settings', PUBLIC_DATA_TTL, () => loadSettings(env));
   const vals = { site: { url: siteUrl(env) }, seller: s.seller, support: s.support };
   return html.replace(/\{\{(\w+)\.(\w+)\}\}/g, (all, a, b) => {
     const v = vals[a] && vals[a][b];
@@ -267,7 +272,12 @@ async function render(env, url, page, params, who, status) {
     jsonld: [],
   };
   let loaded = {};
-  if (typeof page.load === 'function') { try { loaded = (await page.load(env, ctx)) || {}; } catch { loaded = {}; } }
+  if (typeof page.load === 'function') {
+    // pages that load data (home, pricing) also show seller and Free-plan text: ask for all three at once
+    remember(env, 'settings', PUBLIC_DATA_TTL, () => loadSettings(env)).catch(() => {});
+    remember(env, 'freeLessons', PUBLIC_DATA_TTL, () => freeLessons(env)).catch(() => {});
+    try { loaded = (await page.load(env, ctx)) || {}; } catch { loaded = {}; }
+  }
   if (loaded.data !== undefined) ctx.data = loaded.data;
   const ld = typeof page.jsonld === 'function' ? page.jsonld(ctx, loaded) : page.jsonld;
   if (ld) ctx.jsonld = Array.isArray(ld) ? ld : [ld];
