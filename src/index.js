@@ -1,6 +1,7 @@
 // TypeCraft Worker: serves index.html as a static asset and handles /api/* for
 // accounts and progress. Static files never reach this code (see wrangler.jsonc).
 import { HttpError, json, errorResponse, assertSameOriginWrite } from './http.js';
+import { forgetAll } from './memo.js';
 import * as auth from './auth.js';
 import * as account from './account.js';
 import * as progress from './progress.js';
@@ -99,7 +100,10 @@ export default {
     if (early) return early;
     if (pathname.startsWith('/api/')) {
       try {
-        return await handleApi(request, env, ctx);
+        const res = await handleApi(request, env, ctx);
+        // an admin or console change (prices, plans, seller details, rules): public pages read it fresh
+        if (request.method !== 'GET' && /^\/api\/(admin|console)\//.test(pathname)) forgetAll(env);
+        return res;
       } catch (err) {
         if (/no such table/i.test(String(err && err.message))) {
           return errorResponse(new HttpError(503, 'database_not_migrated', "Accounts aren't available yet: the database's tables haven't been created (SETUP.md, step 1)."));
