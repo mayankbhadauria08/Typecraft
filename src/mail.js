@@ -549,7 +549,7 @@ export async function adminAnnouncement(request, env, ctx) {
     return json({ test: true, status: r.status, to: user.email });
   }
   if (!(await hitLimit(env, `announce:${user.id}`, 5, 3600))) throw tooMany(60);
-  // With email campaigns switched on (migration 0010) an announcement is a campaign that starts now, so it
+  // With email campaigns switched on (migration 0012) an announcement is a campaign that starts now, so it
   // keeps to the daily limit (docs/ADMIN-PHASE-4.md §4). Before that, the old way below.
   try {
     const { campaignFromAnnouncement } = await import('./console/campaigns-api.js');
