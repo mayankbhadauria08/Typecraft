@@ -117,7 +117,7 @@ Full notes: `docs/EXAM-MODES.md`.
 2. **[You] Merge the pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Read the two new lines in the Privacy policy (section 1 and 2); its date is now 19 November 2026.
 
-## 1g. Institutes, part 1: foundations
+## 1g. Institutes (five pull requests: #28, #30, #31, #32 and part 5)
 
 Full notes: `docs/INSTITUTES.md`. Nothing changes for learners until an institute exists, and
 institutes are only created in the console (part 2).
@@ -134,6 +134,9 @@ institutes are only created in the console (part 2).
 3. To set up an institute: Console › Institutes › New institute, with their admin's email. Record their
    payment when it reaches your bank: that switches it on. Their admin gets an email (needs
    `RESEND_API_KEY`); until email works, tell them to sign in at `/institute` with that email.
+4. **[You] Before the first institute starts**: move to Workers Paid ($5 a month), Cloudflare dashboard ›
+   Workers & Pages › Plans (Capacity today on console › Institutes shows why); read `/institute-terms`
+   and the new privacy lines with a lawyer or CA. Full list: `docs/INSTITUTES.md` §11.
 
 ## 2. Secrets and settings checklist
 

@@ -176,7 +176,7 @@ export async function getInstitute(request, env, ctx, params) {
     DB.prepare(`SELECT b.id, b.name, b.archived_at, b.join_code,
                        (SELECT COUNT(*) FROM institute_students s WHERE s.batch_id = b.id AND s.status = 'active') AS students,
                        (SELECT COUNT(*) FROM institute_students s WHERE s.batch_id = b.id AND s.status = 'active'
-                           AND NOT EXISTS (SELECT 1 FROM daily_totals d WHERE d.user_id = s.user_id AND d.day >= ?3 AND d.seconds > 0)) AS quiet,
+                           AND NOT EXISTS (SELECT 1 FROM daily_totals d WHERE d.user_id = s.user_id AND d.day >= ?3 AND (d.seconds > 0 OR d.runs > 0 OR d.steps > 0))) AS quiet,
                        (SELECT GROUP_CONCAT(COALESCE(u.full_name, st.email), ', ') FROM batch_teachers t JOIN institute_staff st ON st.id = t.staff_id
                           LEFT JOIN users u ON u.id = st.user_id WHERE t.batch_id = b.id AND st.status = 'active') AS teachers
                   FROM batches b WHERE b.institute_id = ?1 AND ${visibleBatchSql(staff.role, '?2')}

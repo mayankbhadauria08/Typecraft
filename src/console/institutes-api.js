@@ -2,6 +2,7 @@
 // record the money it pays, and change its seats and term.
 //
 //   GET  /api/console/institutes                         institutes.view      list: q, status, page
+//   GET  /api/console/institutes/capacity                institutes.view      today's lessons and the database size against the free plan
 //   POST /api/console/institutes                         institutes.manage    create (starts 'pending'); { …fields, adminEmail? }
 //   GET  /api/console/institutes/:id                     institutes.view      one: batches, staff, payments, history
 //   PUT  /api/console/institutes/:id                     institutes.manage    name, city, contact, GSTIN, notes
@@ -424,10 +425,39 @@ export async function postStaffRemove(request, env, ctx, params) {
   });
 }
 
+/* ---------- GET /api/console/institutes/capacity ---------- */
+// How busy the site is today, against what Cloudflare's free plan allows (docs/INSTITUTES.md §10). Counts are
+// real; the lesson limit is worked out from a measured cost (a finished lesson writes about 48 database rows,
+// index updates included) and the free plan's 100,000 rows written a day. Cheap: today's events by their index.
+export const FREE_WRITES_A_DAY = 100000;
+export const WRITES_A_LESSON = 48;
+export const FREE_DB_BYTES = 5 * 1000 * 1000 * 1000;
+export async function getCapacity(request, env) {
+  await requireAdmin(env, request, 'institutes.view');
+  const DB = env.DB, today = istDay(), since = istDayStart(today);
+  const [runs, seats] = await DB.batch([
+    DB.prepare("SELECT COUNT(*) AS lessons, COUNT(DISTINCT user_id) AS learners FROM events WHERE server_at >= ?1 AND type = 'run'").bind(since),
+    DB.prepare(`SELECT COUNT(*) AS n FROM institute_students s JOIN institutes i ON i.id = s.institute_id
+                 WHERE s.status = 'active' AND i.status = 'active' AND i.ends_at > ?1`).bind(nowIso()),
+  ]).catch(async (err) => {
+    if (!/no such table/i.test(String(err && err.message))) throw err;
+    return [await DB.prepare("SELECT COUNT(*) AS lessons, COUNT(DISTINCT user_id) AS learners FROM events WHERE server_at >= ?1 AND type = 'run'").bind(since).all(), { results: [{ n: 0 }] }];
+  });
+  // D1 reports the database's size with every answer; the local test database doesn't
+  const size = runs.meta && Number.isFinite(runs.meta.size_after) ? runs.meta.size_after : null;
+  return json({
+    today, since,
+    lessonsToday: runs.results[0].lessons, learnersToday: runs.results[0].learners, seatsInUse: seats.results[0].n,
+    databaseBytes: size, freeDatabaseBytes: FREE_DB_BYTES,
+    freeLessonsADay: Math.floor(FREE_WRITES_A_DAY / WRITES_A_LESSON), writesALesson: WRITES_A_LESSON, freeWritesADay: FREE_WRITES_A_DAY,
+  });
+}
+
 const ID = '([a-z]{3,4}_[0-9a-f]{20})';
 const P = (method, tail, names, fn) => [method, new RegExp(`^/api/console/institutes/${ID}${tail}$`), ['id', ...names], fn];
 export const ROUTES = {
   'GET /api/console/institutes': getInstitutes,
+  'GET /api/console/institutes/capacity': getCapacity,
   'POST /api/console/institutes': postInstitute,
 };
 export const PATTERNS = [

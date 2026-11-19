@@ -7,7 +7,7 @@ export const meta = {
 export const body = `
 <div class="page-head">
   <h1>Institute</h1>
-  <p class="lede muted">For the admins and teachers of a coaching centre: set up batches, give students their code, and see how they are doing.</p>
+  <p class="lede muted">For the admins and teachers of a coaching centre: set up batches, give students their code, and see how they are doing. See the <a href="/institute-terms">terms for institutes</a> and the <a href="/institute-guide">guide</a>.</p>
 </div>
 <section class="section" id="ih-invites-sec" hidden aria-labelledby="ih-invites-h">
   <h2 id="ih-invites-h">Invitations</h2>
