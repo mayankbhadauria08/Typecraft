@@ -289,3 +289,12 @@ html,body{overflow-x:hidden}
 :root.in-lesson #bgfx{display:none}
 .lesson-shell > .lesson-machine{grid-area:rail;min-width:0}
 .has-machine .lesson-shell > .watch-panel,.has-machine .lesson-shell > .boss-mount,.has-machine .lesson-shell > .step-note{grid-column:1 / -1}
+
+/* ---------- top-bar menus: solid cards in the theme's own colours ----------
+   A frosted (blurred) panel can't blur through the top bar, which is blurred itself, so the
+   glass menus were see-through. They are solid now, with a shadow to lift them off the page. */
+.account-menu,.theme-menu{background:var(--surface);border:1px solid var(--line-strong);
+  box-shadow:0 26px 50px -18px var(--deep),0 2px 8px rgba(0,0,0,.18);-webkit-backdrop-filter:none;backdrop-filter:none}
+.account-menu button:hover,.account-menu .am-link:hover{background:var(--raise)}
+.theme-menu .theme-chip{background:var(--raise)}
+a.config-item{text-decoration:none}

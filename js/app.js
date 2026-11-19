@@ -1591,13 +1591,13 @@ function openAccount(tab){
   else window.scrollTo(0, 0);
 }
 function setAccountTab(tab){
-  document.querySelectorAll('#acctTabs .config-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#acctTabs button.config-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#accountView .acct-panel').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== tab));
   if(tab === 'learning') renderLearningPanel();
   if(tab === 'profile') renderProfilePanel();
   if(tab === 'settings') document.querySelectorAll('#accountView form').forEach(f => showForm(f, {}, ''));
 }
-document.querySelectorAll('#acctTabs .config-item').forEach(b => b.addEventListener('click', () => setAccountTab(b.dataset.tab)));
+document.querySelectorAll('#acctTabs button.config-item').forEach(b => b.addEventListener('click', () => setAccountTab(b.dataset.tab)));
 document.getElementById('acctBackBtn').addEventListener('click', backToDashboard);
 
 function when(iso){
@@ -1739,13 +1739,14 @@ document.getElementById('accountBtn').addEventListener('click', (e) => {
   const menu = document.getElementById('accountMenu');
   const open = menu.classList.toggle('hidden') === false;
   e.currentTarget.setAttribute('aria-expanded', String(open));
+  if(open) closeThemeMenu();   // one menu at a time
 });
 document.querySelectorAll('#accountMenu [data-acct]').forEach(b => b.addEventListener('click', () => openAccount(b.dataset.acct)));
 document.getElementById('signOutBtn').addEventListener('click', () => signOut(!!Account.forceNextSignOut));
 document.addEventListener('click', (e) => { if(!e.target.closest('#accountWrap')) closeAccountMenu(); });
 document.addEventListener('keydown', (e) => {
   if(e.key !== 'Escape') return;
-  closeAccountMenu();
+  closeAccountMenu(); closeThemeMenu();
   if(!document.getElementById('authModal').classList.contains('hidden')) closeAuth();
 });
 
@@ -2020,7 +2021,7 @@ document.addEventListener('click', (e)=>{
   const chip=e.target.closest && e.target.closest('.theme-chip'); if(chip){ applyTheme(chip.dataset.bg); return; }
   if(!e.target.closest('.theme-wrap')) closeThemeMenu();
 });
-themeToggle.addEventListener('click', (e)=>{ e.stopPropagation(); const m=document.getElementById('themeMenu'); const open=m.classList.toggle('hidden')===false; themeToggle.setAttribute('aria-expanded', String(open)); });
+themeToggle.addEventListener('click', (e)=>{ e.stopPropagation(); const m=document.getElementById('themeMenu'); const open=m.classList.toggle('hidden')===false; themeToggle.setAttribute('aria-expanded', String(open)); if(open) closeAccountMenu(); });
 document.querySelectorAll('#setEffects button').forEach(b=>b.addEventListener('click',()=>applyEffects(b.dataset.v)));
 document.querySelectorAll('#setSound button').forEach(b=>b.addEventListener('click',()=>{ applySoundLevel(+b.dataset.v); paintThemeControls(); }));
 document.querySelectorAll('#setGoal button').forEach(b=>b.addEventListener('click',()=>{ Settings.dailyGoal=+b.dataset.v; saveSettings(); paintThemeControls(); }));

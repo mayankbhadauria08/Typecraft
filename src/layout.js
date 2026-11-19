@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '3';
+export const ASSET_VERSION = '4';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -99,7 +99,7 @@ function userMenu(ctx, withTheme) {
     <a role="menuitem" href="/account/certificates">${icon('certificate')}<span>My certificates</span></a>
     <a role="menuitem" href="/account/plans">${icon('package')}<span>Plans &amp; billing</span></a>
     <a role="menuitem" href="/account/profile">${icon('user')}<span>Profile</span></a>
-    <a role="menuitem" href="/account/settings">${icon('settings')}<span>Settings</span></a>
+    <a role="menuitem" href="/account/settings">${icon('settings')}<span>Account settings</span></a>
     ${admin}
     ${withTheme ? '<button type="button" role="menuitem" data-theme-toggle="menu" aria-pressed="false"><span>Switch theme</span></button>' : ''}
     <hr>
