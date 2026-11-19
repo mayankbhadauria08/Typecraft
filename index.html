@@ -38,7 +38,7 @@
           <button id="themeToggle" class="nav-btn icon-btn" title="Background theme" aria-haspopup="true" aria-expanded="false"></button>
           <div class="theme-menu hidden" id="themeMenu" role="group" aria-label="Background theme"></div>
         </div>
-        <button id="navSettings" class="nav-btn icon-btn" title="Settings"><svg class="nb-svg" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg><span class="nav-label">Settings</span></button>
+        <button id="navSettings" class="nav-btn icon-btn" title="Practice settings: theme, sounds, daily goal" aria-label="Practice settings"><svg class="nb-svg" viewBox="0 0 24 24" stroke-width="2.1" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="nav-label">Settings</span></button>
         <a class="plan-chip" id="planChip" href="/account/plans" hidden></a>
         <span class="sync-status" id="syncStatus" role="status" aria-live="polite"></span>
         <div class="account-wrap" id="accountWrap" hidden>
@@ -49,12 +49,10 @@
             <a href="/exam-practice" role="menuitem" class="am-link">Exam practice</a>
             <a href="/account/certificates" role="menuitem" class="am-link">Certificates</a>
             <button data-acct="learning" role="menuitem">My learning</button>
-            <button data-acct="profile" role="menuitem">My profile</button>
-            <button data-acct="settings" role="menuitem">Account settings</button>
-            <button data-acct="password" role="menuitem">Change password</button>
+            <a href="/account/profile" role="menuitem" class="am-link">Profile</a>
+            <a href="/account/settings" role="menuitem" class="am-link">Account settings</a>
             <div class="am-sep"></div>
             <a href="/account/plans" role="menuitem" class="am-link" id="amPlans">Plans</a>
-            <a href="/account/settings" role="menuitem" class="am-link">Settings</a>
             <div class="am-sep"></div>
             <button id="signOutBtn" role="menuitem">Sign out</button>
           </div>
@@ -181,8 +179,8 @@
       <h1 class="acct-title" id="acctTitle">Your account</h1>
       <div class="config-bar" id="acctTabs">
         <button class="config-item active" data-tab="learning">my learning</button>
-        <button class="config-item" data-tab="profile">profile</button>
-        <button class="config-item" data-tab="settings">settings</button>
+        <a class="config-item" href="/account/profile">profile</a>
+        <a class="config-item" href="/account/settings">account settings</a>
       </div>
 
       <div class="acct-panel" data-panel="learning">
