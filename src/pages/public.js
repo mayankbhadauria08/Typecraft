@@ -16,6 +16,7 @@ import contact, { meta as contactMeta } from './public/contact.js';
 import privacy, { meta as privacyMeta } from './public/privacy.js';
 import terms, { meta as termsMeta } from './public/terms.js';
 import refund, { meta as refundMeta } from './public/refund-policy.js';
+import getTheApp, { meta as getTheAppMeta } from './public/get-the-app.js';
 
 const organization = (ctx) => ({
   '@context': 'https://schema.org',
@@ -65,6 +66,7 @@ export const PAGES = [
   { meta: pricingMeta, body: pricing, scripts: ['/site/js/pricing.js'], load: packagesData, jsonld: (ctx, loaded) => [productLd(ctx, loaded), faqJsonLd(FAQ.plans)] },
   { meta: faqMeta, body: faq, scripts: [], jsonld: () => faqJsonLd(ALL_FAQ) },
   { meta: contactMeta, body: contact, scripts: ['/site/js/contact.js'] },
+  { meta: getTheAppMeta, body: getTheApp, scripts: [] },
   { meta: privacyMeta, body: privacy, scripts: [] },
   { meta: termsMeta, body: terms, scripts: [] },
   { meta: refundMeta, body: refund, scripts: [] },

@@ -193,3 +193,54 @@ test('a seller change in admin shows on the legal pages straight away', async ()
   assert.equal(put.status, 200, await put.clone().text());
   assert.match((await get('/privacy')).text, /Asha Verma \(sole proprietor\)/);
 });
+
+import { readFileSync } from 'node:fs';
+const pngSize = (path) => { const b = readFileSync(new URL('../' + path, import.meta.url)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+
+test('share picture, icon files and app settings', async () => {
+  const home = await get('/');
+  assert.match(home.text, /<meta property="og:image" content="https:\/\/typecrafttyping\.in\/site\/og-image\.png">/);
+  assert.match(home.text, /<meta property="og:image:width" content="1200">/);
+  assert.match(home.text, /<meta property="og:image:height" content="630">/);
+  assert.match(home.text, /<link rel="icon" href="\/favicon\.ico" sizes="48x48">/);
+  assert.match(home.text, /<link rel="icon" href="\/icons\/favicon\.svg" type="image\/svg\+xml">/);
+  assert.match(home.text, /<link rel="manifest" href="\/manifest\.webmanifest">/);
+  assert.doesNotMatch(home.text, /rel="icon"[^>]*href="data:/, 'no inline icon');
+  assert.deepEqual(pngSize('site/og-image.png'), [1200, 630]);
+  assert.deepEqual(pngSize('icons/icon-192.png'), [192, 192]);
+  assert.deepEqual(pngSize('icons/icon-512.png'), [512, 512]);
+  const ico = readFileSync(new URL('../favicon.ico', import.meta.url));
+  assert.equal(ico.readUInt16LE(2), 1, 'an icon file'); assert.ok(ico.readUInt16LE(4) >= 3, '16, 32 and 48 px');
+
+  const m = JSON.parse(readFileSync(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(m.start_url, '/app', 'the installed app opens the trainer');
+  assert.equal(m.id, '/app');
+  assert.equal(m.display, 'standalone');
+  for (const size of ['192x192', '512x512']) assert.ok(m.icons.some((i) => i.sizes === size && i.type === 'image/png'), size + ' icon');
+  for (const i of m.icons.filter((x) => x.type === 'image/png')) assert.deepEqual(pngSize(i.src.slice(1)), i.sizes.split('x').map(Number));
+  assert.deepEqual(m.shortcuts.map((s) => s.url), ['/app', '/arcade', '/typing-test']);
+  for (const s of m.screenshots) assert.deepEqual(pngSize(s.src.slice(1)), s.sizes.split('x').map(Number), s.src);
+  assert.ok(m.screenshots.every((s) => s.form_factor === 'wide'), 'computer screenshots only');
+
+  const app = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /rel="icon"[^>]*href="data:/);
+  assert.match(app, /<link rel="manifest" href="\/manifest\.webmanifest">/);
+  assert.match(app, /data-install hidden>Install the app</);
+  assert.match(app, /id="installCard" hidden/);
+});
+
+test('Get the app page, the account menu install item and the phone keyboard note', async () => {
+  const page = await get('/get-the-app');
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Install TypeCraft on your computer\.<\/h1>/);
+  assert.match(page.text, /data-install hidden>/);
+  assert.match(page.text, /data-install-status data-state="manual"/);
+  assert.match((await get('/sitemap.xml')).text, /\/get-the-app<\/loc>/);
+  assert.match((await get('/')).text, /<a href="\/get-the-app">Get the app<\/a>/);
+
+  const cookie = await signup('install@example.com', '203.0.113.91');
+  assert.match((await get('/pricing', { cookie })).text, /<button type="button" role="menuitem" data-install hidden>/);
+
+  for (const p of ['/typing-test', '/exam-practice', '/practice']) assert.match((await get(p)).text, /data-kb-note/, p + ': keyboard note for phones');
+  for (const p of ['/', '/about', '/pricing']) assert.doesNotMatch((await get(p)).text, /data-kb-note/, p);
+});
