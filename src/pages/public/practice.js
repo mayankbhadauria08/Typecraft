@@ -3,6 +3,7 @@ import { icon, esc } from '../../layout.js';
 
 const M = globalThis.TC_META;
 export const meta = {
+  needsKeyboard: true,   // phones see a note offering to send the link to a computer
   path: '/practice',
   title: 'Typing practice: the full course',
   description: 'Practise touch typing with a structured course: 78 lessons in 5 levels, five steps per lesson, stars for accuracy, crowns for speed and boss tests. Start free.',

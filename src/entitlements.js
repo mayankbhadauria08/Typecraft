@@ -75,7 +75,7 @@ export function overrideOf(ent, kind, id) {
 
 export async function entitlementsFor(env, userId, now = nowIso()) {
   const DB = env.DB;
-  const [seats, [freeRes, subsRes, rulesRes]] = await Promise.all([seatsFor(env, userId, now), DB.batch([
+  const [seats, [freeRes, subsRes, rulesRes], overrides] = await Promise.all([seatsFor(env, userId, now), DB.batch([
     DB.prepare("SELECT id, name, features, limits FROM packages WHERE id = 'free'"),
     DB.prepare(`SELECT s.id, s.package_id, s.status, s.source, s.starts_at, s.expires_at, s.features, s.limits,
                        p.name AS package_name, p.display_order, p.limits AS package_limits
@@ -83,7 +83,7 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
                  WHERE s.user_id = ?1 AND s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > ?2)
                  ORDER BY s.starts_at`).bind(userId, now),
     rulesStatement(env),
-  ])]);
+  ]), overridesFor(env, userId, now)]);   // at the same time: one wait instead of three
   const free = freeRes.results[0];
   const ent = {
     plan: 'free',
@@ -92,7 +92,7 @@ export async function entitlementsFor(env, userId, now = nowIso()) {
     features: free ? parse(free.features, FREE.features) : [...FREE.features],
     limits: { ...FREE.limits, ...(free ? parse(free.limits, {}) : {}) },
     subscriptions: [],
-    overrides: await overridesFor(env, userId, now),
+    overrides,
     rules: projection(fromRow(rulesRes.results[0]).stored),
   };
   let best = null, latest = null, lifetime = false;

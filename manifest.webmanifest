@@ -1,14 +1,26 @@
 {
-  "name": "TypeCraft",
+  "id": "/app",
+  "name": "TypeCraft: touch typing course",
   "short_name": "TypeCraft",
-  "description": "Learn to touch type: lessons, a coach and an arcade. Free, no ads.",
-  "start_url": "./",
-  "scope": "./",
+  "description": "Learn to touch type on your computer: 78 short lessons from the home row to full speed, a coach that finds your weak keys, exam-style tests and an arcade.",
+  "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#070b0a",
   "theme_color": "#070b0a",
+  "lang": "en-IN",
+  "categories": ["education", "productivity"],
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Continue learning", "url": "/app", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Arcade", "url": "/arcade", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Typing test", "url": "/typing-test", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
+  "screenshots": [
+    { "src": "/icons/screenshot-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "The TypeCraft trainer: lessons, coach and arcade" }
   ]
 }
