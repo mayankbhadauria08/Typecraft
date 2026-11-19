@@ -128,8 +128,12 @@ institutes are only created in the console (part 2).
    `SELECT name FROM sqlite_master WHERE name LIKE 'institute%' OR name LIKE 'batch%'`, and that
    `users`, `user_subscriptions` and `lesson_scores` have the same counts as before.
    Before this, the site works as today and the institute pages say they aren't switched on.
-2. **[You] Merge the pull request.** The new `/join` page and the "Your institute" line on Plans
-   appear; weak keys start showing in the console and in Analytics (no new data is stored for that).
+2. **[You] Merge the pull requests in order** (part 1, then part 2, …). The new `/join` page and the
+   "Your institute" line on Plans appear; weak keys start showing in the console and in Analytics (no
+   new data is stored for that). Part 2 adds Core operations › Institutes to the console.
+3. To set up an institute: Console › Institutes › New institute, with their admin's email. Record their
+   payment when it reaches your bank: that switches it on. Their admin gets an email (needs
+   `RESEND_API_KEY`); until email works, tell them to sign in at `/institute` with that email.
 
 ## 2. Secrets and settings checklist
 
