@@ -8,7 +8,7 @@
 //
 // Messages arrive through the contact form (POST /api/contact, src/mail.js) into contact_messages.
 // A reply goes out as the support_reply email with Reply-To set to the support address, so the
-// customer's answer lands in the support inbox (Gmail). Replies and notes: support_replies (0009).
+// customer's answer lands in the support inbox (Gmail). Replies and notes: support_replies (migration 0011).
 import { HttpError, json, readJson, fieldError, clientIp, nowIso } from '../http.js';
 import { uuid } from '../crypto.js';
 import { hitLimit, emailEnabled } from '../session.js';

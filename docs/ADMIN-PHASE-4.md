@@ -9,7 +9,7 @@ live database, without the owner's yes.
 
 | PR | Branch | Contents | Migration |
 | --- | --- | --- | --- |
-| 4a | `console/phase4a-support-reports` | Support inbox, Business reports | `0009_support.sql` |
+| 4a | `console/phase4a-support-reports` | Support inbox, Business reports | `0011_support.sql` |
 | 4b | `console/phase4b-campaigns` | Email campaigns, learner notifications | `0010_campaigns.sql` |
 | 4c | `console/phase4c-coupons` | Coupons, promotions, checkout | `0011_coupons.sql` |
 
@@ -41,7 +41,7 @@ live database, without the owner's yes.
 
 Pages: `/console/support` (inbox) and `/console/support/msg_…` (one message).
 API: `src/console/support-api.js`. Data: `contact_messages` (already there) plus
-`support_replies` and `support_assignments` (`migrations/0009_support.sql`).
+`support_replies` and `support_assignments` (`migrations/0011_support.sql`).
 
 - **Inbox**: search by name, email, words in the message or the message ID; filter by status
   (new, answered, closed, or "still open" = new or answered), topic, and who looks after it (me,
@@ -80,8 +80,8 @@ Support no by default). No new tables.
 ## 4. Going live
 
 Same pattern as before: a restore bookmark first, then the migration by hand (never
-`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1g.
+`wrangler d1 migrations apply`), then merge. Steps with the checks: `docs/LAUNCH.md` §1i.
 
-1. Bookmark, then apply `migrations/0009_support.sql` (two new tables; changes no rows).
+1. Bookmark, then apply `migrations/0011_support.sql` (two new tables; changes no rows).
 2. Merge 4a. Until the migration is applied, the Support pages answer "not switched on yet" (503)
    and Business reports work (they need no new table).

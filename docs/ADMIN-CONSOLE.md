@@ -185,10 +185,10 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
 
 ## 7. Migrations
 
-- `0009_support.sql` (Phase 4a): `support_replies`, `support_assignments`. Two new tables, no row
+- `0011_support.sql` (Phase 4a; 0009 and 0010 are the Institutes migrations): `support_replies`, `support_assignments`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the Support pages answer "not switched on yet"
   (503); Business reports need no new table. Go-live steps: `docs/ADMIN-PHASE-4.md` §4 and
-  `docs/LAUNCH.md` §1g.
+  `docs/LAUNCH.md` §1i.
 - `0007_course.sql` (Phase 3): `course_drafts`, `course_releases`. Two new tables, no row
   changes, safe to run twice. Before it is applied, the course pages answer "not switched on yet"
   (503) and learners get the course exactly as it is in the code. Go-live steps:
