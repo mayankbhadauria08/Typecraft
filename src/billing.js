@@ -15,6 +15,7 @@ import { entitlementsFor, has } from './entitlements.js';
 import { keyStatsSql } from './key-stats.js';
 import { sendTemplate } from './mail.js';
 import { todayOf } from './api.js';
+import { remember, PUBLIC_DATA_TTL } from './memo.js';
 
 const DAY_MS = 86400000;
 const MIN_MS = 60000;
@@ -58,12 +59,15 @@ async function assertPayments(env) {
 export { packageView };
 
 export async function getPackages(request, env) {
-  const [pk, ft] = await env.DB.batch([
-    env.DB.prepare('SELECT * FROM packages WHERE active = 1 ORDER BY display_order, price_paise'),
-    env.DB.prepare('SELECT key, label, description FROM package_features ORDER BY display_order'),
-  ]);
-  const labels = Object.fromEntries(ft.results.map((f) => [f.key, f.label]));
-  return json({ packages: pk.results.map((p) => packageView(p, labels)), features: catalogueView(ft.results) }, 200, { 'Cache-Control': 'public, max-age=60' });
+  const body = await remember(env, 'api-packages', PUBLIC_DATA_TTL, async () => {
+    const [pk, ft] = await env.DB.batch([
+      env.DB.prepare('SELECT * FROM packages WHERE active = 1 ORDER BY display_order, price_paise'),
+      env.DB.prepare('SELECT key, label, description FROM package_features ORDER BY display_order'),
+    ]);
+    const labels = Object.fromEntries(ft.results.map((f) => [f.key, f.label]));
+    return { packages: pk.results.map((p) => packageView(p, labels)), features: catalogueView(ft.results) };
+  });
+  return json(body, 200, { 'Cache-Control': 'public, max-age=60' });
 }
 
 /* ---------------- GET /api/me/entitlements ---------------- */

@@ -65,6 +65,8 @@
     devices: '<rect x="2.5" y="4.5" width="14" height="10" rx="1.5"/><path d="M6 18h7M9.5 14.5V18"/><rect x="17" y="8.5" width="4.5" height="11" rx="1.2"/>',
     inbox: '<path d="M3.5 13.5l2.5-8h12l2.5 8v5.5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19z"/><path d="M3.5 13.5h5l1 2.5h5l1-2.5h5"/>',
     package: '<path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9M7.8 5.3l8.5 4.5"/>',
+    monitor: '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/>',
+    copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   };
   const ICONS = {};
   for (const k of Object.keys(P)) {
@@ -72,6 +74,41 @@
   }
   root.TC_ICONS = ICONS;
   if (typeof document === 'undefined') return; // imported by the Worker: icons only
+
+  /* ---------- installing the app on a computer ----------
+     Chrome and Edge fire beforeinstallprompt when the site can be installed; we keep it and show our own
+     "Install the app" buttons ([data-install]). Only on computers: a phone has no keyboard to type with.
+     Firefox and Safari never fire it, so the buttons stay hidden there and /get-the-app explains instead. */
+  const touchOnly = () => !!(root.matchMedia && root.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  const standalone = () => !!(root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || root.navigator.standalone === true;
+  const install = { prompt: null, installed: standalone() };
+  function paintInstall() {
+    const can = !!install.prompt && !install.installed && !touchOnly();
+    document.querySelectorAll('[data-install]').forEach((b) => { b.hidden = !can; });
+    const status = document.querySelector('[data-install-status]');
+    if (status) status.setAttribute('data-state', install.installed ? 'installed' : touchOnly() ? 'phone' : can ? 'ready' : 'manual');
+  }
+  async function runInstall() {
+    if (!install.prompt) return;
+    const p = install.prompt;
+    install.prompt = null;
+    p.prompt();
+    try { const choice = await p.userChoice; if (choice && choice.outcome === 'accepted') install.installed = true; } catch (e) { /* closed */ }
+    paintInstall();
+  }
+  root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); install.prompt = e; paintInstall(); });
+  root.addEventListener('appinstalled', () => { install.installed = true; install.prompt = null; paintInstall(); });
+
+  /* ---------- "send this link to your computer" (phones) ---------- */
+  async function shareLink(btn) {
+    const url = (document.querySelector('link[rel="canonical"]') || {}).href || location.href;
+    const data = { title: 'TypeCraft', text: 'Open TypeCraft on my computer: ', url };
+    if (root.navigator.share) {
+      try { await root.navigator.share(data); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await root.navigator.clipboard.writeText(url); toast('Link copied. Paste it into WhatsApp or an email to yourself.', 'ok'); }
+    catch (e) { root.prompt('Copy this link and send it to yourself:', url); }
+  }
 
   /* ---------- basics ---------- */
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -317,6 +354,14 @@
       b.addEventListener('click', () => { setTheme(document.documentElement.getAttribute('data-theme') !== 'light'); sync(); });
     });
     document.querySelectorAll('[data-tabs]').forEach(initTabs);
+    document.querySelectorAll('[data-install]').forEach((b) => b.addEventListener('click', runInstall));
+    paintInstall();
+    document.querySelectorAll('[data-share-link]').forEach((b) => b.addEventListener('click', () => shareLink(b)));
+    document.querySelectorAll('[data-kb-dismiss]').forEach((b) => b.addEventListener('click', () => {
+      const note = b.closest('[data-kb-note]'); if (note) note.remove();
+      try { sessionStorage.setItem('tcKbNote', 'off'); } catch (e) {}
+    }));
+    try { if (sessionStorage.getItem('tcKbNote') === 'off') document.querySelectorAll('[data-kb-note]').forEach((n) => n.remove()); } catch (e) {}
     // "Start free" calls to action become "Open the trainer" for signed-in visitors
     const boot = readBoot();
     if (boot && boot.user) document.querySelectorAll('a[data-auth-swap]').forEach((a) => { a.href = a.getAttribute('data-auth-swap') || '/app'; a.innerHTML = 'Open the trainer' + icon('arrowRight'); });

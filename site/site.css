@@ -632,6 +632,26 @@ form{margin:0}
   .card,.table-wrap{box-shadow:none;border-color:#ccc;background:#fff}
 }
 .grid > *,.split > *{min-width:0}
+
+/* ---------- phones: "typing needs a keyboard" note (pages with meta.needsKeyboard) ---------- */
+.kb-note{display:none;align-items:center;gap:14px;margin:16px 0 0;padding:14px 16px;border-radius:16px;
+  background:var(--brass-soft);border:1px solid color-mix(in srgb,var(--brass) 35%,transparent)}
+.kb-text{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;font-size:14.5px;line-height:1.4}
+.kb-text span{color:var(--muted)}
+.kb-actions{display:flex;flex-wrap:wrap;gap:8px}
+@media (hover:none) and (pointer:coarse){ .kb-note{display:flex;flex-wrap:wrap} .kb-actions{width:100%} }
+
+/* ---------- /get-the-app ---------- */
+.section-title{font:600 clamp(24px,2.6vw,30px)/1.2 var(--display);letter-spacing:-.02em;margin:0 0 18px}
+.install-status [data-when]{display:none}
+.install-status[data-state="ready"] [data-when="ready"],
+.install-status[data-state="installed"] [data-when="installed"],
+.install-status[data-state="manual"] [data-when="manual"],
+.install-status[data-state="phone"] [data-when="phone"]{display:block}
+.install-status p{margin:6px 0 0;color:var(--muted);font-size:15px;line-height:1.5}
+.install-status p .ic{width:18px;height:18px;color:var(--teal);vertical-align:-4px;margin-right:8px}
+.install-phone .btn{margin-top:10px}
+.install-steps{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.55}
 /* the institute's own pages (docs/INSTITUTES.md §8) */
 .back-link{font-size:14px;color:var(--muted)}
 .ins-sec-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:14px}
