@@ -59,7 +59,7 @@ ${section('sessions', 'Signed in to the admin console now', lines(3), '<div clas
 ${section('locks', 'Sign-in locks', lines(2))}
 ${section('failed', 'Failed admin sign-ins (7 days)', lines(2))}
 </div>
-${section('rules', 'How sign-in is protected', lines(4))}
+${section('rules', 'How sign-in is protected', lines(4), tools('rules'))}
 </div>`;
 }
 

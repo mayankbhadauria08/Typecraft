@@ -8,7 +8,7 @@ import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { HOME, LAYERS } from './modules.js';
 
 /** Bump whenever a file in site/console/ changes: browsers and the service worker keep the old address cached. */
-export const CONSOLE_ASSETS = '27';
+export const CONSOLE_ASSETS = '28';
 // a name starting with / is a file from elsewhere on the site (the shared course rules in /shared/)
 const asset = (name) => `${name.startsWith('/') ? name : '/site/console/' + name}?v=${CONSOLE_ASSETS}`;
 
@@ -104,7 +104,7 @@ function topbar(me, crumbs) {
 <div class="menu-head"><strong>${esc(me.user.fullName || '')}</strong><span>${esc(me.user.email || '')}</span></div>
 <dl class="facts facts-menu">
 <div><dt>Role</dt><dd>${esc(role)}</dd></div>
-<div><dt>Session ends</dt><dd data-session-ends>at the latest in 8 hours</dd></div>
+<div><dt>Session ends</dt><dd data-session-ends>at the latest in ${esc(me.session.max || '8 hours')}</dd></div>
 </dl>
 <button type="button" class="btn btn-quiet btn-block" data-sign-out>${icon('logout')}<span>Sign out</span></button>
 </div>

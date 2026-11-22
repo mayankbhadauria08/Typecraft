@@ -274,3 +274,71 @@ test('the Administrators, Activity logs and Security pages: by permission, no in
   assert.ok(!/Phase \d/.test(home.replace(/<script[\s\S]*?<\/script>/g, '')), 'no module waits for a later phase');
   assert.ok(!/still managed in the current admin/.test(home));
 });
+
+/* ---------------- sign-in length ---------------- */
+test('sign-in length: a Super Admin chooses it under Security, and it applies at once to every admin sign-in', async () => {
+  const HOUR = 3600000;
+  const agoMs = (ms) => new Date(Date.now() - ms).toISOString();
+  const o = await K.consoleLogin(ownerWho);
+  const a = await K.consoleLogin(adminWho);
+  const sp = await K.consoleLogin(supportWho);
+  const pageHint = async () => (await o('GET', '/admin')).text.match(/You're signed out after ([^<]+)<\/p>/)[1];
+
+  // the cookie outlives every choice (7 days); the server decides when a sign-in has ended
+  const raw = K.client();
+  const signIn = await raw('POST', '/api/admin/auth/login', { email: adminWho.email, password: pw });
+  assert.match(signIn.headers.getSetCookie().find((c) => c.startsWith('__Host-tc_admin=')), /Max-Age=604800/);
+
+  // the standard: 30 minutes without activity, 8 hours at most
+  let s = await o('GET', '/api/console/security');
+  assert.deepEqual([s.body.rules.length, s.body.rules.idle, s.body.rules.max, s.body.rules.lengthChanged], ['30m', '30 minutes', '8 hours', null]);
+  assert.deepEqual(s.body.rules.lengths.map((l) => l.key), ['30m', '2h', '8h', '1d']);
+  assert.equal(s.body.rules.emailCode, false);
+  assert.match(await pageHint(), /^30 minutes without activity, and after 8 hours at the latest/);
+
+  // only a Super Admin, with the password confirmed, and only a length on the list
+  assert.equal((await a('POST', '/api/console/security/session-length', { length: '1d' })).status, 403);
+  assert.equal((await sp('POST', '/api/console/security/session-length', { length: '1d' })).status, 403);
+  const bad = await o('POST', '/api/console/security/session-length', { length: '3d' });
+  assert.equal(bad.status, 400); assert.ok(bad.body.error.fields.length);
+  await K.stale(o);
+  const stale = await o('POST', '/api/console/security/session-length', { length: '1d' });
+  assert.equal(stale.status, 403); assert.equal(stale.body.error.code, 'reauth_required');
+  assert.equal((await o('POST', '/api/admin/auth/reauth', { password: pw })).status, 200);
+
+  // three hours idle: signed out under the standard setting, still in once 1 day is chosen
+  await K.run('UPDATE admin_sessions SET last_seen_at = ?2 WHERE user_id = ?1 AND ended_at IS NULL', adminWho.id, agoMs(3 * HOUR));
+  const set = await o('POST', '/api/console/security/session-length', { length: '1d' });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.match(set.body.message, /1 day without activity, and after 7 days at the latest/);
+  assert.equal((await a('GET', '/api/admin/auth/me')).status, 200, 'applies at once to someone already signed in');
+  const me = (await a('GET', '/api/admin/auth/me')).body;
+  assert.equal(me.session.idleMinutes, 1440); assert.equal(me.session.max, '7 days');
+  assert.equal(Date.parse(me.session.expiresAt) - Date.parse(me.session.createdAt), 7 * 24 * HOUR);
+  s = await o('GET', '/api/console/security');
+  assert.equal(s.body.rules.length, '1d'); assert.equal(s.body.rules.lengthChanged.by, 'Mayank Owner');
+  assert.ok(s.body.sessions.some((x) => x.email === adminWho.email), 'listed as signed in');
+  assert.match(await pageHint(), /^1 day without activity, and after 7 days at the latest/);
+  const log = await K.audits('security.session_length');
+  assert.equal(log.length, 1); assert.deepEqual(JSON.parse(log[0].detail), { from: '30 minutes', to: '1 day' });
+  assert.match((await o('POST', '/api/console/security/session-length', { length: '1d' })).body.message, /^No change/);
+  assert.equal((await K.audits('security.session_length')).length, 1);
+
+  // even 1 day ends: 25 hours idle, or 7 days after signing in
+  await K.run('UPDATE admin_sessions SET last_seen_at = ?2 WHERE user_id = ?1 AND ended_at IS NULL', supportWho.id, agoMs(25 * HOUR));
+  assert.equal((await sp('GET', '/api/admin/auth/me')).status, 401);
+  const sp2 = await K.consoleLogin(supportWho);
+  await K.run('UPDATE admin_sessions SET created_at = ?2 WHERE user_id = ?1 AND ended_at IS NULL', supportWho.id, agoMs(7 * 24 * HOUR + 60000));
+  assert.equal((await sp2('GET', '/api/admin/auth/me')).status, 401);
+  assert.equal((await K.one("SELECT ended_reason FROM admin_sessions WHERE user_id = ?1 AND ended_at IS NOT NULL ORDER BY ended_at DESC LIMIT 1", supportWho.id)).ended_reason, 'expired');
+
+  // back to 30 minutes: the three-hours-idle sign-in ends straight away
+  await K.run('UPDATE admin_sessions SET last_seen_at = ?2 WHERE user_id = ?1 AND ended_at IS NULL', adminWho.id, agoMs(3 * HOUR));
+  assert.equal((await o('POST', '/api/console/security/session-length', { length: '30m' })).status, 200);
+  assert.equal((await a('GET', '/api/admin/auth/me')).status, 401);
+  assert.equal((await K.one("SELECT ended_reason FROM admin_sessions WHERE user_id = ?1 AND ended_at IS NOT NULL ORDER BY ended_at DESC LIMIT 1", adminWho.id)).ended_reason, 'idle');
+  // a stored value that isn't a known length counts as the standard one, never as longer
+  await K.run("UPDATE platform_settings SET value = '{\"length\":\"forever\"}' WHERE key = 'admin_session'");
+  assert.equal((await o('GET', '/api/console/security')).body.rules.length, '30m');
+  await K.run("UPDATE platform_settings SET value = '{\"length\":\"30m\"}' WHERE key = 'admin_session'");
+});

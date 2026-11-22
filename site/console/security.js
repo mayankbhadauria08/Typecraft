@@ -1,9 +1,11 @@
 /* Security: admin console sign-ins, sign-in locks, failed admin sign-ins, checks.
    GET  /api/console/security → { sessions: [{ ref, userId, name, email, role, roleLabel, device, ip, secondFactor, startedAt, lastSeenAt, endsAt, you }],
           locks: [{ ref, kind, label, email, ip, tries, limit, locked, until }], failed: [{ name, email, what, ip, at }],
-          checks: [{ ok, label, detail }], rules: { idleMinutes, maxHours, freshMinutes, learnerLock, adminLock }, can: { manage } }
+          checks: [{ ok, label, detail }], rules: { length, idle, max, lengths: [{ key, idle, max }], lengthChanged, emailCode, idleMinutes, maxHours,
+          freshMinutes, learnerLock, adminLock }, can: { manage } }
    POST /api/console/security/sessions/:ref/end    POST /api/console/security/sessions/end-others    POST /api/console/security/unlock { ref }
-   The three changes ask for the password again. */
+   POST /api/console/security/session-length { length }
+   The four changes ask for the password again. */
 (function () {
   'use strict';
   var AC = window.AC, el = AC.el;
@@ -90,9 +92,35 @@
     })) : el('p', { class: 'all-clear' }, [AC.icon('check'), 'None in the last 7 days.'])]);
   }
 
+  // what each sign-in length is for (the server sends the lengths themselves)
+  var LENGTH_HINTS = {
+    '30m': 'The safest. Best on a computer other people use.',
+    '2h': 'Fewer sign-ins during a long task.',
+    '8h': 'Stay signed in for a working day.',
+    '1d': 'Only on your own computer, locked when you step away.'
+  };
+
+  function editLength() {
+    var r = data.rules;
+    AC.formDialog({
+      title: 'How long an admin sign-in lasts',
+      text: 'For you and every other administrator. It applies straight away, to everyone signed in now too. Whatever you choose, refunds, roles, '
+        + 'administrators and security changes still ask for the password again after ' + r.freshMinutes + ' minutes.'
+        + (r.emailCode ? '' : ' The emailed sign-in code is off, so a password alone opens the admin: a longer sign-in is safer once the code is on.'),
+      submitLabel: 'Save',
+      fields: [{ name: 'length', label: 'Sign out after', type: 'radio', value: r.length, options: r.lengths.map(function (l) {
+        return { value: l.key, label: l.idle + ' without activity', hint: 'And after ' + l.max + ' at the latest. ' + (LENGTH_HINTS[l.key] || '') };
+      }) }],
+      submit: function (v) { return AC.api('POST', '/api/console/security/session-length', { length: v.length }); }
+    }).then(function (res) { if (res) { AC.toast(res.message); load(); } });
+  }
+
   function rules(r) {
+    var tools = AC.clear(byId('rulesTools'));
+    if (data.can.manage) tools.appendChild(el('button', { type: 'button', class: 'btn btn-quiet btn-sm', text: 'Change sign-in length', on: { click: editLength } }));
+    var changed = r.lengthChanged ? 'Set by ' + (r.lengthChanged.by || 'an administrator') + ' on ' + AC.fmt.date(r.lengthChanged.at) : 'The standard setting';
     AC.fill('rulesBody', [el('dl', { class: 'facts' }, [
-      AC.fact('Admin console: signed out after', r.idleMinutes + ' minutes without activity, and ' + r.maxHours + ' hours at the latest'),
+      AC.fact('Admin console: signed out after', r.idle + ' without activity, and ' + r.max + ' at the latest', el('div', { class: 'cell-sub', text: changed })),
       AC.fact('Sensitive changes', 'Ask for the password again after ' + r.freshMinutes + ' minutes'),
       AC.fact('Admin sign-in lock', r.adminLock.tries + ' wrong passwords from one address: locked for ' + r.adminLock.minutes + ' minutes'),
       AC.fact('Site sign-in lock', r.learnerLock.tries + ' wrong passwords: locked for ' + r.learnerLock.minutes + ' minutes'),
@@ -105,7 +133,7 @@
       data = d;
       byId('dash').removeAttribute('aria-busy');
       var note = AC.clear(byId('securityNote'));
-      if (!d.can.manage) note.appendChild(AC.notice('Your role can see this page. Signing people out and unlocking accounts is for Super Admins.'));
+      if (!d.can.manage) note.appendChild(AC.notice('Your role can see this page. Signing people out, unlocking accounts and the sign-in length are for Super Admins.'));
       checks(d.checks); sessions(d.sessions); locks(d.locks); failed(d.failed); rules(d.rules);
     }, function (err) {
       byId('dash').removeAttribute('aria-busy');

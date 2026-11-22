@@ -79,7 +79,12 @@ The console session (`admin_sessions`, `src/console/session.js`):
 
 - its own cookie, `__Host-tc_admin`: `HttpOnly`, `Secure`, `SameSite=Strict`. Only the SHA-256 of
   the token is stored;
-- ends after **30 minutes** without a request and after **8 hours** at the latest;
+- ends after a time without a request and after a longest time, chosen by a Super Admin under
+  Security › **Change sign-in length**: 30 minutes and 8 hours (the standard), 2 and 12 hours,
+  8 hours and 1 day, or 1 day and 7 days (`SESSION_LENGTHS` in `src/console/config.js`, stored in
+  `platform_settings` 'admin_session'). It is read on every request, so a change applies at once to
+  everyone signed in; the cookie itself lasts 7 days and the server decides. An unknown stored value
+  counts as the standard one;
 - ends at once when the account is disabled, loses its role, or changes its password;
 - the role and its permissions are read from the database on every request. Nothing is cached
   in the session, so a change applies on the next click.

@@ -5,18 +5,27 @@
 //                                                      (the learner sign-in never opens an admin endpoint)
 //   assertCan(env, who, 'customers.manage')            a further permission inside a handler
 //
-// A console session is separate from the learner session: its own cookie (SameSite=Strict),
-// 30 minutes idle, 8 hours at most, and it stops working the moment the account loses its
-// role or is disabled. The role and its permissions are read on every request, never cached.
+// A console session is separate from the learner session: its own cookie (SameSite=Strict), an
+// idle limit and a maximum length chosen under Security (SESSION_LENGTHS in ./config.js; 30 minutes
+// and 8 hours unless changed), and it stops working the moment the account loses its role or is
+// disabled. The role, its permissions and the length are read on every request, never cached.
 import { HttpError, readCookie, nowIso, clientIp } from '../http.js';
 import { randomToken, sha256Hex } from '../crypto.js';
 import { publicUser } from '../session.js';
 import { roleFrom } from '../roles.js';
 import { can, BY_KEY } from './permissions.js';
-import { ADMIN_COOKIE, IDLE_MS, MAX_MS, FRESH_MS, TOUCH_MS } from './config.js';
+import { ADMIN_COOKIE, FRESH_MS, TOUCH_MS, COOKIE_MAX_MS, SESSION_SETTING, sessionLength } from './config.js';
 
 const COOKIE_ATTRS = 'Path=/; HttpOnly; Secure; SameSite=Strict';
-export const adminCookie = (token) => `${ADMIN_COOKIE}=${token}; ${COOKIE_ATTRS}; Max-Age=${Math.floor(MAX_MS / 1000)}`;
+export const adminCookie = (token) => `${ADMIN_COOKIE}=${token}; ${COOKIE_ATTRS}; Max-Age=${Math.floor(COOKIE_MAX_MS / 1000)}`;
+
+/** How long admin sign-ins last now (Security › Sign-in length): { key, idleMs, maxMs, idle, max }. */
+export async function readSessionLength(env) {
+  try {
+    const row = await env.DB.prepare('SELECT value FROM platform_settings WHERE key = ?1').bind(SESSION_SETTING).first();
+    return sessionLength(row && row.value);
+  } catch { return sessionLength(null); } // a database hiccup gets the strictest choice, never a longer one
+}
 export const clearAdminCookie = () => `${ADMIN_COOKIE}=; ${COOKIE_ATTRS}; Max-Age=0`;
 
 /** "Chrome on Windows" (browser and OS family only). */
@@ -35,7 +44,7 @@ export async function createAdminSession(env, request, userId, { secondFactor = 
   const id = await sha256Hex(token);
   const now = Date.now();
   const nowS = new Date(now).toISOString();
-  const expiresAt = new Date(now + MAX_MS).toISOString();
+  const expiresAt = new Date(now + (await readSessionLength(env)).maxMs).toISOString(); // as chosen now; getAdminSession uses the current choice
   const device = deviceOf(request);
   await env.DB.prepare(
     `INSERT INTO admin_sessions (id, user_id, second_factor, created_at, last_seen_at, expires_at, reauth_at, ip, device)
@@ -67,15 +76,17 @@ export async function getAdminSession(env, request) {
   const row = await env.DB.prepare(
     `SELECT s.second_factor, s.created_at AS session_created, s.last_seen_at, s.expires_at, s.reauth_at, s.device,
             u.id, u.full_name, u.email, u.phone_number, u.email_verified, u.created_at, u.last_login_at, u.account_status,
-            a.role AS staff_role
+            a.role AS staff_role, (SELECT value FROM platform_settings WHERE key = ?2) AS length_setting
        FROM admin_sessions s JOIN users u ON u.id = s.user_id LEFT JOIN admin_users a ON a.user_id = u.id
       WHERE s.id = ?1 AND s.ended_at IS NULL`
-  ).bind(id).first();
+  ).bind(id, SESSION_SETTING).first();
   if (!row) return null;
   const now = Date.now();
+  const length = sessionLength(row.length_setting);
+  const endsAt = Date.parse(row.session_created) + length.maxMs; // the current choice, so a change applies at once
   const end = async (reason) => { await endAdminSession(env, id, reason); return null; };
-  if (Date.parse(row.expires_at) <= now) return end('expired');
-  if (now - Date.parse(row.last_seen_at) > IDLE_MS) return end('idle');
+  if (endsAt <= now) return end('expired');
+  if (now - Date.parse(row.last_seen_at) > length.idleMs) return end('idle');
   if (row.account_status !== 'active') return end('account_disabled');
   const role = roleFrom(env, row.email, row.staff_role);
   if (!role) return end('role_removed');
@@ -92,8 +103,9 @@ export async function getAdminSession(env, request) {
       secondFactor: !!row.second_factor,
       device: row.device,
       createdAt: row.session_created,
-      expiresAt: row.expires_at,
-      idleExpiresAt: new Date(Math.min(lastSeen + IDLE_MS, Date.parse(row.expires_at))).toISOString(),
+      expiresAt: new Date(endsAt).toISOString(),
+      idleExpiresAt: new Date(Math.min(lastSeen + length.idleMs, endsAt)).toISOString(),
+      length,
       fresh: now - Date.parse(row.reauth_at) <= FRESH_MS,
     },
   };

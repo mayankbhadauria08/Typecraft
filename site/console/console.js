@@ -765,7 +765,7 @@
         var now = Date.now();
         if (now >= ends || now - lastContact >= idleMs) { toLogin(true); return; }
         Array.prototype.forEach.call(doc.querySelectorAll('[data-session-ends]'), function (node) {
-          node.textContent = fmt.time(me.session.expiresAt) + ' (' + fmt.until(me.session.expiresAt) + ')';
+          node.textContent = (ends - now > 20 * 3600000 ? fmt.dateTime(me.session.expiresAt) : fmt.time(me.session.expiresAt)) + ' (' + fmt.until(me.session.expiresAt) + ')';
         });
       };
       tick();

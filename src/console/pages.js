@@ -6,7 +6,7 @@
 // its module's key so the sidebar shows where you are.
 import { esc } from '../layout.js';
 import { icon } from './icons.js';
-import { CONSOLE_BASE, ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
+import { CONSOLE_BASE, ROLE_LABELS } from './config.js';
 import { LAYERS } from './permissions.js';
 import { skeletonRows, lines, select, section, listFrame, downloadButton } from './page-kit.js';
 import { CORE_PAGES } from './pages-core.js';
@@ -40,7 +40,7 @@ function homeBody(me) {
 <div><dt>Started</dt><dd data-time="${esc(me.session.createdAt)}">–</dd></div>
 <div><dt>Ends</dt><dd data-session-ends>–</dd></div>
 </dl>
-<p class="hint">You're signed out after ${Math.round(IDLE_MS / 60000)} minutes without activity, and after ${Math.round(MAX_MS / 3600000)} hours at the latest.</p>
+<p class="hint">You're signed out after ${esc(me.session.idle)} without activity, and after ${esc(me.session.max)} at the latest. A Super Admin can change this under Security.</p>
 <button type="button" class="btn btn-quiet" data-sign-out>${icon('logout')}<span>Sign out</span></button>
 </section>
 

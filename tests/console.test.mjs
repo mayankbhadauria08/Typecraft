@@ -109,7 +109,8 @@ test('admin sign-in: one answer for every failure; only accounts with a role get
   assert.equal(ok.status, 200);
   assert.equal(ok.body.step, 'done'); assert.equal(ok.body.role, 'owner');
   const cookie = ok.setCookie.find((s) => s.startsWith('__Host-tc_admin='));
-  assert.match(cookie, /; Path=\/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800$/);
+  // 7 days, the longest sign-in length a Super Admin can choose: the server decides when a sign-in has ended
+  assert.match(cookie, /; Path=\/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800$/);
   assert.ok(!c.jar.has('__Host-tc_session'), 'the learner session is not started by an admin sign-in');
   assert.ok(!JSON.stringify(ok.body).includes(c.jar.get('__Host-tc_admin')), 'the token is only in the cookie');
 
@@ -252,8 +253,8 @@ test('a console session ends when idle, when it is too old, on sign-out, and the
   assert.equal(idle.status, 401); assert.equal(idle.body.error.code, 'admin_sign_in');
   assert.equal((await sessionOf(c)).ended_reason, 'idle');
 
-  c = await fresh();
-  await A.env.DB.prepare('UPDATE admin_sessions SET expires_at = ?2 WHERE user_id = ?1').bind(c.who.id, ago(1000)).run();
+  c = await fresh(); // 8 hours after signing in (the standard sign-in length), however busy
+  await A.env.DB.prepare('UPDATE admin_sessions SET created_at = ?2 WHERE user_id = ?1').bind(c.who.id, ago(8 * 3600 * 1000 + 1000)).run();
   assert.equal((await c('GET', '/api/admin/auth/me')).status, 401);
   assert.equal((await sessionOf(c)).ended_reason, 'expired');
 
