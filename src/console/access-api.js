@@ -14,7 +14,7 @@ import * as mail from '../mail.js';
 import { LAYERS, EDITABLE_ROLES, matrix, setPermission, resetRole } from './permissions.js';
 import { requireAdmin } from './session.js';
 import { emailCodeOn } from './auth.js';
-import { ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
+import { ROLE_LABELS } from './config.js';
 
 const grid = async (env, who) => ({
   roles: [{ key: 'owner', label: ROLE_LABELS.owner, editable: false }, ...EDITABLE_ROLES.map((r) => ({ key: r, label: ROLE_LABELS[r], editable: true }))],
@@ -106,8 +106,9 @@ export function setupItems(env) {
 }
 
 export async function getSetup(request, env) {
-  await requireAdmin(env, request, 'settings.view');
-  return json({ items: setupItems(env), session: { idleMinutes: Math.round(IDLE_MS / 60000), maxHours: Math.round(MAX_MS / 3600000) } });
+  const who = await requireAdmin(env, request, 'settings.view');
+  const len = who.session.length;
+  return json({ items: setupItems(env), session: { idleMinutes: Math.round(len.idleMs / 60000), maxHours: Math.round(len.maxMs / 3600000) } });
 }
 
 export const ROUTES = {

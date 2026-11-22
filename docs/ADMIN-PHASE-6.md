@@ -19,7 +19,8 @@ Underneath:
 - **Sign-in.** A separate admin sign-in at `/admin/login`: email and password, then a 6-digit
   code by email once email and `SESSION_SECRET` are set up. The admin session uses its own cookie
   (`__Host-tc_admin`, SameSite=Strict). It ends after 30 idle minutes or 8 hours, whichever comes
-  first, and at once when the account loses its role or changes its password.
+  first (a Super Admin can choose up to 1 day and 7 days under Security), and at once when the
+  account loses its role or changes its password.
 - **Permissions.** One permission engine with 52 permissions. Super Admin has all of them; Admin
   and Support have defaults that a Super Admin can switch per role. Refunds, roles and
   administrators also need the password confirmed in the last 10 minutes.
@@ -120,6 +121,8 @@ There is no database change in this pull request and nothing to set in Cloudflar
   warns when this is the case.
 - Until email and `SESSION_SECRET` are set up, the password is the only factor, and it is the same
   password as the learner account.
+- A longer sign-in length (Security › Change sign-in length) keeps an unlocked computer signed in
+  to the admin for longer. Keep the standard 30 minutes on any computer other people use.
 - Whoever controls an administrator's inbox can reset the password and read the code. Protect
   those inboxes with two-step sign-in.
 - Lesson texts are public JavaScript (`docs/LAUNCH.md` §3), so locked lessons can be read by a

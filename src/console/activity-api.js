@@ -38,6 +38,7 @@ export const LABELS = {
   'admin.login_failed': 'Failed admin sign-in', 'admin.reauth_failed': 'Wrong password when confirming a change',
   'security.session_end': "Ended someone's admin sign-in", 'security.sessions_end_others': 'Signed everyone else out of the admin console',
   'security.unlock': 'Unlocked an account',
+  'security.session_length': 'Changed how long admin sign-ins last',
   'user.role': 'Changed an administrator role', 'permission.update': 'Changed a permission', 'permission.reset': 'Put a role back to its defaults',
   'settings.update': 'Changed settings', 'campaign.limit': 'Changed the daily campaign limit',
   'user.disable': 'Disabled an account', 'user.enable': 'Switched an account back on', 'user.sign_out': 'Signed a customer out everywhere',

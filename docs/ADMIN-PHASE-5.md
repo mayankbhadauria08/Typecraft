@@ -217,9 +217,15 @@ Permission `audit.view`: Super Admin and Admin.
   are locked for 15 minutes; the admin code step after 10 wrong codes for an hour. Accounts with 3 or more
   wrong tries show here, with **Unlock** (or **Reset count**) for when you know the tries were theirs.
 - **Failed admin sign-ins** in the last 7 days, and the rules above in plain words.
+- **Sign-in length** (added after Phase 6): how long an admin sign-in lasts without activity, and at the
+  latest: 30 minutes / 8 hours (the standard), 2 / 12 hours, 8 hours / 1 day, or 1 day / 7 days.
+  `POST /api/console/security/session-length { length }`, `security.manage`, password asked again, activity
+  log entry `security.session_length`. It applies at once to everyone signed in. The password check for
+  sensitive changes stays at 10 minutes whatever the choice. The dialog warns while the emailed sign-in
+  code is off.
 
 Sessions are named by the first 16 characters of their id; the full id never leaves the server (tested).
-`security.view`: Super Admin and Admin. `security.manage` (sign out, unlock): Super Admin; asks for the
+`security.view`: Super Admin and Admin. `security.manage` (sign out, unlock, sign-in length): Super Admin; asks for the
 password again; can be given to Admin.
 
 ## 12. The nightly privacy clean-up (`src/retention.js`)

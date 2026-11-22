@@ -5,6 +5,8 @@
 //   POST /api/console/security/sessions/:ref/end        security.manage  ends one admin console session (not your own)
 //   POST /api/console/security/sessions/end-others      security.manage  ends every console session but yours
 //   POST /api/console/security/unlock                   security.manage  { ref } lifts a sign-in lock before its 15 minutes run out
+//   POST /api/console/security/session-length           security.manage  { length: '30m' | '2h' | '8h' | '1d' } how long an admin
+//                                                                         sign-in lasts (SESSION_LENGTHS in ./config.js); applies at once
 //
 // security.manage asks for the password again. A session is named by `ref`, the first 16 characters of its id
 // (itself a SHA-256 of the cookie), so the full id never leaves the server. Locks are rows in rate_limits.
@@ -15,7 +17,7 @@ import { roleFrom } from '../roles.js';
 import { requireAdmin, endAdminSession } from './session.js';
 import { can } from './permissions.js';
 import { emailCodeOn } from './auth.js';
-import { ROLE_LABELS, IDLE_MS, MAX_MS, FRESH_MS } from './config.js';
+import { ROLE_LABELS, FRESH_MS, SESSION_LENGTHS, SESSION_SETTING } from './config.js';
 
 // The sign-in locks in src/auth.js and ./auth.js: key prefix, who it is for, how many tries, over how long
 const LOCKS = [
@@ -26,18 +28,18 @@ const LOCKS = [
 const STALE_STAFF_DAYS = 90;
 const ref = (id) => String(id).slice(0, 16);
 
-async function sessions(env, meSessionId) {
+async function sessions(env, meSessionId, length) {
   const now = Date.now();
   const rows = (await env.DB.prepare(
-    `SELECT s.id, s.user_id, s.second_factor, s.created_at, s.last_seen_at, s.expires_at, s.ip, s.device, u.full_name, u.email, a.role
+    `SELECT s.id, s.user_id, s.second_factor, s.created_at, s.last_seen_at, s.ip, s.device, u.full_name, u.email, a.role
        FROM admin_sessions s JOIN users u ON u.id = s.user_id LEFT JOIN admin_users a ON a.user_id = u.id
-      WHERE s.ended_at IS NULL AND s.expires_at > ?1 AND s.last_seen_at > ?2 ORDER BY s.last_seen_at DESC LIMIT 100`
-  ).bind(new Date(now).toISOString(), new Date(now - IDLE_MS).toISOString()).all()).results;
+      WHERE s.ended_at IS NULL AND s.created_at > ?1 AND s.last_seen_at > ?2 ORDER BY s.last_seen_at DESC LIMIT 100`
+  ).bind(new Date(now - length.maxMs).toISOString(), new Date(now - length.idleMs).toISOString()).all()).results;
   return rows.map((r) => {
     const role = roleFrom(env, r.email, r.role);
     return { ref: ref(r.id), userId: r.user_id, name: r.full_name, email: r.email, role, roleLabel: ROLE_LABELS[role] || 'No role',
       device: r.device || 'Unknown device', ip: r.ip || null, secondFactor: !!r.second_factor, startedAt: r.created_at, lastSeenAt: r.last_seen_at,
-      endsAt: new Date(Math.min(Date.parse(r.last_seen_at) + IDLE_MS, Date.parse(r.expires_at))).toISOString(), you: r.id === meSessionId };
+      endsAt: new Date(Math.min(Date.parse(r.last_seen_at) + length.idleMs, Date.parse(r.created_at) + length.maxMs)).toISOString(), you: r.id === meSessionId };
   });
 }
 
@@ -118,9 +120,12 @@ async function checks(env) {
 
 export async function getSecurity(request, env) {
   const who = await requireAdmin(env, request, 'security.view');
-  const [s, l, f, c] = await Promise.all([sessions(env, who.session.id), locks(env), failed(env), checks(env)]);
+  const len = who.session.length;
+  const [s, l, f, c, changed] = await Promise.all([sessions(env, who.session.id, len), locks(env), failed(env), checks(env), lengthChanged(env)]);
   return json({ sessions: s, locks: l, failed: f, checks: c,
-    rules: { idleMinutes: Math.round(IDLE_MS / 60000), maxHours: Math.round(MAX_MS / 3600000), freshMinutes: Math.round(FRESH_MS / 60000),
+    rules: { length: len.key, idle: len.idle, max: len.max, idleMinutes: Math.round(len.idleMs / 60000), maxHours: Math.round(len.maxMs / 3600000),
+      lengths: Object.entries(SESSION_LENGTHS).map(([key, x]) => ({ key, idle: x.idle, max: x.max })), lengthChanged: changed,
+      emailCode: emailCodeOn(env), freshMinutes: Math.round(FRESH_MS / 60000),
       learnerLock: { tries: LOCKS[0].limit, minutes: LOCKS[0].window / 60 }, adminLock: { tries: LOCKS[1].limit, minutes: LOCKS[1].window / 60 } },
     can: { manage: await can(env, who.role, 'security.manage') } });
 }
@@ -157,8 +162,34 @@ export async function postUnlock(request, env) {
   return json({ message: 'Unlocked. They can try again straight away.' });
 }
 
+async function lengthChanged(env) {
+  const r = await env.DB.prepare(`SELECT s.updated_at, u.full_name, u.email FROM platform_settings s LEFT JOIN users u ON u.id = s.updated_by WHERE s.key = ?1`)
+    .bind(SESSION_SETTING).first();
+  return r && r.updated_at ? { at: r.updated_at, by: r.full_name || r.email || null } : null;
+}
+
+export async function postSessionLength(request, env) {
+  const who = await requireAdmin(env, request, 'security.manage');
+  const body = await readJson(request, 1024);
+  const key = typeof body.length === 'string' ? body.length : '';
+  if (!Object.prototype.hasOwnProperty.call(SESSION_LENGTHS, key)) {
+    throw new HttpError(400, 'invalid_input', 'Choose one of the lengths shown.', { length: 'Choose one of the lengths shown.' });
+  }
+  const before = who.session.length.key;
+  const to = SESSION_LENGTHS[key];
+  if (key === before) return json({ length: key, message: `No change: admin sign-ins already end after ${to.idle} without activity.` });
+  await env.DB.prepare(`INSERT INTO platform_settings (key, value, updated_by, updated_at) VALUES (?1, ?2, ?3, ?4)
+    ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+    .bind(SESSION_SETTING, JSON.stringify({ length: key }), who.user.id, nowIso()).run();
+  await audit(env, { actorId: who.user.id, action: 'security.session_length', target: 'admin_sessions',
+    detail: { from: SESSION_LENGTHS[before].idle, to: to.idle }, ip: clientIp(request) });
+  return json({ length: key,
+    message: `Saved. Admin sign-ins now end after ${to.idle} without activity, and after ${to.max} at the latest. This applies straight away, to everyone signed in now too.` });
+}
+
 export const ROUTES = {
   'GET /api/console/security': getSecurity,
+  'POST /api/console/security/session-length': postSessionLength,
   'POST /api/console/security/sessions/end-others': postEndOthers,
   'POST /api/console/security/unlock': postUnlock,
 };

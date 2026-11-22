@@ -20,7 +20,7 @@ import { sendTemplate, sendLater } from '../mail.js';
 import { audit } from '../billing.js';
 import { permissionsFor, BY_KEY } from './permissions.js';
 import { createAdminSession, endAdminSession, getAdminSession, requireAdmin, clearAdminCookie, deviceOf } from './session.js';
-import { STEP_COOKIE, STEP_MS, IDLE_MS, FRESH_MS, ROLE_LABELS } from './config.js';
+import { STEP_COOKIE, STEP_MS, FRESH_MS, ROLE_LABELS } from './config.js';
 
 const WRONG = "Those details don't match an administrator account.";
 const OTP_PURPOSE = 'sensitive'; // only this file creates codes with this purpose
@@ -188,7 +188,8 @@ export async function describe(env, who) {
     session: {
       secondFactor: who.session.secondFactor, device: who.session.device, createdAt: who.session.createdAt,
       expiresAt: who.session.expiresAt, idleExpiresAt: who.session.idleExpiresAt,
-      idleMinutes: Math.round(IDLE_MS / 60000), fresh: who.session.fresh, freshMinutes: Math.round(FRESH_MS / 60000),
+      idleMinutes: Math.round(who.session.length.idleMs / 60000), idle: who.session.length.idle, max: who.session.length.max,
+      fresh: who.session.fresh, freshMinutes: Math.round(FRESH_MS / 60000),
     },
     emailCodes: emailCodeOn(env),
   };
