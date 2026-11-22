@@ -122,7 +122,7 @@ migration applied by hand and has no `d1_migrations` table, so **never** run
 
 ## 5. Step 1: Customers (built)
 
-Pages: `/console/customers` and `/console/customers/:id`.
+Pages: `/admin/customers` and `/admin/customers/:id`.
 
 | Method and path | Permission | What |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ password, signing in as a customer, changing staff roles (Phase 5).
 
 ## 6. Step 2: Payments (built)
 
-Pages: `/console/payments` (one row per order) and `/console/payments/:orderId`.
+Pages: `/admin/payments` (one row per order) and `/admin/payments/:orderId`.
 
 | Method and path | Permission | What |
 | --- | --- | --- |
@@ -166,7 +166,7 @@ after. Customer names link to the customer page and the customer page's payments
 
 ## 7. Step 3: Refunds (built)
 
-Page: `/console/refunds`; the refund dialog opens from a payment's page ("Refund").
+Page: `/admin/refunds`; the refund dialog opens from a payment's page ("Refund").
 
 | Method and path | Permission | What |
 | --- | --- | --- |
@@ -196,7 +196,7 @@ Page: `/console/refunds`; the refund dialog opens from a payment's page ("Refund
 
 ## 8. Step 4: Subscriptions (built)
 
-Page: `/console/subscriptions` (Extend and End on each row); on a customer's page, Give a
+Page: `/admin/subscriptions` (Extend and End on each row); on a customer's page, Give a
 plan, Extend and End. The dialogs are shared: `site/console/plan-actions.js` (`AC.plans`).
 
 | Method and path | Permission | What |
@@ -219,7 +219,7 @@ plan is allowed once a minute and audited as `subscription.extend_all` with the 
 
 ## 9. Step 5: Learning access (built)
 
-Page: `/console/access` (End on each row); on a customer's page, a Learning access section
+Page: `/admin/access` (End on each row); on a customer's page, a Learning access section
 with "Open or close" and End. Shared dialogs: `site/console/access-actions.js` (`AC.access`).
 
 | Method and path | Permission | What |
@@ -244,7 +244,7 @@ with "Open or close" and End. Shared dialogs: `site/console/access-actions.js` (
 
 ## 10. Step 6: Packages (built)
 
-Pages: `/console/packages`, `/console/packages/new`, `/console/packages/:id` (a form on its
+Pages: `/admin/packages`, `/admin/packages/new`, `/admin/packages/:id` (a form on its
 own page; read-only without `packages.manage`).
 
 | Method and path | Permission | What |
@@ -264,7 +264,7 @@ changes what every free user gets at once, and the page says so. Audit `package.
 
 ## 11. Step 7: Dashboard (built)
 
-Page: `/console/dashboard`. `GET /api/console/dashboard?range=today|7d|30d`
+Page: `/admin/dashboard`. `GET /api/console/dashboard?range=today|7d|30d`
 (`dashboard.view`), one `DB.batch`. The period is kept in the address.
 
 - Customers: new in the range, learners who practised, all customers, paying customers and

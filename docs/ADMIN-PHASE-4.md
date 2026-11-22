@@ -39,7 +39,7 @@ live database, without the owner's yes.
 
 ## 2. Support (4a)
 
-Pages: `/console/support` (inbox) and `/console/support/msg_…` (one message).
+Pages: `/admin/support` (inbox) and `/admin/support/msg_…` (one message).
 API: `src/console/support-api.js`. Data: `contact_messages` (already there) plus
 `support_replies` and `support_assignments` (`migrations/0014_support.sql`).
 
@@ -63,7 +63,7 @@ API: `src/console/support-api.js`. Data: `contact_messages` (already there) plus
 
 ## 3. Business reports (4a)
 
-Page: `/console/reports`. API: `src/console/reports-api.js`. Needs `revenue.view` (Admin yes,
+Page: `/admin/reports`. API: `src/console/reports-api.js`. Needs `revenue.view` (Admin yes,
 Support no by default). No new tables.
 
 - Periods: last 7 days, 30 days, 90 days (by week), 12 months (by month). Days are India days.
@@ -79,7 +79,7 @@ Support no by default). No new tables.
 
 ## 4. Email campaigns and the email log (4b)
 
-Pages: `/console/campaigns`, `/console/campaigns/cmp_…`, `/console/email-log`.
+Pages: `/admin/campaigns`, `/admin/campaigns/cmp_…`, `/admin/email-log`.
 API: `src/console/campaigns-api.js`. Data: `email_campaigns`, `campaign_sends` (`migrations/0015_campaigns.sql`);
 the daily limit is `platform_settings` key `campaigns` (`{"dailyCap": 80}`).
 
@@ -110,7 +110,7 @@ the daily limit is `platform_settings` key `campaigns` (`{"dailyCap": 80}`).
 
 ## 5. Notifications for learners (4b)
 
-Page: `/console/notifications`. API: `src/console/notices-api.js` (`notices.view`: Admin and Support;
+Page: `/admin/notifications`. API: `src/console/notices-api.js` (`notices.view`: Admin and Support;
 `notices.manage`: Admin). Learners: `src/notices.js`, `GET /api/notices?place=site|trainer`.
 Data: `site_notices` (`migrations/0015_campaigns.sql`).
 
@@ -127,7 +127,7 @@ Data: `site_notices` (`migrations/0015_campaigns.sql`).
 
 ## 7. Coupons and promotions (4c)
 
-Pages: `/console/coupons`, `/console/coupons/cpn_…`, `/console/promotions`. API: `src/console/coupons-api.js`.
+Pages: `/admin/coupons`, `/admin/coupons/cpn_…`, `/admin/promotions`. API: `src/console/coupons-api.js`.
 What customers pay: `src/pricing.js`. Data: `coupons`, `promotions`, `order_discounts` (`migrations/0016_coupons.sql`).
 
 - **Who**: `coupons.view` and `promotions.view` for Admin and Support; `coupons.manage` and

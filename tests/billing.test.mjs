@@ -75,15 +75,18 @@ after(() => { srv.server.close(); globalThis.fetch = realFetch; });
 /* ---------------- browser stand-ins ---------------- */
 let ipN = 0;
 function client() {
-  let cookie = null;
+  const jar = new Map(); // every cookie by name (the console sets its own beside the site's)
   const ip = `10.7.0.${++ipN}`;
   const c = async (method, path, body) => {
     env.__ip = ip;
     const headers = { Origin: base };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (cookie) headers.Cookie = cookie;
+    if (jar.size) headers.Cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
     const res = await realFetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-    for (const sc of res.headers.getSetCookie()) cookie = /Max-Age=0/.test(sc) ? null : sc.split(';')[0];
+    for (const sc of res.headers.getSetCookie()) {
+      const pair = sc.split(';')[0], i = pair.indexOf('=');
+      if (/Max-Age=0/.test(sc) || !pair.slice(i + 1)) jar.delete(pair.slice(0, i)); else jar.set(pair.slice(0, i), pair.slice(i + 1));
+    }
     const text = await res.text();
     let json = null; try { json = JSON.parse(text); } catch { json = null; }
     return { status: res.status, body: json };
@@ -97,6 +100,13 @@ async function signup(email = `learner${++userN}@example.com`) {
   const r = await c('POST', '/api/auth/signup', { fullName: 'Asha Learner', email, phoneNumber: '+91 98765 43210', password: pw, confirmPassword: pw });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   c.user = r.body.user;
+  return c;
+}
+/** A browser signed in to the admin console (POST /api/admin/auth/login; no emailed code without email set up). */
+async function consoleSignIn(email) {
+  const c = client();
+  const r = await c('POST', '/api/admin/auth/login', { email, password: pw });
+  assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(r.body.step, 'done');
   return c;
 }
 async function webhook(event, payload, { id = `evt_${++fake.n}`, secret = WH_SECRET, signature } = {}) {
@@ -288,32 +298,35 @@ test('webhook: payment.failed marks the order failed; the browser failure messag
 
 /* ---------------- refunds ---------------- */
 test('refunds: a partial refund keeps the plan; the full refund revokes it', async () => {
-  const owner = await signup('boss@example.com');
+  await signup('boss@example.com');
+  const owner = await consoleSignIn('boss@example.com');
   const c = await signup();
   const { order, verify } = await buy(c, 'pro');
   assert.equal(verify.body.status, 'paid');
   const payRow = await env.DB.prepare('SELECT id FROM payments WHERE order_id = ?1').bind(order.orderId).first();
-  assert.equal((await c('POST', `/api/admin/payments/${payRow.id}/refund`, { reason: 'x' })).status, 404);
-  assert.equal((await owner('POST', `/api/admin/payments/${payRow.id}/refund`, { amountPaise: 5000 })).status, 400); // reason needed
-  assert.equal((await owner('POST', `/api/admin/payments/${payRow.id}/refund`, { amountPaise: 99999, reason: 'too much' })).status, 400);
-  const part = await owner('POST', `/api/admin/payments/${payRow.id}/refund`, { amountPaise: 5000, reason: 'Goodwill' });
-  assert.equal(part.status, 200, JSON.stringify(part.body));
+  const refund = (who, body) => who('POST', '/api/console/refunds', { paymentId: payRow.id, reasonCode: 'request', ...body });
+  assert.equal((await refund(c, {})).status, 401, 'a learner session is not an admin session');
+  assert.equal((await refund(owner, { amountPaise: 99999 })).status, 400);
+  const part = await refund(owner, { amountPaise: 5000, reasonCode: 'other', reasonText: 'Goodwill after an outage' });
+  assert.equal(part.status, 201, JSON.stringify(part.body));
   assert.equal(part.body.orderStatus, 'partially_refunded');
   assert.equal((await c('GET', '/api/me/entitlements')).body.plan, 'pro');
   // the refund.processed webhook for the same refund changes nothing more
   await webhook('refund.processed', { refund: { entity: { ...fake.refunds[fake.refunds.length - 1] } } });
   assert.equal(await count("SELECT COUNT(*) AS n FROM refunds WHERE order_id = ?1 AND status = 'processed'", order.orderId), 1);
 
-  const rest = await owner('POST', `/api/admin/payments/${order.orderId}/refund`, { reason: 'Customer asked' });
-  assert.equal(rest.status, 200, JSON.stringify(rest.body));
-  assert.equal(rest.body.refund.amountPaise, 14900);
+  await env.DB.prepare('DELETE FROM rate_limits').run(); // one refund per payment a minute (a double click guard)
+  const rest = await refund(owner, {});
+  assert.equal(rest.status, 201, JSON.stringify(rest.body));
+  assert.equal(rest.body.amountPaise, 14900);
   assert.equal(rest.body.orderStatus, 'refunded');
   assert.equal((await c('GET', '/api/me/entitlements')).body.plan, 'free');
   assert.equal((await env.DB.prepare('SELECT status FROM user_subscriptions WHERE order_id = ?1').bind(order.orderId).first()).status, 'revoked');
   assert.equal((await env.DB.prepare('SELECT status FROM payments WHERE id = ?1').bind(payRow.id).first()).status, 'refunded');
   assert.equal(await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'payment.refund' AND target = ?1", `payment:${payRow.id}`), 2);
   // nothing left to refund, and a replayed capture webhook does not bring the plan back
-  assert.equal((await owner('POST', `/api/admin/payments/${payRow.id}/refund`, { reason: 'again' })).status, 400);
+  await env.DB.prepare('DELETE FROM rate_limits').run();
+  assert.equal((await refund(owner, {})).status, 400);
   const p = await env.DB.prepare('SELECT razorpay_payment_id FROM payments WHERE id = ?1').bind(payRow.id).first();
   await webhook('payment.captured', { payment: { entity: { ...fake.payments.get(p.razorpay_payment_id), status: 'captured' } } });
   assert.equal((await c('GET', '/api/me/entitlements')).body.plan, 'free');
@@ -453,95 +466,26 @@ test('analytics: basic for everyone, advanced and insights only with their featu
 });
 
 /* ---------------- admin ---------------- */
-test('admin endpoints answer 404 to learners and signed-out visitors, and work for the OWNER_EMAILS owner', async () => {
+test('the admin is the console: the old /api/admin pages API is gone, and a site sign-in never opens an admin endpoint', async () => {
   const learner = await signup();
   const anon = client();
-  const paths = ['/api/admin/overview', '/api/admin/users', '/api/admin/packages', '/api/admin/payments', '/api/admin/revenue', '/api/admin/settings', '/api/admin/audit', `/api/admin/users/${learner.user.id}`];
-  for (const p of paths) {
-    assert.equal((await learner('GET', p)).status, 404, p);
-    assert.equal((await anon('GET', p)).status, 404, p);
-  }
-  assert.equal((await learner('PUT', '/api/admin/packages/pro', { pricePaise: 1 })).status, 404);
-  assert.equal((await learner('POST', `/api/admin/users/${learner.user.id}`, { role: 'owner' })).status, 404);
-
   const owner = client();
   assert.equal((await owner('POST', '/api/auth/login', { email: 'boss@example.com', password: pw })).status, 200);
-  const ov = (await owner('GET', '/api/admin/overview')).body;
-  assert.ok(ov.users.total >= 10); assert.ok(ov.revenue.grossTotalPaise > 0); assert.ok(ov.users.paying >= 1);
-  assert.ok('learners' in ov.health && 'rejectReasons7d' in ov.health, 'old health numbers included');
-  assert.equal((await owner('GET', '/api/admin/me')).body.role, 'owner');
-
-  const users = (await owner('GET', `/api/admin/users?q=${encodeURIComponent(learner.user.email)}`)).body;
-  assert.equal(users.total, 1); assert.equal(users.items[0].id, learner.user.id); assert.equal(users.items[0].plan, 'Free');
-  const detail = (await owner('GET', `/api/admin/users/${learner.user.id}`)).body;
-  assert.equal(detail.user.role, null, 'the user drawer reads user.role'); assert.equal(detail.entitlements.plan, 'free');
-  assert.ok(Array.isArray(detail.subscriptions) && Array.isArray(detail.orders));
-  const pays = (await owner('GET', '/api/admin/payments?status=paid')).body;
-  assert.ok(pays.items.length >= 1 && pays.items.every((p) => p.status === 'paid'));
-  const rev = (await owner('GET', '/api/admin/revenue')).body;
-  assert.equal(rev.daily.length, 30); assert.ok(rev.totals.grossPaise > 0); assert.ok(rev.totals.refundsPaise > 0);
-  assert.equal(rev.totals.netPaise, rev.totals.grossPaise - rev.totals.refundsPaise);
-  assert.ok(rev.byPackage.some((p) => p.packageId === 'pro'));
-
-  // grant, revoke, disable
-  const g = await owner('POST', `/api/admin/users/${learner.user.id}`, { grant: { packageId: 'premium', days: 10 } });
-  assert.equal(g.status, 200, JSON.stringify(g.body));
-  assert.equal(g.body.entitlements.plan, 'premium');
-  const subId = g.body.subscriptions[0].id;
-  assert.equal((await learner('GET', '/api/me/entitlements')).body.plan, 'premium');
-  await owner('POST', `/api/admin/users/${learner.user.id}`, { revoke: subId });
-  assert.equal((await learner('GET', '/api/me/entitlements')).body.plan, 'free');
-  assert.equal((await owner('POST', `/api/admin/users/${learner.user.id}`, { status: 'disabled' })).status, 200);
-  assert.equal((await learner('GET', '/api/me/entitlements')).status, 401);
-  await owner('POST', `/api/admin/users/${learner.user.id}`, { status: 'active' });
-  for (const a of ['subscription.grant', 'subscription.revoke', 'user.disable', 'user.enable']) {
-    assert.equal(await count('SELECT COUNT(*) AS n FROM audit_logs WHERE action = ?1 AND target = ?2', a, `user:${learner.user.id}`), 1, a);
+  // the endpoints of the old /admin pages (Phase 6 removed them): not found for everyone, the owner included
+  const gone = ['/api/admin/me', '/api/admin/overview', '/api/admin/users', '/api/admin/packages', '/api/admin/payments', '/api/admin/revenue',
+    '/api/admin/settings', '/api/admin/audit', '/api/admin/emails', '/api/admin/contact', '/api/admin/health', `/api/admin/users/${learner.user.id}`];
+  for (const p of gone) for (const who of [owner, learner, anon]) assert.equal((await who('GET', p)).status, 404, p);
+  assert.equal((await owner('PUT', '/api/admin/packages/pro', { pricePaise: 1 })).status, 404);
+  assert.equal((await owner('POST', `/api/admin/users/${learner.user.id}`, { role: 'owner' })).status, 404);
+  assert.equal((await owner('POST', '/api/admin/announcements', { subject: 'x', body: 'y' })).status, 404);
+  // the console's own endpoints answer only to a console session: the owner's site sign-in is not one
+  for (const p of ['/api/console/customers', '/api/console/payments', '/api/console/settings', '/api/admin/permissions', '/api/admin/staff']) {
+    for (const who of [owner, learner, anon]) assert.equal((await who('GET', p)).status, 401, p);
   }
-  assert.ok((await owner('GET', '/api/admin/audit')).body.total >= 4);
-});
-
-test('roles: only the owner changes roles; support is read-only; permissions decide the rest; packages and settings are validated and audited', async () => {
-  const owner = client();
-  await owner('POST', '/api/auth/login', { email: 'boss@example.com', password: pw });
-  const adm = await signup(), sup = await signup();
-  assert.equal((await owner('POST', `/api/admin/users/${adm.user.id}`, { role: 'admin' })).status, 200);
-  assert.equal((await owner('POST', `/api/admin/users/${sup.user.id}`, { role: 'support' })).status, 200);
-  assert.equal((await owner('POST', `/api/admin/users/${sup.user.id}`, { role: 'king' })).status, 400);
-  // support: reads users and payments, nothing else
-  assert.equal((await sup('GET', '/api/admin/users')).status, 200);
-  assert.equal((await sup('GET', '/api/admin/payments')).status, 200);
-  assert.equal((await sup('PUT', '/api/admin/packages/pro', { pricePaise: 100 })).status, 403);
-  assert.equal((await sup('GET', '/api/admin/revenue')).status, 403);
-  assert.equal((await sup('POST', `/api/admin/users/${adm.user.id}`, { status: 'disabled' })).status, 403);
-  // admin: everything but roles
-  assert.equal((await adm('POST', `/api/admin/users/${sup.user.id}`, { role: 'admin' })).status, 403);
-  assert.equal((await adm('GET', '/api/admin/revenue')).status, 200);
-  const badPrice = await adm('PUT', '/api/admin/packages/pro', { pricePaise: 12.5 });
-  assert.equal(badPrice.status, 400); assert.ok(badPrice.body.error.fields.pricePaise);
-  assert.equal((await adm('PUT', '/api/admin/packages/pro', { features: ['lessons.all', 'flying'] })).status, 400);
-  assert.equal((await adm('PUT', '/api/admin/packages/free', { pricePaise: 100 })).status, 400);
-  assert.equal((await adm('PUT', '/api/admin/packages/free', { active: false })).status, 400);
-  assert.equal((await adm('PUT', '/api/admin/packages/pro', { limits: { lessons: 'some', dailyTests: null, historyDays: null } })).status, 400);
-  const ok = await adm('PUT', '/api/admin/packages/pro', { pricePaise: 24900, highlight: false });
-  assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.deepEqual(ok.body.changed.sort(), ['highlight', 'pricePaise']);
-  assert.equal((await client()('GET', '/api/packages')).body.packages.find((p) => p.id === 'pro').pricePaise, 24900);
-  const learner = await signup();
-  assert.equal((await learner('POST', '/api/checkout/order', { packageId: 'pro' })).body.amountPaise, 24900);
-  await adm('PUT', '/api/admin/packages/pro', { pricePaise: 19900, highlight: true });
-  assert.equal(await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'package.update' AND target = 'package:pro'"), 2);
-  // settings: Admin can read them but, by default, not change them; a Super Admin can switch that on (role_permissions)
-  assert.equal((await adm('GET', '/api/admin/settings')).status, 200);
-  assert.equal((await adm('PUT', '/api/admin/settings', { signups: { open: true } })).status, 403);
-  assert.equal((await adm('POST', '/api/admin/payments/ord_none/refund', { reason: 'x' })).status, 403); // refunds are off for Admin by default
-  await env.DB.prepare("INSERT INTO role_permissions (role, permission, allowed, updated_at) VALUES ('admin', 'settings.manage', 1, '2026-11-15T00:00:00Z')").run();
-  assert.equal((await adm('PUT', '/api/admin/settings', { seller: { gstin: 'nope' } })).status, 400);
-  assert.equal((await adm('PUT', '/api/admin/settings', { secrets: { a: 1 } })).status, 400);
-  const s = await adm('PUT', '/api/admin/settings', { seller: { legalName: 'Asha Sharma (sole proprietor)' }, signups: { open: true } });
-  assert.equal(s.status, 200);
-  assert.equal(s.body.settings.seller.legalName, 'Asha Sharma (sole proprietor)'); assert.equal(s.body.settings.seller.name, 'TypeCraft');
-  assert.equal(await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'settings.update'"), 1);
-  assert.equal(await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'user.role'"), 2);
+  // signed in to the console, the same owner gets in
+  const consoleOwner = await consoleSignIn('boss@example.com');
+  assert.equal((await consoleOwner('GET', '/api/console/customers')).status, 200);
+  assert.equal((await consoleOwner('GET', '/api/admin/overview')).status, 404, 'still gone');
 });
 
 /* ---------------- invoices and crons ---------------- */

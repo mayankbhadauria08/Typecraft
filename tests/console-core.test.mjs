@@ -384,48 +384,47 @@ test('download: only with the permission and a fresh password check; cells are m
 
 /* ---------------- pages ---------------- */
 test('customer pages: frames by permission, the sidebar shows where you are, strict headers', async () => {
-  const anon = await K.client()('GET', '/console/customers?plan=paid');
-  assert.equal(anon.status, 302); assert.equal(anon.headers.get('location'), S.base + '/console/login?next=%2Fconsole%2Fcustomers%3Fplan%3Dpaid');
+  const anon = await K.client()('GET', '/admin/customers?plan=paid');
+  assert.equal(anon.status, 302); assert.equal(anon.headers.get('location'), S.base + '/admin/login?next=%2Fadmin%2Fcustomers%3Fplan%3Dpaid');
 
-  const page = await admin('GET', '/console/customers');
+  const page = await admin('GET', '/admin/customers');
   assert.equal(page.status, 200);
   assertNoInlineCode(page.text);
   assert.ok(page.headers.get('content-security-policy').includes("default-src 'none'"));
   assert.equal(page.headers.get('cache-control'), 'private, no-store');
-  assert.match(page.text, /<a class="nav-item is-current" href="\/console\/customers" aria-current="page">/);
+  assert.match(page.text, /<a class="nav-item is-current" href="\/admin\/customers" aria-current="page">/);
   for (const name of ['q', 'plan', 'status', 'verified', 'joined', 'sort']) assert.ok(page.text.includes(`name="${name}"`), name);
   assert.ok(page.text.includes('id="exportBtn"') && page.text.includes('/site/console/customers.js?v='));
-  assert.ok(!(await support('GET', '/console/customers')).text.includes('id="exportBtn"'), 'no download button without the permission');
+  assert.ok(!(await support('GET', '/admin/customers')).text.includes('id="exportBtn"'), 'no download button without the permission');
   assert.ok(!/Riya Sharma|riya\.sharma/.test(page.text), 'the frame carries no customer data; the script asks for it');
 
-  const profile = await owner('GET', `/console/customers/${P.riya}`);
+  const profile = await owner('GET', `/admin/customers/${P.riya}`);
   assert.equal(profile.status, 200);
   assertNoInlineCode(profile.text);
-  assert.match(profile.text, /<a class="nav-item is-current" href="\/console\/customers" aria-current="page">/);
-  assert.match(profile.text, /<a class="crumb" href="\/console\/customers">Customers<\/a>/);
+  assert.match(profile.text, /<a class="nav-item is-current" href="\/admin\/customers" aria-current="page">/);
+  assert.match(profile.text, /<a class="crumb" href="\/admin\/customers">Customers<\/a>/);
   for (const id of ['planBody', 'ordersBody', 'progressBody', 'noteForm', 'notesBody', 'emailsBody', 'activityBody', 'accountBody', 'devicesBody']) assert.ok(profile.text.includes(`id="${id}"`), id);
   const boot = JSON.parse(profile.text.match(/<script type="application\/json" id="console-boot">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(boot.page, { key: 'customers', title: 'Customer', params: { id: P.riya } });
-  const asSupport = (await support('GET', `/console/customers/${P.riya}`)).text;
+  const asSupport = (await support('GET', `/admin/customers/${P.riya}`)).text;
   assert.ok(asSupport.includes('id="ordersBody"') && asSupport.includes('id="noteForm"') && !asSupport.includes('id="activityBody"'));
 
-  // Home says what is ready here, with links only to what the role may open
-  const home = (await owner('GET', '/console')).text;
-  assert.match(home, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>/);
-  assert.match(home, /<a href="\/console\/roles">Roles and permissions<\/a>, [^.]*<a href="\/console\/settings">Settings<\/a>\./);
-  assert.ok(!/ustomers[^.<]* still managed in the current admin/.test(home), 'what is built here is no longer listed as managed elsewhere');
-  const supportHome = (await support('GET', '/console')).text;
-  assert.match(supportHome, /Ready here: [^.]*<a href="\/console\/customers">Customers<\/a>/);
-  assert.ok(!supportHome.includes('href="/console/roles"'), 'Support may not open Roles, so it is not offered');
+  // Home: since the cutover (Phase 6) no "being built" notice; the menu offers only what the role may open
+  const home = (await owner('GET', '/admin')).text;
+  assert.ok(!/being built in phases|current admin/.test(home));
+  assert.ok(home.includes('href="/admin/customers"') && home.includes('href="/admin/roles"'));
+  const supportHome = (await support('GET', '/admin')).text;
+  assert.ok(supportHome.includes('href="/admin/customers"'));
+  assert.ok(!supportHome.includes('href="/admin/roles"'), 'Support may not open Roles, so it is not offered');
 
-  assert.equal((await owner('GET', '/console/customers/a/b')).status, 404);
-  assert.equal((await owner('GET', '/console/customers/' + 'x'.repeat(70))).status, 404);
-  assert.equal((await owner('GET', `/console/customers/${P.riya}/`)).headers.get('location'), `${S.base}/console/customers/${P.riya}`);
+  assert.equal((await owner('GET', '/admin/customers/a/b')).status, 404);
+  assert.equal((await owner('GET', '/admin/customers/' + 'x'.repeat(70))).status, 404);
+  assert.equal((await owner('GET', `/admin/customers/${P.riya}/`)).headers.get('location'), `${S.base}/admin/customers/${P.riya}`);
   await K.setPermission('support', 'customers.view', false);
   try {
-    assert.equal((await support('GET', '/console/customers')).status, 403);
-    assert.equal((await support('GET', `/console/customers/${P.riya}`)).status, 403);
-    assert.ok(!(await support('GET', '/console')).text.includes('href="/console/customers"'), 'and no link in the sidebar');
+    assert.equal((await support('GET', '/admin/customers')).status, 403);
+    assert.equal((await support('GET', `/admin/customers/${P.riya}`)).status, 403);
+    assert.ok(!(await support('GET', '/admin')).text.includes('href="/admin/customers"'), 'and no link in the sidebar');
   } finally { await K.run("DELETE FROM role_permissions WHERE permission = 'customers.view'"); }
   for (const f of ['customers.js', 'customer.js']) {
     const r = await K.client()('GET', `/site/console/${f}`);
@@ -454,7 +453,7 @@ test('before migration 0006: the list works, the parts that need new tables say 
   assert.equal(me.status, 201);
   assert.equal((await call('POST', '/api/admin/auth/login', { email: OWNER, password: pw })).status, 200);
   assert.equal((await call('GET', '/api/console/customers')).body.total, 1);
-  assert.equal((await call('GET', '/console/customers')).status, 200);
+  assert.equal((await call('GET', '/admin/customers')).status, 200);
   for (const [method, p, body] of [['GET', `/api/console/customers/${me.body.user.id}`], ['POST', `/api/console/customers/${me.body.user.id}/notes`, { body: 'hello' }], ['DELETE', '/api/console/notes/abc', {}]]) {
     const r = await call(method, p, body);
     assert.equal(r.status, 503, `${method} ${p}`); assert.equal(r.body.error.code, 'console_not_ready');

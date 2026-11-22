@@ -8,7 +8,6 @@ import { esc } from '../layout.js';
 import { icon } from './icons.js';
 import { CONSOLE_BASE, ROLE_LABELS, IDLE_MS, MAX_MS } from './config.js';
 import { LAYERS } from './permissions.js';
-import { LAYERS as MODULE_LAYERS } from './modules.js';
 import { skeletonRows, lines, select, section, listFrame, downloadButton } from './page-kit.js';
 import { CORE_PAGES } from './pages-core.js';
 import { LEARNING_PAGES } from './pages-learning.js';
@@ -17,27 +16,6 @@ import { INSTITUTE_PAGES } from './pages-institutes.js';
 import { INFRA_PAGES } from './pages-infra.js';
 
 /* ---------- Home ---------- */
-// What the current admin (/admin) looks after, by the console module that takes it over.
-const OLD_ADMIN = [['customers', 'customers'], ['payments', 'payments'], ['packages', 'packages'], ['emails', 'emails'], ['settings', 'settings'],
-  ['activity-logs', 'the activity log'], ['administrators', 'administrator roles']];
-
-const wordList = (words) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
-
-/** The notice on Home: what is ready here and what the current admin still looks after.
- *  Read from the module list, so it stays true as each module is built. */
-function phaseNotice(me) {
-  const built = MODULE_LAYERS.flatMap((layer) => layer.modules).filter((m) => m.path);
-  const open = built.filter((m) => me.permissions.includes(m.permission));
-  const waiting = OLD_ADMIN.filter(([key]) => !built.some((m) => m.key === key)).map(([, word]) => word);
-  const ready = open.length ? ` Ready here: ${open.map((m) => `<a href="${CONSOLE_BASE}${m.path}">${esc(m.label)}</a>`).join(', ')}.` : '';
-  const list = wordList(waiting);
-  const old = waiting.length
-    ? ` ${list.charAt(0).toUpperCase()}${list.slice(1)} are still managed in the current admin until ${waiting.length === 1 ? 'they are' : 'each one is'} rebuilt in this console.`
-    : '';
-  return `<div class="notice">${icon('info')}<div><p><strong>This console is being built in phases.</strong>${ready}${old}</p>
-<p><a href="/admin" target="_blank" rel="noopener">Open the current admin</a>. It uses your normal TypeCraft sign-in.</p></div></div>`;
-}
-
 function homeBody(me) {
   const role = ROLE_LABELS[me.role] || me.role;
   const canSetup = me.permissions.includes('settings.view');
@@ -51,8 +29,6 @@ function homeBody(me) {
 <h1>Home</h1>
 <p class="page-sub">You're signed in as ${esc(role)}.</p>
 </div>
-
-${phaseNotice(me)}
 
 <div class="cols">
 <section class="panel" aria-labelledby="sessionTitle">

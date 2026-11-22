@@ -1,6 +1,6 @@
 // Platform settings (platform_settings rows 'seller', 'support', 'payments' and 'signups'): what each holds,
 // how a change is checked, and saving it with an activity-log entry. Used by the admin console's Settings page
-// (src/console/settings-api.js) and the old /admin (src/admin-api.js). docs/ADMIN-PHASE-5.md §1.
+// (src/console/settings-api.js). docs/ADMIN-PHASE-5.md §1.
 //
 // Where they are read: seller → every new invoice (src/invoices.js copies it at issue time); support → the
 // reply-to of every email and the contact page; payments.enabled → checkout (src/billing.js); signups.open →
@@ -121,20 +121,4 @@ export async function saveSettings(env, changes, { actorId = null, ip = null } =
   await env.DB.batch(writes);
   await audit(env, { actorId, action: 'settings.update', target: `settings:${Object.keys(diff).join(',')}`, detail: diff, ip });
   return { changed: Object.keys(diff), diff };
-}
-
-/** For the old /admin: checks a whole body ({ seller: {…}, … }); throws 400 with fields named 'seller.email' and so on. */
-export function checkBody(body) {
-  const changes = {}, fields = {};
-  for (const [k, v] of Object.entries(body || {})) {
-    if (!SECTIONS[k]) { fields[k] = 'This setting does not exist.'; continue; }
-    if (!v || typeof v !== 'object' || Array.isArray(v)) { fields[k] = 'Send the fields of this setting.'; continue; }
-    const { testMode, ...rest } = v; // the old page sent it back unchanged; it means nothing now
-    void testMode;
-    const { values, errors } = checkSection(k, rest);
-    for (const [f, msg] of Object.entries(errors)) fields[`${k}.${f}`] = msg;
-    if (Object.keys(values).length) changes[k] = values;
-  }
-  if (Object.keys(fields).length) throw fieldError(fields);
-  return changes;
 }

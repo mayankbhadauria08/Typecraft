@@ -141,9 +141,10 @@ sendTemplate(env, ctx, { to, userId?, template, data, category }) → { id, stat
   to support + `contact_received` auto-reply; 5/h per IP; `priority` = 1 if `support.priority`.
 - `POST /api/webhooks/resend` (optional, `RESEND_WEBHOOK_SECRET`, Svix signature) →
   `delivered` / `bounced` on `email_logs`.
-- Admin (email part): `GET /api/admin/emails?status&q&page`, `POST /api/admin/emails/:id/retry`,
-  `POST /api/admin/announcements {subject, body, audience:'all'|'paid'|'free', test:true}`,
-  `GET /api/admin/contact?status`, `POST /api/admin/contact/:id {status}`.
+- Admin (email part): moved to the console in Phase 6. The email log, retries, campaigns and
+  customer messages are `/api/console/email-log`, `/api/console/campaigns…` and
+  `/api/console/support…` (docs/ADMIN-PHASE-4.md); the old `/api/admin/emails`,
+  `/api/admin/announcements` and `/api/admin/contact` routes are gone.
 
 ## 5. Payments (owner: billing part) — `src/billing.js`, `src/razorpay.js`, `src/invoices.js`
 
@@ -192,15 +193,11 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
   `GET /api/me/tests?limit`. Analytics: `GET /api/me/analytics` (basic: daily speed/accuracy
   series; advanced fields only with `analytics.advanced`: key heatmap from `key_stats`,
   slow pairs from `bigram_stats`, `error_classes`; `insights` with `insights`).
-- Admin (billing part; role check from §7): `GET /api/admin/overview`,
-  `GET /api/admin/users?q&page`, `GET /api/admin/users/:id`, `POST /api/admin/users/:id
-  {status?, grant:{packageId, days?}?, revoke:subscriptionId?, role?}`,
-  `GET /api/admin/packages`, `PUT /api/admin/packages/:id {name, description, pricePaise,
-  validityDays, features, limits, highlight, active, displayOrder}`,
-  `GET /api/admin/payments?status&q&page`, `POST /api/admin/payments/:id/refund
-  {amountPaise?, reason}`, `GET /api/admin/revenue?from&to` (daily series, by package,
-  totals, refunds), `GET/PUT /api/admin/settings` (`seller`, `support`, `payments`,
-  `signups`), `GET /api/admin/audit?page`. Every admin write → `audit_logs`.
+- Admin (billing part): moved to the console in Phase 6. Customers, plans, packages,
+  payments, refunds, reports and settings are `/api/console/…` (docs/ADMIN-PHASE-2.md,
+  docs/ADMIN-PHASE-4.md, docs/ADMIN-PHASE-5.md); the old `/api/admin/overview`, `users`,
+  `packages`, `payments`, `revenue`, `settings`, `audit` and `health` routes are gone. Every admin
+  write → `audit_logs`.
 
 ## 6. Content (owner: app part) — `src/content.js`
 
@@ -301,11 +298,12 @@ Secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - `src/roles.js`: `roleOf(env, user)` → `'owner'|'admin'|'support'|null`
   (OWNER_EMAILS → owner; else `admin_users`). What each role may do is no longer a list of
   roles per handler: every admin handler names a permission and
-  `requirePermission(env, request, '<permission>')` (`src/console/session.js`) decides, from the
-  catalogue and the Super Admin's switches. See `docs/ADMIN-CONSOLE.md` §4. People without a
-  role still get 404 from the admin API.
+  `requireAdmin(env, request, '<permission>')` (`src/console/session.js`) decides, from the
+  console session, the catalogue and the Super Admin's switches. A site sign-in alone opens no
+  admin endpoint (since Phase 6). See `docs/ADMIN-CONSOLE.md` §4.
 - Pages: `public` (anyone), `guest` (signed-out only; signed-in → `/dashboard`),
-  `user` (signed in; else 302 `/login?next=<path>`), `admin` (role; else 404).
+  `user` (signed in; else 302 `/login?next=<path>`). Admin pages are the console's
+  (`src/console/router.js`, console session; docs/ADMIN-CONSOLE.md §5).
 
 ## 8. Pages and routing (owner: site part) — `src/site.js`, `src/layout.js`, `src/pages/*.js`
 

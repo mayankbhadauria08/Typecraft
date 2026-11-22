@@ -16,15 +16,18 @@ after(() => srv.server.close());
 const pw = 'correct horse 9';
 let ip = 0;
 function client() {
-  let cookie = null;
+  const jar = new Map(); // every cookie by name (the admin console sets its own)
   const myIp = `10.9.0.${++ip}`;
   const c = async (method, path, body) => {
     env.__ip = myIp;
     const headers = { Origin: base };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (cookie) headers.Cookie = cookie;
-    const res = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-    for (const sc of res.headers.getSetCookie()) cookie = /Max-Age=0/.test(sc) ? null : sc.split(';')[0];
+    if (jar.size) headers.Cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
+    const res = await fetch(base + path, { method, headers, redirect: 'manual', body: body === undefined ? undefined : JSON.stringify(body) });
+    for (const sc of res.headers.getSetCookie()) {
+      const pair = sc.split(';')[0], i = pair.indexOf('=');
+      if (/Max-Age=0/.test(sc) || !pair.slice(i + 1)) jar.delete(pair.slice(0, i)); else jar.set(pair.slice(0, i), pair.slice(i + 1));
+    }
     const text = await res.text();
     let json = null; try { json = JSON.parse(text); } catch { json = null; }
     return { status: res.status, body: json, text, headers: res.headers };
@@ -256,19 +259,23 @@ test('stats batches merge once; settings check what is unlocked; history and exp
   assert.ok(!JSON.stringify(ex.body).includes('password'));
 });
 
-test('owner health page and numbers are for owners only', async () => {
+test('the saving-health numbers are in the admin console (System health), for admins signed in there only', async () => {
   const learner = await signup('notowner@example.com');
-  assert.equal((await learner('GET', '/api/admin/health')).status, 404);
-  assert.equal((await learner('GET', '/admin')).status, 404);
-  assert.notEqual((await client()('GET', '/admin.html')).status, 200);
+  assert.equal((await learner('GET', '/api/admin/health')).status, 404, 'the old owner page API is gone');
+  assert.equal((await learner('GET', '/api/console/health')).status, 401);
+  const page = await learner('GET', '/admin');
+  assert.equal(page.status, 302); assert.match(page.headers.get('location'), /\/admin\/login/);
+  const old = await client()('GET', '/admin.html');
+  assert.equal(old.status, 301); assert.equal(new URL(old.headers.get('location'), 'http://x').pathname, '/admin');
   const owner = await signup('owner@example.com');
-  const h = await owner('GET', '/api/admin/health');
-  assert.equal(h.status, 200);
-  assert.ok(h.body.learners >= 2);
-  assert.ok(h.body.runsToday >= 1);
-  assert.ok(h.body.rejectedToday >= 12);
-  const page = await owner('GET', '/admin');
-  assert.equal(page.status, 200); // the admin overview page (src/pages/admin)
+  assert.equal((await owner('GET', '/api/console/health')).status, 401, 'a site sign-in is not an admin sign-in');
+  const signedIn = client();
+  assert.equal((await signedIn('POST', '/api/admin/auth/login', { email: 'owner@example.com', password: pw })).status, 200);
+  const h = await signedIn('GET', '/api/console/health');
+  assert.equal(h.status, 200, JSON.stringify(h.body));
+  assert.ok(h.body.learning.learners >= 2);
+  assert.ok(h.body.learning.runsToday >= 1);
+  assert.ok(h.body.learning.rejectedToday >= 12);
 });
 
 /* 6 */

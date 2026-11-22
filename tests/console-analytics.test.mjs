@@ -69,7 +69,7 @@ test('who may see learning analytics', async () => {
   assert.equal((await get(support)).status, 200, 'Support can see it');
   await K.setPermission('support', 'analytics.view', false);
   assert.equal((await get(support)).status, 403);
-  assert.equal((await support('GET', '/console/learning-analytics')).status, 403);
+  assert.equal((await support('GET', '/admin/learning-analytics')).status, 403);
   await K.setPermission('support', 'analytics.view', true);
 });
 
@@ -125,9 +125,9 @@ test('a renamed lesson or level shows its published name; an empty start reads a
 });
 
 test('the page: frame, no inline code, in the menu', async () => {
-  const r = await support('GET', '/console/learning-analytics');
+  const r = await support('GET', '/admin/learning-analytics');
   assert.equal(r.status, 200); assertNoInlineCode(r.text);
   for (const id of ['practiceTiles', 'activeChart', 'levelsBody', 'hardestBody', 'speedBody', 'placementBody', 'keysBody']) assert.ok(r.text.includes(`id="${id}"`), id);
   assert.ok(r.text.includes('/site/console/analytics.js?v='));
-  assert.ok((await support('GET', '/console')).text.includes('href="/console/learning-analytics"'));
+  assert.ok((await support('GET', '/admin')).text.includes('href="/admin/learning-analytics"'));
 });

@@ -67,7 +67,7 @@ test('who may see progress', async () => {
   await K.setPermission('support', 'progress.view', false);
   assert.equal((await support('GET', '/api/console/progress')).status, 403);
   assert.equal((await support('GET', `/api/console/progress/${asha.id}`)).status, 403);
-  assert.equal((await support('GET', '/console/progress')).status, 403);
+  assert.equal((await support('GET', '/admin/progress')).status, 403);
   await K.setPermission('support', 'progress.view', true);
 });
 
@@ -140,10 +140,10 @@ test('a renamed lesson or level shows its published name', async () => {
 });
 
 test('pages: frames by permission, no inline code, in the menu', async () => {
-  for (const [path, needs] of [['/console/progress', 'id="listBody"'], [`/console/progress/${asha.id}`, 'id="daysChart"']]) {
+  for (const [path, needs] of [['/admin/progress', 'id="listBody"'], [`/admin/progress/${asha.id}`, 'id="daysChart"']]) {
     const r = await support('GET', path);
     assert.equal(r.status, 200, path); assertNoInlineCode(r.text); assert.ok(r.text.includes(needs), path);
   }
-  assert.ok((await support('GET', `/console/progress/${asha.id}`)).text.includes('/site/console/charts.js?v='));
-  assert.ok((await support('GET', '/console')).text.includes('href="/console/progress"'));
+  assert.ok((await support('GET', `/admin/progress/${asha.id}`)).text.includes('/site/console/charts.js?v='));
+  assert.ok((await support('GET', '/admin')).text.includes('href="/admin/progress"'));
 });

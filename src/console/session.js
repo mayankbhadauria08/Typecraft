@@ -1,10 +1,8 @@
 // Admin console sessions and the one place every admin API checks who is asking
 // (docs/ADMIN-CONSOLE.md §3–§4).
 //
-//   requireAdmin(env, request, 'payments.refund')      console-only endpoints: a console session is required
-//   requirePermission(env, request, 'customers.view')  endpoints the current /admin pages also use: a console
-//                                                      session, or (until the console replaces those pages) the
-//                                                      learner sign-in of an account that has a role
+//   requireAdmin(env, request, 'payments.refund')      every admin endpoint: a console session is required
+//                                                      (the learner sign-in never opens an admin endpoint)
 //   assertCan(env, who, 'customers.manage')            a further permission inside a handler
 //
 // A console session is separate from the learner session: its own cookie (SameSite=Strict),
@@ -12,8 +10,8 @@
 // role or is disabled. The role and its permissions are read on every request, never cached.
 import { HttpError, readCookie, nowIso, clientIp } from '../http.js';
 import { randomToken, sha256Hex } from '../crypto.js';
-import { getSession, publicUser } from '../session.js';
-import { roleOf, roleFrom } from '../roles.js';
+import { publicUser } from '../session.js';
+import { roleFrom } from '../roles.js';
 import { can, BY_KEY } from './permissions.js';
 import { ADMIN_COOKIE, IDLE_MS, MAX_MS, FRESH_MS, TOUCH_MS } from './config.js';
 
@@ -119,22 +117,3 @@ export async function requireAdmin(env, request, permission = null, opts = {}) {
   return who;
 }
 
-/**
- * A console session, or the learner sign-in of an account with a role (the current /admin
- * pages; this second way goes when the console replaces them). Everyone else gets 404,
- * as before. → { user, role, session | null, setCookie? }
- */
-export async function requirePermission(env, request, permission = null) {
-  let who = null;
-  try { who = await getAdminSession(env, request); } catch (err) {
-    if (!/no such table/i.test(String(err && err.message))) throw err; // before migration 0005
-  }
-  if (!who) {
-    const s = await getSession(env, request);
-    const role = s ? await roleOf(env, s.user) : null;
-    if (role) who = { user: s.user, role, session: null, setCookie: s.setCookie };
-  }
-  if (!who) throw new HttpError(404, 'not_found', 'Not found.');
-  if (permission) await assertCan(env, who, permission);
-  return who;
-}

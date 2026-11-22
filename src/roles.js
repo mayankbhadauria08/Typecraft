@@ -1,7 +1,7 @@
 // Who has which role (docs/SAAS-CONTRACTS.md §7, docs/ADMIN-CONSOLE.md §3).
 // OWNER_EMAILS (secret, comma-separated) are always 'owner'; everyone else gets the
 // role in admin_users, or none. What a role may do is decided in one place only:
-// src/console/permissions.js, through requireAdmin() / requirePermission() in src/console/session.js.
+// src/console/permissions.js, through requireAdmin() in src/console/session.js.
 import { isOwner } from './admin.js';
 
 export const ROLES = ['owner', 'admin', 'support'];

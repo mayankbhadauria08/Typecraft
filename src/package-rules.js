@@ -1,5 +1,4 @@
-// The rules for a package (a plan on sale), in one place for the current admin (PUT
-// /api/admin/packages/:id in src/admin-api.js) and the admin console (src/console/packages-api.js).
+// The rules for a package (a plan on sale), used by the admin console (src/console/packages-api.js).
 //
 // What a customer already bought does not change when a package changes: a subscription keeps a
 // copy of the features and limits it was sold with (user_subscriptions.features, .limits). The Free

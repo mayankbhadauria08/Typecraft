@@ -1,13 +1,13 @@
 # TypeCraft admin console
 
-The new admin dashboard, built in six phases beside the current `/admin` pages. This file is the
-map for whoever works on it next: what exists, how sign-in and permissions work, how to add a
-module, and what has to happen before it replaces the current admin.
+The admin dashboard, built in six phases. Since Phase 6 it *is* the admin: the old `/admin`
+pages are gone. This file is the map for whoever works on it next: what exists, how sign-in and
+permissions work, and how to add a module.
 
-Status: **Phases 1 to 5 of 6 are built** (foundation; core operations; learning operations; business
-growth; infrastructure). It lives at `/console`. The current `/admin`
-keeps working unchanged until the cutover in §9. Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`,
-`docs/ADMIN-PHASE-3.md`, `docs/ADMIN-PHASE-4.md`, `docs/ADMIN-PHASE-5.md`.
+Status: **all six phases are built** (foundation; core operations; learning operations; business
+growth; infrastructure; cutover). It lives at `/admin`; old `/console` links redirect there (§9).
+Work orders, endpoints and rules: `docs/ADMIN-PHASE-2.md`, `docs/ADMIN-PHASE-3.md`,
+`docs/ADMIN-PHASE-4.md`, `docs/ADMIN-PHASE-5.md`; the delivery report is `docs/ADMIN-PHASE-6.md`.
 
 | Phase | Contents | Status |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ keeps working unchanged until the cutover in §9. Work orders, endpoints and rul
 | 3 | Learning operations: courses, modules, levels, lessons, exercises, unlock conditions, progress, analytics | built (docs/ADMIN-PHASE-3.md, docs/UNLOCK-RULES.md) |
 | 4 | Business growth: coupons, promotions, email campaigns, support, notifications, reports | built in three parts: 4a Support and Business reports, 4b Email campaigns and Notifications, 4c Coupons and Promotions (docs/ADMIN-PHASE-4.md) |
 | 5 | Infrastructure: administrators, activity logs, system health, integrations, security, settings | built in two parts: 5a Settings, Integrations, System health; 5b Administrators, Activity logs, Security (docs/ADMIN-PHASE-5.md) |
-| 6 | Optimisation, full test pass, cutover, delivery report | not started |
+| 6 | Optimisation, full test pass, cutover, delivery report | built (docs/ADMIN-PHASE-6.md) |
 
 ## 1. What the audit found (Phase 1)
 
@@ -61,7 +61,7 @@ One account system. An administrator is an ordinary TypeCraft account that has a
 - **Admin**, **Support**: a row in `admin_users`.
 
 No admin password exists anywhere in the code or the configuration. Signing in at
-`/console/login` (`src/console/auth.js`):
+`/admin/login` (`src/console/auth.js`):
 
 1. Email and password. Every failure gives the same answer, whether the email is unknown, the
    password is wrong, or the account has no role.
@@ -110,11 +110,10 @@ module, label, description and the defaults for Admin and Support. Super Admin a
 everything. `role_permissions` stores only the switches a Super Admin changed from the default.
 
 ```js
-import { requireAdmin, requirePermission, assertCan } from './console/session.js';
+import { requireAdmin, assertCan } from './console/session.js';
 
-const who = await requireAdmin(env, request, 'payments.refund');     // console-only endpoints
-const who = await requirePermission(env, request, 'customers.view'); // endpoints the current /admin also uses
-await assertCan(env, who, 'customers.manage');                       // a second permission inside a handler
+const who = await requireAdmin(env, request, 'payments.refund'); // every admin endpoint
+await assertCan(env, who, 'customers.manage');                   // a second permission inside a handler
 ```
 
 Rules that hold everywhere:
@@ -132,15 +131,16 @@ customer messages, and can update messages. It cannot refund, manage administrat
 or see or change settings. Admin runs daily operations but cannot refund or change settings
 until a Super Admin switches that on, and can never manage roles or administrators.
 
-`requirePermission()` also accepts the normal site sign-in of an account with a role, because
-the current `/admin` pages still use it. That second way is removed at cutover (§9).
+Only a console session opens an admin endpoint. The normal site sign-in of an account with a
+role is not enough, even for the Super Admin: the old `requirePermission()` that accepted it was
+removed at the cutover (§9), and `tests/admin-cutover.test.mjs` walks every admin route to prove it.
 
 ## 5. Pages
 
-`src/site.js` hands every address at or below `CONSOLE_BASE` (`/console`) to
+`src/site.js` hands every address at or below `CONSOLE_BASE` (`/admin`) to
 `src/console/router.js`:
 
-- `/console/login` is public. Everything else needs a console session, otherwise the browser is
+- `/admin/login` is public. Everything else needs a console session, otherwise the browser is
   sent to the sign-in page with a checked `next` address (console addresses only).
 - A page whose permission the role lacks returns a 403 page inside the frame.
 - Headers on every console page: `Cache-Control: private, no-store`, `X-Robots-Tag: noindex,
@@ -209,7 +209,7 @@ through `src/billing.js`, and only what Razorpay confirms counts as paid.
   other parts that need it answer "not switched on yet" (503), lists still work, and nothing
   changes for customers. Go-live steps: `docs/ADMIN-PHASE-2.md` §4 and `docs/LAUNCH.md` §1c.
 - `0005_admin_console.sql`: `admin_sessions`, `role_permissions`. Additive only.
-- Apply to live D1 **before or right after** the Phase 1 merge. Until then `/console/login`
+- Apply to live D1 **before or right after** the Phase 1 merge. Until then `/admin/login`
   says the console isn't switched on, and the rest of the site is unaffected (tested).
 - Take a D1 bookmark first, as for 0002–0004, and note it in `docs/LAUNCH.md`.
 - A nightly job removes console sign-ins older than 30 days.
@@ -229,16 +229,21 @@ After the first deploy with this change, check that the build on `main` is green
 `/css/app.css` loads. If the build rejects the setting, put back `"run_worker_first": true`;
 nothing else depends on it.
 
-## 9. Cutover (when the console replaces `/admin`)
+## 9. Cutover (done in Phase 6)
 
-Phases 2–5 now cover everything the current admin does (since Phase 5b); the cutover is Phase 6.
+1. Done: `CONSOLE_BASE` in `src/console/config.js` is `/admin`. The old admin pages
+   (`src/pages/admin/`, `src/pages/admin.js`, `site/js/admin-*.js`, `admin.html`), their API
+   (`src/admin-api.js`, the old email and announcement handlers in `src/mail.js`) and the admin
+   registry and layout in `src/site.js` / `src/layout.js` are removed.
+2. Done: `requirePermission()` is gone; every admin endpoint needs a console session.
+3. `sw.js` is unchanged on purpose: it already skips `/admin`, `/console` and `/site/console/`,
+   and a new `VERSION` would show every learner an "Update ready" prompt for no change of theirs.
+   The `/console` line is harmless and can go with the next learner-facing release.
+4. Done: security review and delivery report, `docs/ADMIN-PHASE-6.md`.
 
-1. `CONSOLE_BASE` in `src/console/config.js` becomes `/admin`; remove the admin pages from
-   `src/pages/admin/`, `site/js/admin-*.js` and the registry in `src/site.js`.
-2. `requirePermission()` loses its site-sign-in path; every admin endpoint then needs a console
-   session.
-3. `sw.js`: the `/console` exclusion can go (`/admin` is already excluded); keep `/site/console/`.
-4. Re-run the security review, then the delivery report (A–H).
+Old addresses: `/console` and anything below it answers 301 to the same place under `/admin`
+(query kept), and `/admin.html` answers 301 to `/admin`, so bookmarks and the links in past alert
+emails still work.
 
 ## 10. Settings that affect the console
 
@@ -255,8 +260,7 @@ All are secrets or variables on the `typecraft` Worker in Cloudflare; none are i
 
 ## 11. Tests
 
-`node --test tests/console.test.mjs` (sign-in, codes, limits, sessions, the grid and its effect
-on the older admin APIs, page headers, redirects, the not-yet-migrated state, static routing).
+`node --test tests/console.test.mjs` (sign-in, codes, limits, sessions, the grid, page headers, redirects, the not-yet-migrated state, static routing).
 Phase 2: `tests/console-core.test.mjs` (customers), `console-payments` (payments, refunds,
 with the fake Razorpay in `tests/fake-razorpay.mjs`), `console-plans` (subscriptions, learning
 access, packages), `console-overview` (dashboard, search); `tests/app-plan.test.mjs` covers
@@ -270,3 +274,5 @@ Phase 4: `console-support`, `console-campaigns`, `console-coupons`, `console-ins
 Phase 5a: `tests/console-system.test.mjs` (settings, integrations, system health, the job record and
 its alerts, email previews; docs/ADMIN-PHASE-5.md §8). Phase 5b: `tests/console-security.test.mjs`
 (administrators, activity logs, security, the privacy clean-up; §14).
+Phase 6: `tests/admin-cutover.test.mjs` (every `/api/admin` and `/api/console` route refuses a
+visitor, a learner and the Super Admin's site sign-in; the old files are gone; the redirects).

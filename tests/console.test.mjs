@@ -1,6 +1,6 @@
 // Admin console, phase 1: sign-in (password, emailed code), console sessions, the
 // permissions grid and its effect on every admin API, the console pages and their headers.
-//   node --test tests/console.test.mjs
+//   node --test tests/admin.test.mjs
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -330,7 +330,7 @@ test('defaults: Support cannot refund, manage administrators, or touch settings;
   for (const p of PERMISSIONS) assert.ok(['core', 'learning', 'growth', 'infra'].includes(p.layer), p.key);
 });
 
-test('the grid: everyone with roles.view can read it, only a Super Admin can change it, and changes reach the old admin APIs at once', async () => {
+test('the grid: everyone with roles.view can read it, only a Super Admin can change it, and changes apply on the next request', async () => {
   const owner = await consoleLogin(A, await ownerOf(A));
   const adminWho = await account(A, { role: 'admin' }), supportWho = await account(A, { role: 'support' });
   const admin = await consoleLogin(A, adminWho), support = await consoleLogin(A, supportWho);
@@ -366,17 +366,17 @@ test('the grid: everyone with roles.view can read it, only a Super Admin can cha
   }
   assert.equal((await many(A, 'SELECT * FROM role_permissions')).length, 0);
 
-  // Support cannot see revenue by default (an endpoint the current /admin pages use)
-  assert.equal((await support('GET', '/api/admin/revenue')).status, 403);
+  // Support cannot see revenue by default (Business reports)
+  assert.equal((await support('GET', '/api/console/reports')).status, 403);
   const on = await put({ role: 'support', permission: 'revenue.view', allowed: true });
   assert.equal(on.status, 200); assert.equal(on.body.changed, true);
   assert.deepEqual(on.body.permissions.find((p) => p.key === 'revenue.view').roles.support, { allowed: true, default: false, changed: true });
-  assert.equal((await support('GET', '/api/admin/revenue')).status, 200, 'the change applies on the next request');
+  assert.equal((await support('GET', '/api/console/reports')).status, 200, 'the change applies on the next request');
   assert.ok((await support('GET', '/api/admin/auth/me')).body.permissions.includes('revenue.view'));
   // taking something away that a role has by default
-  assert.equal((await admin('GET', '/api/admin/audit')).status, 200);
+  assert.equal((await admin('GET', '/api/console/activity')).status, 200);
   await put({ role: 'admin', permission: 'audit.view', allowed: false });
-  assert.equal((await admin('GET', '/api/admin/audit')).status, 403);
+  assert.equal((await admin('GET', '/api/console/activity')).status, 403);
   // setting a switch to what it already is changes nothing and writes no audit entry
   const same = await put({ role: 'admin', permission: 'audit.view', allowed: false });
   assert.equal(same.body.changed, false);
@@ -390,7 +390,7 @@ test('the grid: everyone with roles.view can read it, only a Super Admin can cha
 
   const reset = await owner('POST', '/api/admin/permissions/reset', { role: 'admin' });
   assert.equal(reset.status, 200); assert.equal(reset.body.changed, true);
-  assert.equal((await admin('GET', '/api/admin/audit')).status, 200);
+  assert.equal((await admin('GET', '/api/console/activity')).status, 200);
   assert.equal((await owner('POST', '/api/admin/permissions/reset', { role: 'owner' })).status, 400);
 
   const audit = await many(A, "SELECT action, target, detail FROM audit_logs WHERE action LIKE 'permission.%' ORDER BY created_at, action");
@@ -436,7 +436,7 @@ test('sensitive changes need the password confirmed in the last 10 minutes', asy
   assert.equal((await client(A)('POST', '/api/admin/auth/reauth', { password: pw })).status, 401, 'needs a console session');
 });
 
-test('console-only APIs need the console sign-in; the current /admin APIs still accept the site sign-in of an account with a role', async () => {
+test('every admin API needs the console sign-in: the site sign-in of an account with a role opens none', async () => {
   const owner = await ownerOf(A);
   const learnerOnly = owner.learner; // signed in to the site, not to the console
   for (const [method, p, body] of [['GET', '/api/admin/permissions'], ['GET', '/api/admin/staff'], ['GET', '/api/admin/console/setup'], ['GET', '/api/admin/auth/me'],
@@ -444,13 +444,14 @@ test('console-only APIs need the console sign-in; the current /admin APIs still 
     const r = await learnerOnly(method, p, body);
     assert.equal(r.status, 401, `${method} ${p}`); assert.equal(r.body.error.code, 'admin_sign_in');
   }
-  assert.equal((await learnerOnly('GET', '/api/admin/overview')).status, 200);
-  assert.equal((await learnerOnly('GET', '/api/admin/me')).body.role, 'owner');
-  // someone without a role: the admin API does not exist for them
+  for (const p of ['/api/console/customers', '/api/console/settings', '/api/console/activity']) assert.equal((await learnerOnly('GET', p)).status, 401, p);
+  // the old /admin pages' API went with the cutover (Phase 6): not found, whoever asks
+  for (const p of ['/api/admin/overview', '/api/admin/me', '/api/admin/users', '/api/admin/settings']) assert.equal((await learnerOnly('GET', p)).status, 404, p);
+  // someone without a role
   const plain = (await account(A)).learner;
-  assert.equal((await plain('GET', '/api/admin/overview')).status, 404);
   assert.equal((await plain('GET', '/api/admin/permissions')).status, 401);
-  assert.equal((await client(A)('GET', '/api/admin/overview')).status, 404);
+  assert.equal((await plain('GET', '/api/console/customers')).status, 401);
+  assert.equal((await client(A)('GET', '/api/console/customers')).status, 401);
 });
 
 test('who has access: Super Admins from OWNER_EMAILS and the people in admin_users, nobody else', async () => {
@@ -494,25 +495,25 @@ test('the setup checklist says what is switched on and never shows a value', asy
 });
 
 /* ---------------- pages ---------------- */
-const NO_REDIRECT = ['https://evil.example/', '//evil.example', '/\\evil.example', '/consolex', '/console/../login', '/console/login', '/account', '/console/a b', 'javascript:alert(1)', '/console#x', ''];
+const NO_REDIRECT = ['https://evil.example/', '//evil.example', '/\\evil.example', '/consolex', '/admin/../login', '/admin/login', '/account', '/admin/a b', 'javascript:alert(1)', '/admin#x', ''];
 test('safeConsoleNext keeps only addresses inside the console', () => {
   for (const v of NO_REDIRECT) assert.equal(safeConsoleNext(v), null, v);
-  for (const v of ['/console', '/console/roles', '/console/roles?tab=staff&x=1']) assert.equal(safeConsoleNext(v), v);
-  assert.equal(safeConsoleNext('/console/' + 'a'.repeat(400)), null);
+  for (const v of ['/admin', '/admin/roles', '/admin/roles?tab=staff&x=1']) assert.equal(safeConsoleNext(v), v);
+  assert.equal(safeConsoleNext('/admin/' + 'a'.repeat(400)), null);
   assert.equal(safeConsoleNext(null), null);
 });
 
 test('console pages: sign-in first, strict headers, no inline code, and nothing sensitive in the page', async () => {
   const anon = client(A);
-  for (const [p, to] of [['/console', '/console/login'], ['/console/roles', '/console/login?next=%2Fconsole%2Froles'], ['/console/roles?x=1', '/console/login?next=%2Fconsole%2Froles%3Fx%3D1'], ['/console/anything/else', '/console/login?next=%2Fconsole%2Fanything%2Felse']]) {
+  for (const [p, to] of [['/admin', '/admin/login'], ['/admin/roles', '/admin/login?next=%2Fadmin%2Froles'], ['/admin/roles?x=1', '/admin/login?next=%2Fadmin%2Froles%3Fx%3D1'], ['/admin/anything/else', '/admin/login?next=%2Fadmin%2Fanything%2Felse']]) {
     const r = await anon('GET', p);
     assert.equal(r.status, 302, p); assert.equal(r.headers.get('location'), A.base + to);
     assert.equal(r.headers.get('cache-control'), 'private, no-store');
   }
-  assert.equal((await anon('GET', '/console/')).headers.get('location'), A.base + '/console');
-  assert.equal((await anon('POST', '/console', {})).status, 405);
+  assert.equal((await anon('GET', '/admin/')).headers.get('location'), A.base + '/admin');
+  assert.equal((await anon('POST', '/admin', {})).status, 405);
 
-  const login = await anon('GET', '/console/login?next=' + encodeURIComponent('/console/roles'));
+  const login = await anon('GET', '/admin/login?next=' + encodeURIComponent('/admin/roles'));
   assert.equal(login.status, 200);
   const csp = login.headers.get('content-security-policy');
   assert.ok(csp.includes("default-src 'none'") && csp.includes("script-src 'self'") && csp.includes("frame-ancestors 'none'") && csp.includes("form-action 'self'"));
@@ -521,10 +522,10 @@ test('console pages: sign-in first, strict headers, no inline code, and nothing 
   assert.equal(login.headers.get('x-frame-options'), 'DENY');
   assert.equal(login.headers.get('cache-control'), 'private, no-store');
   assert.equal(login.headers.get('referrer-policy'), 'same-origin');
-  assert.ok(login.text.includes('data-next="/console/roles"'));
+  assert.ok(login.text.includes('data-next="/admin/roles"'));
   assert.ok(login.text.includes('Admin sign in'));
   for (const bad of NO_REDIRECT) {
-    const r = await anon('GET', '/console/login?next=' + encodeURIComponent(bad));
+    const r = await anon('GET', '/admin/login?next=' + encodeURIComponent(bad));
     assert.ok(r.text.includes('data-next=""'), `next=${bad}`);
   }
 
@@ -539,16 +540,16 @@ test('console pages: sign-in first, strict headers, no inline code, and nothing 
   noInlineCode(login.text);
 
   // signed in: the sign-in page sends you on, only to console addresses
-  assert.equal((await owner('GET', '/console/login')).headers.get('location'), A.base + '/console');
-  assert.equal((await owner('GET', '/console/login?next=%2Fconsole%2Froles')).headers.get('location'), A.base + '/console/roles');
-  for (const bad of NO_REDIRECT) assert.equal((await owner('GET', '/console/login?next=' + encodeURIComponent(bad))).headers.get('location'), A.base + '/console', bad);
+  assert.equal((await owner('GET', '/admin/login')).headers.get('location'), A.base + '/admin');
+  assert.equal((await owner('GET', '/admin/login?next=%2Fadmin%2Froles')).headers.get('location'), A.base + '/admin/roles');
+  for (const bad of NO_REDIRECT) assert.equal((await owner('GET', '/admin/login?next=' + encodeURIComponent(bad))).headers.get('location'), A.base + '/admin', bad);
 
-  const home = await owner('GET', '/console');
+  const home = await owner('GET', '/admin');
   assert.equal(home.status, 200);
   noInlineCode(home.text);
   assert.equal(home.headers.get('content-security-policy'), csp);
   for (const layer of LAYERS) assert.ok(home.text.includes(layer.label), layer.label);
-  assert.ok(home.text.includes('href="/console/roles"'));
+  assert.ok(home.text.includes('href="/admin/roles"'));
   assert.ok(home.text.includes('Mayank Owner') && home.text.includes('Super Admin'));
   assert.equal((home.text.match(/class="nav-item is-soon"/g) || []).length, LAYERS.flatMap((l) => l.modules).filter((m) => m.path === undefined).length, 'modules that are not built are labels, not links');
   // what the page carries about the session: no token, no session id, no password hash
@@ -558,40 +559,40 @@ test('console pages: sign-in first, strict headers, no inline code, and nothing 
   const sid = (await one(A, 'SELECT id FROM admin_sessions WHERE user_id = ?1 AND ended_at IS NULL ORDER BY created_at DESC', (await ownerOf(A)).id)).id;
   assert.ok(!home.text.includes(sid) && !/pbkdf2|password_hash/i.test(home.text));
 
-  const roles = await owner('GET', '/console/roles');
+  const roles = await owner('GET', '/admin/roles');
   assert.equal(roles.status, 200);
   noInlineCode(roles.text);
   assert.ok(roles.text.includes('aria-current="page"') && roles.text.includes('/site/console/roles.js'));
-  const missing = await owner('GET', '/console/nope');
+  const missing = await owner('GET', '/admin/nope');
   assert.equal(missing.status, 404); assert.ok(missing.text.includes('Page not found'));
-  const head = await owner('HEAD', '/console');
+  const head = await owner('HEAD', '/admin');
   assert.equal(head.status, 200); assert.equal(head.text, '');
 
   // Support: no Roles link, and the page itself says no (the API refuses separately, tested above)
   const support = await consoleLogin(A, await account(A, { role: 'support' }));
-  const sHome = await support('GET', '/console');
-  assert.ok(!sHome.text.includes('href="/console/roles"'));
+  const sHome = await support('GET', '/admin');
+  assert.ok(!sHome.text.includes('href="/admin/roles"'));
   assert.ok(!sHome.text.includes('id="setupList"'), 'no setup checklist without settings.view');
-  const refused = await support('GET', '/console/roles');
+  const refused = await support('GET', '/admin/roles');
   assert.equal(refused.status, 403);
   assert.ok(refused.text.includes("Your role doesn&#39;t include this page"));
   assert.ok(!refused.text.includes('/site/console/roles.js'));
 
   // a learner signed in to the site (even the owner) is not signed in to the console
-  assert.equal((await (await ownerOf(A)).learner('GET', '/console')).status, 302);
+  assert.equal((await (await ownerOf(A)).learner('GET', '/admin')).status, 302);
 });
 
 test('the sidebar remembers which layers you opened or closed; a made-up cookie changes nothing', async () => {
   const owner = await consoleLogin(A, await ownerOf(A));
   const openGroups = (html) => [...html.matchAll(/<details class="nav-group" data-group="(\w+)"( open)?>/g)].filter((m) => m[2]).map((m) => m[1]);
-  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['core', 'learning', 'growth', 'infra'], 'by default: the layers that have something built');
+  assert.deepEqual(openGroups((await owner('GET', '/admin')).text), ['core', 'learning', 'growth', 'infra'], 'by default: the layers that have something built');
   owner.jar.set('tc_console_nav', 'core-shut.learning-shut.growth-shut.infra-shut');
-  assert.deepEqual(openGroups((await owner('GET', '/console')).text), []);
-  assert.deepEqual(openGroups((await owner('GET', '/console/roles')).text), ['infra'], 'the layer you are in is always open');
+  assert.deepEqual(openGroups((await owner('GET', '/admin')).text), []);
+  assert.deepEqual(openGroups((await owner('GET', '/admin/roles')).text), ['infra'], 'the layer you are in is always open');
   owner.jar.set('tc_console_nav', 'core-shut.learning-open.growth-shut.infra-shut');
-  assert.deepEqual(openGroups((await owner('GET', '/console')).text), ['learning']);
+  assert.deepEqual(openGroups((await owner('GET', '/admin')).text), ['learning']);
   owner.jar.set('tc_console_nav', 'core-shut"><script>.x-open.growth-maybe');
-  const html = (await owner('GET', '/console')).text;
+  const html = (await owner('GET', '/admin')).text;
   assert.deepEqual(openGroups(html), ['core', 'learning', 'growth', 'infra']);
   assert.ok(!html.includes('<script>.x'));
 });
@@ -624,17 +625,16 @@ test('before migration 0005 the console says it is not switched on, and the rest
   };
   const signup = await call('POST', '/api/auth/signup', { fullName: 'Mayank Owner', email: OWNER, phoneNumber: '+91 98765 43210', password: pw, confirmPassword: pw });
   assert.equal(signup.status, 201);
-  const page = await call('GET', '/console/login');
+  const page = await call('GET', '/admin/login');
   assert.equal(page.status, 503); assert.ok(page.text.includes('Database update 0005'));
   assert.ok(!page.text.includes('login.js'));
-  assert.equal((await call('GET', '/console')).status, 302);
+  assert.equal((await call('GET', '/admin')).status, 302);
   const login = await call('POST', '/api/admin/auth/login', { email: OWNER, password: pw });
   assert.equal(login.status, 503); assert.equal(login.body.error.code, 'console_not_ready');
-  // the current admin and the site keep working exactly as before
-  assert.equal((await call('GET', '/api/admin/overview', undefined, signup.cookie)).status, 200);
-  assert.equal((await call('GET', '/api/admin/me', undefined, signup.cookie)).body.role, 'owner');
-  assert.equal((await call('PUT', '/api/admin/settings', { support: { email: 'help@example.com' } }, signup.cookie)).status, 200);
+  // the site keeps working; the owner's site sign-in still opens no admin endpoint
   assert.equal((await call('GET', '/')).status, 200);
+  assert.equal((await call('GET', '/api/admin/overview', undefined, signup.cookie)).status, 404);
+  assert.equal((await call('GET', '/api/console/customers', undefined, signup.cookie)).status, 401, 'a site sign-in is not a console session');
 });
 
 test('migration 0005 only adds tables: running every migration twice keeps existing rows', async () => {
@@ -653,9 +653,9 @@ test('migration 0005 only adds tables: running every migration twice keeps exist
 
 test('the console is not advertised to crawlers, stays out of the service worker, and its own files hold no data', async () => {
   const robots = await client(A)('GET', '/robots.txt');
-  assert.ok(!robots.text.includes('/console'));
+  assert.ok(!robots.text.includes('/admin'));
   const sw = readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.includes("url.pathname.startsWith('/console/')") && sw.includes("url.pathname.startsWith('/site/console/')"));
+  assert.ok(sw.includes("url.pathname.startsWith('/admin')") && sw.includes("url.pathname.startsWith('/site/console/')"));
   for (const f of ['console.js', 'login.js', 'home.js', 'roles.js', 'theme.js', 'console.css']) {
     const r = await client(A)('GET', `/site/console/${f}`);
     assert.equal(r.status, 200, f);

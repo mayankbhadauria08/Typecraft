@@ -232,19 +232,19 @@ test('details: edit what changed; unknown and malformed ids are 404', async () =
 
 test('pages: the list and an institute open with no inline code; support has no "New institute" button', async () => {
   const id = await create();
-  let r = await admin('GET', '/console/institutes');
+  let r = await admin('GET', '/admin/institutes');
   assert.equal(r.status, 200);
   assertNoInlineCode(r.text);
   assert.match(r.text, /id="newInstituteBtn"/);
   assert.match(r.text, /institute-actions\.js/);
-  r = await support('GET', '/console/institutes');
+  r = await support('GET', '/admin/institutes');
   assert.equal(r.status, 200);
   assert.ok(!/id="newInstituteBtn"/.test(r.text));
-  r = await admin('GET', `/console/institutes/${id}`);
+  r = await admin('GET', `/admin/institutes/${id}`);
   assert.equal(r.status, 200); assertNoInlineCode(r.text);
   assert.match(r.text, /id="paymentsBody"/);
-  r = await support('GET', `/console/institutes/${id}`);
+  r = await support('GET', `/admin/institutes/${id}`);
   assert.ok(!/id="paymentsBody"/.test(r.text), 'no payments section without money permissions');
-  r = await owner('GET', '/console');
-  assert.match(r.text, /\/console\/institutes/, 'in the sidebar');
+  r = await owner('GET', '/admin');
+  assert.match(r.text, /\/admin\/institutes/, 'in the sidebar');
 });
