@@ -102,9 +102,9 @@ file at a time as in CI. For Phase 6:
 
 Full checklist: `docs/LAUNCH.md` §1p. In short:
 
-1. **[Claude, after your OK]** Apply the waiting migrations 0009–0017 to live D1, one statement at
-   a time in the D1 console, after a restore bookmark. Without 0014 there is no admin page that
-   lists contact messages (they still arrive by email). Without 0015 there are no email campaigns.
+1. Done 22 Nov 2026: the waiting migrations 0009–0017 are on live D1, applied one statement at a
+   time in the D1 console after a restore bookmark (`docs/LAUNCH.md` §1g). Without 0014 there would
+   be no admin page that lists contact messages, and without 0015 no email campaigns.
 2. **[You]** Merge the Phase 6 pull request.
 3. **[You]** Open `typecrafttyping.in/admin` and sign in with the console sign-in. Update your
    bookmark. Old `/console` links keep working.
@@ -126,13 +126,12 @@ There is no database change in this pull request and nothing to set in Cloudflar
   technical user. The server enforces saving, premium packs, analytics and certificates.
 - System health shows only what the Worker can see. There are no usage numbers from Cloudflare's
   API, by decision (`docs/ADMIN-PHASE-5.md`).
-- This is not "production-ready" until the waiting live migrations (0009–0017) are applied and
-  Razorpay has been tested end to end in test mode on the live domain.
+- This is not "production-ready" until Razorpay has been tested end to end in test mode on the
+  live domain. (The live migrations 0009–0017 were applied on 22 Nov 2026.)
 
 ## H. What's next
 
-- Apply migrations 0009–0017 to live (step F1), then run one test-mode purchase and one refund
-  on the live domain.
+- Run one test-mode purchase and one refund on the live domain.
 - Turn on the emailed sign-in code (email plus `SESSION_SECRET`).
 - With the next learner-facing release, drop the `/console` line from `sw.js` (harmless until then).
 - The public exam pages and guides (build-sequence step 3) come in their own pull request.

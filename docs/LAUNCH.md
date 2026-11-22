@@ -128,6 +128,15 @@ institutes are only created in the console (part 2).
    `SELECT name FROM sqlite_master WHERE name LIKE 'institute%' OR name LIKE 'batch%'`, and that
    `users`, `user_subscriptions` and `lesson_scores` have the same counts as before.
    Before this, the site works as today and the institute pages say they aren't switched on.
+   **Done 22 Nov 2026, about 23:30 IST, together with 0010–0017 (§1h–§1n)**, 54 statements one at a
+   time, all successful. Restore bookmark taken just before:
+   `00000634-00000000-0000512b-33fa9b853e54f2081a79630068d3daf0` (D1 console: `/restore <bookmark>`).
+   Checked after: the 54 stored table and index definitions match the migration files exactly; the
+   26 new tables are empty; tables 61 → 88 (26 new plus SQLite's own `sqlite_sequence` for
+   `job_runs`), indexes 109 → 168 (28 named plus SQLite's automatic ones for keys); users 3,
+   user_subscriptions 2, lesson_scores 4, email_logs 9, audit_logs 11, packages 5 and every other
+   count checked are the same as before. The live site answered normally afterwards, and the
+   10-minute job recorded its first run in `job_runs` at 23:40 IST (finished, no failures).
 2. **[You] Merge the pull requests in order** (part 1, then part 2, …). The new `/join` page and the
    "Your institute" line on Plans appear; weak keys start showing in the console and in Analytics (no
    new data is stored for that). Part 2 adds Core operations › Institutes to the console.
@@ -143,12 +152,14 @@ institutes are only created in the console (part 2).
 1. **[Claude, after your OK] Database**: after 0009, take a restore bookmark, then apply
    `migrations/0010_institutes_teaching.sql` one statement at a time (six new tables and indexes; adds
    only). Before this, Release 1 works and the Release 2 parts stay hidden or say they aren't switched on.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge** the Release 2 pull requests in order, after Release 1's.
 
 ## 1i. Institutes, Release 3 (buying seats online, Razorpay test mode)
 
 1. **[Claude, after your OK] Database**: after 0010, take a restore bookmark, then apply
    `migrations/0011_institute_orders.sql` one statement at a time (one table and one index; adds only).
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge** the Release 3 pull request after Release 2's.
 3. **[You] Razorpay test keys** in Cloudflare (`RAZORPAY_KEY_ID` = `rzp_test_…`, `RAZORPAY_KEY_SECRET`,
    `RAZORPAY_WEBHOOK_SECRET`; the same webhook as for plans, with `payment.captured`, `payment.failed`,
@@ -162,9 +173,11 @@ institutes are only created in the console (part 2).
 1. **[Claude, after your OK] Database**: take a restore bookmark, then apply `migrations/0012_batch_tests.sql`
    one statement at a time (two tables and their indexes; adds only). Before it, the batch page simply
    doesn't show *Scheduled tests*.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge** after the earlier institute pull requests.
 3. **[Claude, after your OK] Database**: the Monday email needs `migrations/0013_institute_weekly.sql` (two
    tables; adds only), applied the same way. It needs `RESEND_API_KEY` to actually send.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 
 ## 1k. The admin console, Phase 4a (Support and Business reports)
 
@@ -176,6 +189,7 @@ in that order. Its migrations are numbered 0014 to 0016 because the Institutes w
    here), then apply `migrations/0014_support.sql` (two new tables, `support_replies` and
    `support_assignments`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('support_replies', 'support_assignments')`.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge the 4a pull request.** Nothing changes for learners.
 3. Replies from the console are emailed from the normal sending address with "reply to" set to
    the support address in Settings, so the customer's answer comes back to that inbox.
@@ -188,6 +202,7 @@ Full notes: `docs/ADMIN-PHASE-4.md` §4–5. Merge 4a (§1i) first: this builds 
    here), then apply `migrations/0015_campaigns.sql` (three new tables, `email_campaigns`,
    `campaign_sends` and `site_notices`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('email_campaigns', 'campaign_sends', 'site_notices')`.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge the 4b pull request.** Learners see "Update ready, reload" once (`sw.js` changed).
 3. Campaigns send at most 80 emails a day (Resend's free plan allows 100 a day for everything). After
    upgrading Resend, raise the limit in Console › Email campaigns › Change the limit.
@@ -200,6 +215,7 @@ Full notes: `docs/ADMIN-PHASE-4.md` §7. Merge 4a and 4b (§1i, §1j) first: thi
    here), then apply `migrations/0016_coupons.sql` (three new tables, `coupons`, `promotions` and
    `order_discounts`; adds only, no row changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('coupons', 'promotions', 'order_discounts')`.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge the 4c pull request.**
 3. Making coupons and running sales is for Super Admins. To let Admins do it too, switch on
    "Make and change coupons" and "Run sales" for Admin in Console › Roles and permissions.
@@ -214,6 +230,7 @@ Full notes: `docs/ADMIN-PHASE-5.md`. Phase 5 comes as two pull requests (5a, the
    here), then apply `migrations/0017_job_runs.sql` (one new table, `job_runs`; adds only, no row
    changes). Never `wrangler d1 migrations apply`.
    Check with `SELECT name FROM sqlite_master WHERE name IN ('job_runs', 'job_runs_recent')`.
+   **Done 22 Nov 2026** with §1g (bookmark and checks there).
 2. **[You] Merge the 5a pull request.** Nothing changes for learners.
 3. After 10 minutes, open Console › System health: the "Every 10 minutes" job should say Finished.
    If a job fails, every Super Admin gets one email about it (at most one every 6 hours).
@@ -237,12 +254,9 @@ Full notes: `docs/ADMIN-PHASE-5.md` §9–14. Merge 5a (§1n) first: this builds
 
 Full notes: `docs/ADMIN-PHASE-6.md`. Merge Phases 4 and 5 first (they are on `main`).
 
-1. **No new database update**, but apply the waiting ones first. Live D1 does not have
-   migrations 0009–0017 yet (§1g–§1n). Without 0014 the console's Support page says "not switched
-   on yet", and after this merge there is no other admin page that lists contact messages (they
-   still reach the support inbox by email). Without 0015 there are no email campaigns (the old
-   announcement form is gone). **[Claude, after your OK]** apply 0009–0017 in the D1 console, with a
-   restore bookmark first, before merging this.
+1. **No new database update.** It needed the waiting migrations 0009–0017 on live D1 first
+   (without 0014 the console's Support page says "not switched on yet", and without 0015 there are
+   no email campaigns). **Done 22 Nov 2026** (§1g has the bookmark and checks).
 2. **[You] Merge the Phase 6 pull request.** Nothing changes for learners.
 3. The admin is now at **typecrafttyping.in/admin** and asks for the console sign-in (email,
    password, and the emailed code once `SESSION_SECRET` and email are set up). Being signed in
