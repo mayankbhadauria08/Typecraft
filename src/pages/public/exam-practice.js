@@ -1,10 +1,13 @@
 // /exam-practice — practice tests in the style of Indian government typing tests (docs/EXAM-MODES.md).
 // The tests, passages and marking are shared/exam-rules.js; the page script is site/js/exam-practice.js.
 import { icon, esc } from '../../layout.js';
+import { linkCards, EXAM_PAGES, GUIDES } from './exam-seo.js';
 import '../../../shared/exam-passages.js';
 import '../../../shared/exam-rules.js';
 
 const X = globalThis.TC_EXAMS;
+/** Each test's page with the exam's rules and FAQ (src/pages/public/exam-seo.js). */
+const RULES = { 'ssc-typing': '/ssc-chsl-typing-test', 'ssc-dest': '/ssc-dest-typing-test', cpct: '/cpct-typing-test' };
 
 export const meta = {
   needsKeyboard: true,   // phones see a note offering to send the link to a computer
@@ -28,7 +31,7 @@ function card(m) {
     ['Goal', m.goal],
   ];
   return `<article class="card ex-card" aria-labelledby="ex-${m.id}">
-    <div class="card-head"><div><h2 id="ex-${m.id}">${esc(m.name)}</h2><p class="muted ex-for">For ${esc(m.posts)}</p></div></div>
+    <div class="card-head"><div><h2 id="ex-${m.id}">${esc(m.name)}</h2><p class="muted ex-for">For ${esc(m.posts)}${RULES[m.id] ? ` · <a href="${RULES[m.id]}">Rules and FAQ</a>` : ''}</p></div></div>
     <dl class="ex-facts">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     <div class="card-foot"><span class="muted ex-count">${passages.length} passages</span><button type="button" class="btn btn-primary" data-start="${m.id}">${icon('play')} Start this test</button></div>
   </article>`;
@@ -102,6 +105,14 @@ export default `
       <p>Meet a test's goal with a free account and you can get a certificate with a code. Anyone you give the code to can check it on the <a href="/verify">verify page</a>: it shows your name, the result and the date.</p>
       <p class="muted">The tests are taken online without supervision, and the certificate says so.</p>
     </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="ex-more-h">
+  <div class="container">
+    <h2 id="ex-more-h" class="section-title">Rules for each exam, and guides</h2>
+    ${linkCards(EXAM_PAGES)}
+    <div style="margin-top:16px">${linkCards(GUIDES)}</div>
   </div>
 </section>
 `;

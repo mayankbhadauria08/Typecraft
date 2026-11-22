@@ -6,7 +6,7 @@ import '../site/site.js'; // defines globalThis.TC_ICONS (the same icons the bro
 const ICONS = globalThis.TC_ICONS || {};
 export const icon = (name) => ICONS[name] || '';
 /** Bump when site/site.css or site/site.js change in a way old cached copies would break. */
-export const ASSET_VERSION = '12';
+export const ASSET_VERSION = '13';
 
 export function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -27,10 +27,11 @@ const THEME_SCRIPT = "try{var s=JSON.parse(localStorage.getItem('typingMasterSet
 export const NAV_LEARN = [
   ['/app', 'Course and trainer', 'Lessons from the home row to full speed', 'keyboard'],
   ['/practice', 'Typing practice', 'Free drills by level, key and word', 'target'],
-  ['/typing-test', 'Typing test', 'Check your speed in 1, 3 or 5 minutes', 'clock'],
+  ['/typing-test', 'Typing test', 'Check your speed, from 15 seconds to 15 minutes', 'clock'],
 ];
 export const NAV_RESOURCES = [
   ['/features', 'Features', 'Everything TypeCraft does', 'sparkle'],
+  ['/guides', 'Typing test guides', 'How exam typing tests are marked', 'book'],
   ['/verify', 'Verify a certificate', 'Check a TypeCraft certificate is genuine', 'certificate'],
   ['/faq', 'FAQ', 'Answers to common questions', 'help'],
   ['/contact', 'Contact', 'Write to us', 'mail'],
@@ -179,6 +180,7 @@ function siteFooter(ctx) {
   <div class="foot-grid">
     <div class="foot-brand">${brand('/')}<p class="muted">A calm, thorough typing course: 78 lessons, a coach that finds your weak keys, and an arcade to practise in. Made in India.</p></div>
     <nav aria-label="Product"><h2 class="foot-h">Product</h2><a href="/practice">Typing practice</a><a href="/typing-test">Typing test</a><a href="/exam-practice">Exam practice</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/get-the-app">Get the app</a></nav>
+    <nav aria-label="Exams"><h2 class="foot-h">Exams</h2><a href="/ssc-chsl-typing-test">SSC CHSL typing test</a><a href="/ssc-dest-typing-test">SSC DEST and DEO</a><a href="/cpct-typing-test">MP CPCT typing test</a><a href="/10-minute-typing-test">10-minute typing test</a><a href="/guides">Typing test guides</a></nav>
     <nav aria-label="Company"><h2 class="foot-h">Company</h2><a href="/about">About</a><a href="/contact">Contact</a><a href="/faq">FAQ</a></nav>
     <nav aria-label="Legal"><h2 class="foot-h">Legal</h2><a href="/privacy">Privacy policy</a><a href="/terms">Terms of service</a><a href="/refund-policy">Refund &amp; cancellation</a><a href="/institute-terms">Terms for institutes</a></nav>
   </div>

@@ -7,7 +7,7 @@ import home, { meta as homeMeta } from './public/home.js';
 import about, { meta as aboutMeta } from './public/about.js';
 import features, { meta as featuresMeta } from './public/features.js';
 import practice, { meta as practiceMeta } from './public/practice.js';
-import typingTest, { meta as typingTestMeta } from './public/typing-test.js';
+import typingTest, { meta as typingTestMeta, faq as typingTestFaq } from './public/typing-test.js';
 import examPractice, { meta as examPracticeMeta } from './public/exam-practice.js';
 import verify, { meta as verifyMeta, codeMeta as verifyCodeMeta } from './public/verify.js';
 import pricing, { meta as pricingMeta } from './public/pricing.js';
@@ -19,6 +19,16 @@ import refund, { meta as refundMeta } from './public/refund-policy.js';
 import instituteTerms, { meta as instituteTermsMeta } from './public/institute-terms.js';
 import instituteGuide, { meta as instituteGuideMeta } from './public/institute-guide.js';
 import getTheApp, { meta as getTheAppMeta } from './public/get-the-app.js';
+// exam pages and guides (docs/EXAM-MODES.md §6)
+import { examLd, guideLd } from './public/exam-seo.js';
+import sscChsl, { meta as sscChslMeta, faq as sscChslFaq } from './public/ssc-chsl-typing-test.js';
+import sscDest, { meta as sscDestMeta, faq as sscDestFaq } from './public/ssc-dest-typing-test.js';
+import cpct, { meta as cpctMeta, faq as cpctFaq } from './public/cpct-typing-test.js';
+import tenMinute, { meta as tenMinuteMeta, faq as tenMinuteFaq } from './public/ten-minute-typing-test.js';
+import guides, { meta as guidesMeta } from './public/guides.js';
+import guideMarking, { meta as guideMarkingMeta } from './public/guide-ssc-marking.js';
+import guideKdph, { meta as guideKdphMeta } from './public/guide-key-depressions.js';
+import guideNet, { meta as guideNetMeta } from './public/guide-net-speed.js';
 
 const organization = (ctx) => ({
   '@context': 'https://schema.org',
@@ -60,9 +70,17 @@ export const PAGES = [
   { meta: aboutMeta, body: about, scripts: [] },
   { meta: featuresMeta, body: features, scripts: [] },
   { meta: practiceMeta, body: practice, scripts: [] },
-  { meta: typingTestMeta, body: typingTest, scripts: ['/site/js/typing-test.js'] },
+  { meta: typingTestMeta, body: typingTest, scripts: ['/site/js/typing-test.js'], jsonld: () => faqJsonLd(typingTestFaq) },
+  { meta: tenMinuteMeta, body: tenMinute, scripts: ['/site/js/typing-test.js'], jsonld: examLd(tenMinuteMeta, tenMinuteFaq) },
   { meta: examPracticeMeta, body: examPractice,
     scripts: ['/shared/exam-passages.js', '/shared/exam-rules.js', '/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/exam-practice.js'] },
+  { meta: sscChslMeta, body: sscChsl, scripts: [], jsonld: examLd(sscChslMeta, sscChslFaq) },
+  { meta: sscDestMeta, body: sscDest, scripts: [], jsonld: examLd(sscDestMeta, sscDestFaq) },
+  { meta: cpctMeta, body: cpct, scripts: [], jsonld: examLd(cpctMeta, cpctFaq) },
+  { meta: guidesMeta, body: guides, scripts: [] },
+  { meta: guideMarkingMeta, body: guideMarking, scripts: [], jsonld: guideLd(guideMarkingMeta) },
+  { meta: guideKdphMeta, body: guideKdph, scripts: [], jsonld: guideLd(guideKdphMeta) },
+  { meta: guideNetMeta, body: guideNet, scripts: [], jsonld: guideLd(guideNetMeta) },
   { meta: verifyMeta, body: verify, scripts: ['/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/verify.js'] },
   { meta: verifyCodeMeta, body: verify, scripts: ['/site/js/pages-kit.js', '/js/rewards-ui.js', '/site/js/verify.js'] },
   { meta: pricingMeta, body: pricing, scripts: ['/site/js/pricing.js'], load: packagesData, jsonld: (ctx, loaded) => [productLd(ctx, loaded), faqJsonLd(FAQ.plans)] },
